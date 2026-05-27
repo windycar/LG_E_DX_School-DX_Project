@@ -4,7 +4,7 @@ import {
   ArrowLeft, LogOut, MessageCircle, Shield, ThumbsUp,
   Plus, CheckCircle, AlertTriangle, ChevronRight, Star,
   Home, User, Settings, BookOpen, Calendar, Search, X,
-  Play, Send, Copy,
+  Play, Send, Copy, Zap,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -15,7 +15,7 @@ import {
 type Screen =
   | "home" | "login" | "register" | "dashboard"
   | "discomfort" | "mental" | "ai" | "info" | "community" | "smalltalk"
-  | "diary" | "profile" | "settings";
+  | "diary" | "profile" | "settings" | "appliance";
 type Role = "pregnant" | "guardian";
 
 interface AppUser {
@@ -27,6 +27,13 @@ interface AppUser {
   partnerEmail?: string;
   nickname?: string;
   babyNickname?: string;
+}
+
+interface PartnerStatus {
+  symptoms: string[];
+  emotions: string[];
+  stress: number;
+  timestamp: string;
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────
@@ -73,10 +80,6 @@ const INFO_ITEMS = [
   { id: 5, category: "수면", emoji: "😴", title: "임산부 수면 가이드", summary: "좌측 수면 자세가 혈액순환에 가장 좋습니다. 무릎 사이에 베개를 끼우면 더욱 편안합니다.", source: "보건복지부", badge: "정부 공인" },
 ];
 
-const GUARDIAN_ENTRIES_INIT = [
-  { id: 1, date: "2026년 5월 21일", content: "오늘 수진이가 많이 힘들어 보였다. 발이 많이 붓고 허리가 아프다고 했는데 내가 도와줄 수 있는 게 별로 없어서 미안했다. 그래도 콩이의 태동을 처음으로 함께 느꼈을 때 정말 감격스러웠다.", mood: "💙" },
-  { id: 2, date: "2026년 5월 19일", content: "수진이를 위해 저염 식사를 준비했다. 오늘은 기분이 좋아 보여서 나도 행복했다. 28주차가 되니 배가 정말 많이 나왔다. 콩이가 얼마나 클지 기대된다.", mood: "😊" },
-];
 
 // ── Shared Components ──────────────────────────────────────────────────────
 function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -93,6 +96,7 @@ function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
 function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (s: Screen) => void }) {
   const tabs: Array<{ id: Screen; icon: typeof Home; label: string }> = [
     { id: "dashboard", icon: Home, label: "홈" },
+    { id: "appliance", icon: Zap, label: "가전제어" },
     { id: "diary", icon: BookOpen, label: "다이어리" },
     { id: "profile", icon: User, label: "내정보" },
     { id: "settings", icon: Settings, label: "설정" },
@@ -113,6 +117,358 @@ function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (s: S
           <span className="text-xs font-medium">{label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+// ── APPLIANCE CONTROL VIEW ─────────────────────────────────────────────────
+function ApplianceControlView({ onNavigate }: { onNavigate: (s: Screen) => void }) {
+  const [appliances, setAppliances] = useState<Record<string, boolean>>({
+    moodLight: false,
+    aircon: false,
+    humidifier: false,
+    dehumidifier: false,
+    airPurifier: false,
+  });
+  const [applianceSettings, setApplianceSettings] = useState<Record<string, any>>({
+    moodLight: { brightness: 50, color: "따뜻한 화이트", power: false },
+    aircon: { temp: 24, mode: "냉방", fan: 2, power: true },
+    humidifier: { humidity: 55, intensity: 2, power: false },
+    dehumidifier: { humidity: 50, intensity: 2, power: false },
+    airPurifier: { speed: 2, mode: "자동", power: true },
+  });
+  const [selectedAppliance, setSelectedAppliance] = useState<string | null>(null);
+
+  const APPLIANCE_LIST = [
+    { key: "moodLight", name: "무드등", icon: "💡" },
+    { key: "aircon", name: "에어컨", icon: "❄️" },
+    { key: "humidifier", name: "가습기", icon: "💧" },
+    { key: "dehumidifier", name: "제습기", icon: "🌊" },
+    { key: "airPurifier", name: "공기청정기", icon: "💨" },
+  ];
+
+  const getApplianceStatus = (key: string) => {
+    const settings = applianceSettings[key];
+    if (!settings) return "설정 없음";
+    switch (key) {
+      case "moodLight":
+        return `${settings.color} • 밝기 ${settings.brightness}%`;
+      case "airPurifier":
+        return `${settings.mode} • 풍량 ${settings.speed}`;
+      case "aircon":
+        return `${settings.mode} ${settings.temp}℃ • 풍량 ${settings.fan}`;
+      case "humidifier":
+        return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
+      case "dehumidifier":
+        return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
+      default:
+        return "설정됨";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
+        <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
+          LG ThinQ 가전 제어
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">집안의 모든 가전을 한 곳에서 제어하세요</p>
+      </div>
+
+      <div className="px-5 py-5 flex-1 overflow-y-auto pb-20">
+        <div className="space-y-3">
+          {APPLIANCE_LIST.map((app) => (
+            <div key={app.key} className="bg-card rounded-2xl p-4 border border-border">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{app.icon}</span>
+                  <div>
+                    <p className="font-medium text-sm text-foreground">{app.name}</p>
+                    <p className="text-xs text-muted-foreground">{getApplianceStatus(app.key)}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAppliances((prev) => ({ ...prev, [app.key]: !prev[app.key] }))}
+                  className="relative w-12 h-6 rounded-full transition-all"
+                  style={{ background: appliances[app.key] ? "#C94E70" : "#E5E7EB" }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                    style={{ transform: appliances[app.key] ? "translateX(24px)" : "translateX(0)" }}
+                  />
+                </button>
+              </div>
+              {appliances[app.key] && (
+                <button
+                  onClick={() => setSelectedAppliance(app.key)}
+                  className="w-full mt-2 py-2 rounded-xl text-xs font-medium border border-border text-muted-foreground hover:bg-secondary/50 transition-colors"
+                >
+                  상세 설정
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedAppliance && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={() => setSelectedAppliance(null)}>
+          <div className="bg-background rounded-t-3xl p-5 w-full max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground">
+                {APPLIANCE_LIST.find((a) => a.key === selectedAppliance)?.name} 설정
+              </h3>
+              <button onClick={() => setSelectedAppliance(null)}>
+                <X size={20} className="text-muted-foreground" />
+              </button>
+            </div>
+
+            {selectedAppliance === "moodLight" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">밝기: {applianceSettings.moodLight.brightness}%</p>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={applianceSettings.moodLight.brightness}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      moodLight: { ...prev.moodLight, brightness: parseInt(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">색상</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["따뜻한 화이트", "차가운 화이트", "자연광", "수면 모드"].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          moodLight: { ...prev.moodLight, color },
+                        }))}
+                        className="py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.moodLight.color === color ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.moodLight.color === color ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.moodLight.color === color ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {color}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "aircon" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">온도 설정</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setApplianceSettings((prev) => ({
+                        ...prev,
+                        aircon: { ...prev.aircon, temp: Math.max(16, prev.aircon.temp - 1) },
+                      }))}
+                      className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center"
+                    >
+                      -
+                    </button>
+                    <span className="text-2xl font-bold flex-1 text-center" style={{ color: "#C94E70" }}>
+                      {applianceSettings.aircon.temp}℃
+                    </span>
+                    <button
+                      onClick={() => setApplianceSettings((prev) => ({
+                        ...prev,
+                        aircon: { ...prev.aircon, temp: Math.min(30, prev.aircon.temp + 1) },
+                      }))}
+                      className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">풍량</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((speed) => (
+                      <button
+                        key={speed}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          aircon: { ...prev.aircon, fan: speed },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.aircon.fan === speed ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.aircon.fan === speed ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.aircon.fan === speed ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {speed}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "humidifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">목표 습도: {applianceSettings.humidifier.humidity}%</p>
+                  <input
+                    type="range"
+                    min="30"
+                    max="70"
+                    value={applianceSettings.humidifier.humidity}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      humidifier: { ...prev.humidifier, humidity: parseInt(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>30%</span><span>70%</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">강도</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((intensity) => (
+                      <button
+                        key={intensity}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          humidifier: { ...prev.humidifier, intensity },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.humidifier.intensity === intensity ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.humidifier.intensity === intensity ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.humidifier.intensity === intensity ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {intensity}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "dehumidifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">목표 습도: {applianceSettings.dehumidifier.humidity}%</p>
+                  <input
+                    type="range"
+                    min="30"
+                    max="60"
+                    value={applianceSettings.dehumidifier.humidity}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      dehumidifier: { ...prev.dehumidifier, humidity: parseInt(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>30%</span><span>60%</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">강도</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((intensity) => (
+                      <button
+                        key={intensity}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          dehumidifier: { ...prev.dehumidifier, intensity },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.dehumidifier.intensity === intensity ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.dehumidifier.intensity === intensity ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.dehumidifier.intensity === intensity ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {intensity}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "airPurifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">모드</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["자동", "수면", "터보"].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          airPurifier: { ...prev.airPurifier, mode },
+                        }))}
+                        className="py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.airPurifier.mode === mode ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.airPurifier.mode === mode ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.airPurifier.mode === mode ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">풍량</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((speed) => (
+                      <button
+                        key={speed}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          airPurifier: { ...prev.airPurifier, speed },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.airPurifier.speed === speed ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.airPurifier.speed === speed ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.airPurifier.speed === speed ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {speed}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setSelectedAppliance(null)}
+              className="w-full mt-4 py-3 rounded-2xl font-semibold text-white"
+              style={{ background: "#C94E70" }}
+            >
+              적용하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      <BottomNav current="appliance" onNavigate={onNavigate} />
     </div>
   );
 }
@@ -530,17 +886,86 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
 
 // ── DASHBOARD VIEW ─────────────────────────────────────────────────────────
 function DashboardView({
-  user, onNavigate, onLogout,
+  user, onNavigate, onLogout, partnerStatus,
 }: {
   user: AppUser;
   onNavigate: (s: Screen) => void;
   onLogout: () => void;
+  partnerStatus?: PartnerStatus | null;
 }) {
   const isPregnant = user.role === "pregnant";
 
+  const getMissionFromStatus = (status: PartnerStatus | null) => {
+    if (!status) return null;
+
+    const { symptoms, emotions, stress } = status;
+
+    if (symptoms.length === 0 && emotions.length === 0 && stress <= 3) {
+      return {
+        type: "good" as const,
+        icon: "😊",
+        message: "아내가 오늘 기분이 좋아요!",
+        subtitle: "함께 행복한 시간을 보내세요 💕",
+        color: "#69C99A",
+      };
+    }
+
+    const missionMap: Record<string, { icon: string; message: string; subtitle: string }> = {
+      "두통": { icon: "💊", message: "아내가 두통이 있어요", subtitle: "조용한 환경을 만들어주고 빨래를 대신 해주세요" },
+      "입덧": { icon: "🍵", message: "아내가 입덧으로 힘들어해요", subtitle: "생강차를 준비해주고 환기를 시켜주세요" },
+      "붓기": { icon: "🦶", message: "아내가 붓기로 불편해해요", subtitle: "발 마사지를 해주고 다리를 높이 올려 쉬도록 해주세요" },
+      "피로감": { icon: "😴", message: "아내가 피곤해하고 있어요", subtitle: "집안일을 대신하고 충분히 쉴 수 있게 해주세요" },
+      "허리통증": { icon: "💆", message: "아내가 허리 통증이 있어요", subtitle: "부드럽게 마사지해주고 무거운 물건을 들지 않게 도와주세요" },
+      "수면장애": { icon: "🌙", message: "아내가 잠을 잘 못 자고 있어요", subtitle: "조명을 어둡게 하고 편안한 환경을 만들어주세요" },
+      "소화불량": { icon: "🍽️", message: "아내가 소화불량이에요", subtitle: "가벼운 식사를 준비하고 식후 산책을 함께 해주세요" },
+    };
+
+    for (const symptom of symptoms) {
+      if (missionMap[symptom]) {
+        return {
+          type: "mission" as const,
+          icon: missionMap[symptom].icon,
+          message: missionMap[symptom].message,
+          subtitle: missionMap[symptom].subtitle,
+          color: "#FFAB76",
+        };
+      }
+    }
+
+    if (emotions.includes("스트레스") || emotions.includes("불안") || emotions.includes("우울감")) {
+      return {
+        type: "mission" as const,
+        icon: "💙",
+        message: "아내가 감정적으로 힘든 시간이에요",
+        subtitle: "대화를 나누고 따뜻하게 안아주세요",
+        color: "#9B8EC4",
+      };
+    }
+
+    if (stress >= 7) {
+      return {
+        type: "mission" as const,
+        icon: "🧘",
+        message: "아내의 스트레스 지수가 높아요",
+        subtitle: "함께 산책하거나 좋아하는 음악을 들어주세요",
+        color: "#FFAB76",
+      };
+    }
+
+    return {
+      type: "info" as const,
+      icon: "💕",
+      message: "아내의 컨디션을 확인해보세요",
+      subtitle: "작은 관심이 큰 힘이 됩니다",
+      color: "#FFB3C6",
+    };
+  };
+
+  const mission = !isPregnant ? getMissionFromStatus(partnerStatus) : null;
+
   const features: Array<{ id: Screen; icon: string; title: string; subtitle: string; grad: [string, string]; available: boolean }> = [
-    { id: "discomfort", icon: "🏠", title: "오늘의 상태 체크", subtitle: "불편 증상 & 가전 자동 제어", grad: ["#FFB3C6", "#FF8FAB"], available: true },
-    { id: "mental", icon: "💙", title: "정신 케어", subtitle: "감정 일기 & 보호자 다이어리", grad: ["#C3B1E1", "#9B8EC4"], available: true },
+    { id: "discomfort", icon: "🏠", title: "오늘의 상태 체크", subtitle: "불편 증상 & 가전 자동 제어", grad: ["#FFB3C6", "#FF8FAB"], available: isPregnant },
+    { id: "mental", icon: "💙", title: "정신 케어", subtitle: "감정 일기 & 주간 리포트", grad: ["#C3B1E1", "#9B8EC4"], available: isPregnant },
     { id: "ai", icon: "🤖", title: "AI 맞춤 추천", subtitle: `${user.pregnancyWeek}주차 맞춤 가이드`, grad: ["#FFDAA5", "#FFB74D"], available: isPregnant },
     { id: "info", icon: "📋", title: "신뢰 정보", subtitle: "검증된 의학 정보만", grad: ["#A8E6CF", "#69C99A"], available: true },
     { id: "community", icon: "💬", title: "커뮤니티", subtitle: "같은 시기 예비맘들과 소통", grad: ["#B5EAD7", "#78C9A0"], available: true },
@@ -594,14 +1019,52 @@ function DashboardView({
             </div>
           </div>
         ) : (
-          <div
-            className="rounded-2xl px-5 py-4"
-            style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}
-          >
-            <p className="text-white/80 text-xs font-medium">보호자 모드 {user.babyNickname ? `· ${user.babyNickname}` : ""}</p>
-            <p className="text-xl font-bold">이수진님의 임신 28주차</p>
-            <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
-          </div>
+          <>
+            <div
+              className="rounded-2xl px-5 py-4 mb-3"
+              style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}
+            >
+              <p className="text-white/80 text-xs font-medium">보호자 모드 {user.babyNickname ? `· ${user.babyNickname}` : ""}</p>
+              <p className="text-xl font-bold">이수진님의 임신 28주차</p>
+              <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
+            </div>
+
+            {mission && (
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="rounded-2xl px-5 py-4 shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${mission.color}15, ${mission.color}08)`,
+                  border: `2px solid ${mission.color}40`,
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0"
+                    style={{ background: `${mission.color}20` }}
+                  >
+                    {mission.icon}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-foreground">{mission.message}</p>
+                      {mission.type === "mission" && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: `${mission.color}`, color: "white" }}
+                        >
+                          오늘의 미션
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{mission.subtitle}</p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </>
         )}
       </div>
 
@@ -655,7 +1118,15 @@ function DashboardView({
 }
 
 // ── DISCOMFORT VIEW ────────────────────────────────────────────────────────
-function DiscomfortView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s: Screen) => void }) {
+function DiscomfortView({
+  onBack,
+  onNavigate,
+  onStatusUpdate,
+}: {
+  onBack: () => void;
+  onNavigate?: (s: Screen) => void;
+  onStatusUpdate?: (status: PartnerStatus) => void;
+}) {
   const ALL_SYMPTOMS = [
     "입덧", "붓기", "두통", "피로감", "허리통증", "수면장애", "소화불량", "역류 증상",
     "변비", "어지러움", "빈혈", "가슴통증", "손발저림", "다리경련", "치질", "정맥류",
@@ -679,10 +1150,11 @@ function DiscomfortView({ onBack, onNavigate }: { onBack: () => void; onNavigate
     airPurifier: true, aircon: true, humidifier: false, dehumidifier: false,
   });
   const [applianceSettings, setApplianceSettings] = useState<Record<string, any>>({
-    airPurifier: { speed: 2, mode: "자동", power: true },
+    moodLight: { brightness: 50, color: "따뜻한 화이트", power: false },
     aircon: { temp: 24, mode: "냉방", fan: 2, power: true },
     humidifier: { humidity: 55, intensity: 2, power: false },
     dehumidifier: { humidity: 50, intensity: 2, power: false },
+    airPurifier: { speed: 2, mode: "자동", power: true },
   });
   const [selectedAppliance, setSelectedAppliance] = useState<string | null>(null);
 
@@ -699,17 +1171,20 @@ function DiscomfortView({ onBack, onNavigate }: { onBack: () => void; onNavigate
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "냄새 차단으로 입덧 완화" };
       map.aircon = { key: "aircon", name: "에어컨", action: "18~20℃ 냉방", icon: "❄️", reason: "시원한 공기로 열기 차단" };
     }
-    if (selSymptoms.includes("붓기") || selSymptoms.includes("수면장애")) {
-      map.humidifier = { key: "humidifier", name: "가습기", action: "50~60% 유지", icon: "💧", reason: "쾌적한 수면 환경" };
+    if (selSymptoms.includes("붓기")) {
       map.dehumidifier = { key: "dehumidifier", name: "제습기", action: "45~50% 유지", icon: "🌊", reason: "붓기 완화를 위한 습도 조절" };
+    }
+    if (selSymptoms.includes("수면장애")) {
+      map.moodLight = { key: "moodLight", name: "무드등", action: "수면 모드", icon: "💡", reason: "편안한 수면 분위기 조성" };
+      map.humidifier = { key: "humidifier", name: "가습기", action: "50~60% 유지", icon: "💧", reason: "쾌적한 수면 환경" };
     }
     if (selSymptoms.includes("코막힘") || selSymptoms.includes("코피")) {
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 호흡 개선" };
       map.humidifier = { key: "humidifier", name: "가습기", action: "55~60% 유지", icon: "💧", reason: "건조함 완화" };
     }
     if (selEmotions.includes("스트레스") || selEmotions.includes("불안") || stress >= 7) {
+      map.moodLight = { key: "moodLight", name: "무드등", action: "이완 모드", icon: "💡", reason: "차분한 조명으로 스트레스 완화" };
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 기분 전환" };
-      map.aircon = { key: "aircon", name: "에어컨", action: "쾌적 온도 유지", icon: "❄️", reason: "편안한 실내 온도" };
     }
     return Object.values(map);
   };
@@ -719,19 +1194,31 @@ function DiscomfortView({ onBack, onNavigate }: { onBack: () => void; onNavigate
     getRecs().forEach((r) => { next[r.key] = true; });
     setAppliances(next);
     setSubmitted(true);
+
+    if (onStatusUpdate) {
+      onStatusUpdate({
+        symptoms: selSymptoms,
+        emotions: selEmotions,
+        stress,
+        timestamp: new Date().toISOString(),
+      });
+    }
   };
 
   const APPLIANCE_LIST = [
-    { key: "airPurifier", name: "공기청정기", icon: "💨" },
+    { key: "moodLight", name: "무드등", icon: "💡" },
     { key: "aircon", name: "에어컨", icon: "❄️" },
     { key: "humidifier", name: "가습기", icon: "💧" },
     { key: "dehumidifier", name: "제습기", icon: "🌊" },
+    { key: "airPurifier", name: "공기청정기", icon: "💨" },
   ];
 
   const getApplianceStatus = (key: string) => {
     const settings = applianceSettings[key];
     if (!settings) return "설정 없음";
     switch (key) {
+      case "moodLight":
+        return `${settings.color} • 밝기 ${settings.brightness}%`;
       case "airPurifier":
         return `${settings.mode} • 풍량 ${settings.speed}`;
       case "aircon":
@@ -1186,10 +1673,7 @@ function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: 
   const [mood, setMood] = useState<number | null>(null);
   const [journal, setJournal] = useState("");
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<"today" | "report" | "content" | "diary">("today");
-  const [entries, setEntries] = useState(GUARDIAN_ENTRIES_INIT);
-  const [newEntry, setNewEntry] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [tab, setTab] = useState<"today" | "report" | "content">("today");
 
   const isGuardian = user?.role === "guardian";
 
@@ -1213,7 +1697,7 @@ function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: 
       <PageHeader title="정신 케어" onBack={onBack} />
 
       <div className="flex border-b border-border overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {([["today", "오늘의 감정"], ["report", "주간 리포트"], ["content", "추천 콘텐츠"], ["diary", "보호자 다이어리"]] as const).map(([t, label]) => (
+        {([["today", "오늘의 감정"], ["report", "주간 리포트"], ["content", "추천 콘텐츠"]] as const).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -1351,101 +1835,6 @@ function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: 
           </div>
         )}
 
-        {tab === "diary" && (
-          <div className="space-y-5">
-            {isGuardian && (
-              <div
-                className="rounded-2xl p-4"
-                style={{ background: "linear-gradient(135deg, #FFE8EE, #FFF5F7)", border: "1px solid rgba(201,78,112,0.1)" }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-lg">🤰</span>
-                  <p className="font-semibold text-foreground">이수진님 오늘의 컨디션</p>
-                  <span className="text-xs text-muted-foreground ml-auto">공개된 정보</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "붓기", status: "심함", color: "#E8789A" },
-                    { label: "기분", status: "보통", color: "#9B8EC4" },
-                    { label: "수면", status: "불편", color: "#FFAB76" },
-                  ].map((item) => (
-                    <div key={item.label} className="bg-white rounded-xl p-2 text-center">
-                      <p className="text-xs text-muted-foreground">{item.label}</p>
-                      <p className="text-sm font-semibold mt-0.5" style={{ color: item.color }}>{item.status}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-foreground">
-                {isGuardian ? "나의 다이어리" : "파트너의 다이어리"}
-              </p>
-              {isGuardian && (
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white"
-                  style={{ background: "#C94E70" }}
-                >
-                  <Plus size={14} />새 기록
-                </button>
-              )}
-            </div>
-
-            {showForm && isGuardian && (
-              <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
-                <textarea
-                  value={newEntry}
-                  onChange={(e) => setNewEntry(e.target.value)}
-                  placeholder="오늘의 감정과 경험을 자유롭게 적어보세요..."
-                  rows={4}
-                  className="w-full text-sm px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary resize-none"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      if (!newEntry.trim()) return;
-                      setEntries((prev) => [{ id: Date.now(), date: "2026년 5월 21일", content: newEntry, mood: "💙" }, ...prev]);
-                      setNewEntry("");
-                      setShowForm(false);
-                    }}
-                    className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
-                    style={{ background: "#C94E70" }}
-                  >
-                    저장
-                  </button>
-                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground">취소</button>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {entries.map((entry) => (
-                <div key={entry.id} className="bg-card rounded-2xl p-4 border border-border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span>{entry.mood}</span>
-                    <p className="text-xs text-muted-foreground">{entry.date}</p>
-                  </div>
-                  <p className="text-sm text-foreground leading-relaxed">{entry.content}</p>
-                </div>
-              ))}
-            </div>
-
-            {!isGuardian && (
-              <div
-                className="rounded-2xl p-4 text-center"
-                style={{ background: "rgba(201,78,112,0.05)", border: "1px solid rgba(201,78,112,0.1)" }}
-              >
-                <p className="text-sm font-medium text-foreground">파트너 초대하기</p>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">보호자가 내 상태를 확인하고 다이어리를 쓸 수 있어요</p>
-                <button className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#C94E70" }}>
-                  초대 링크 보내기
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
@@ -1769,12 +2158,12 @@ function InfoView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s:
           의학 정보 AI 챗봇 상담
         </button>
 
-        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        <div className="grid grid-cols-3 gap-2">
           {CATS.map((c) => (
             <button
               key={c}
               onClick={() => setCat(c)}
-              className="shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all"
+              className="px-4 py-2 rounded-full text-sm font-medium transition-all"
               style={{
                 background: cat === c ? "#C94E70" : "var(--secondary)",
                 color: cat === c ? "white" : "var(--muted-foreground)",
@@ -1998,7 +2387,7 @@ function DiaryView({ user, onNavigate }: { user: AppUser; onNavigate: (s: Screen
       <div className="px-5 pt-12 pb-5" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-sm text-muted-foreground">나의 임신 일기</p>
+            <p className="text-sm text-muted-foreground">{user.role === "guardian" ? "보호자 다이어리" : "나의 임신 일기"}</p>
             <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
               다이어리
             </h2>
@@ -2473,7 +2862,7 @@ function SettingsView({ user, onNavigate, onLogout }: { user: AppUser; onNavigat
             {[
               { key: "daily" as const, label: "일일 건강 체크 알림", desc: "매일 오전 9시" },
               { key: "weekly" as const, label: "주간 리포트 알림", desc: "매주 월요일" },
-              { key: "partner" as const, label: "보호자 활동 알림", desc: "새 메시지가 있을 때" },
+              { key: "partner" as const, label: user.role === "guardian" ? "임산부 활동 알림" : "보호자 활동 알림", desc: "새 메시지가 있을 때" },
             ].map((item) => (
               <div key={item.key} className="flex items-center justify-between">
                 <div>
@@ -3119,6 +3508,7 @@ function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: ()
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [user, setUser] = useState<AppUser | null>(null);
+  const [partnerStatus, setPartnerStatus] = useState<PartnerStatus | null>(null);
 
   const go = (s: Screen) => setScreen(s);
   const back = () => setScreen(user ? "dashboard" : "home");
@@ -3140,8 +3530,8 @@ export default function App() {
         {screen === "home" && <HomeView onLogin={() => go("login")} onRegister={() => go("register")} onDemoLogin={demoLogin} />}
         {screen === "login" && <LoginView onBack={() => go("home")} onSuccess={login} onRegister={() => go("register")} />}
         {screen === "register" && <RegisterView onBack={() => go("home")} onSuccess={login} />}
-        {screen === "dashboard" && user && <DashboardView user={user} onNavigate={go} onLogout={logout} />}
-        {screen === "discomfort" && <DiscomfortView onBack={back} onNavigate={go} />}
+        {screen === "dashboard" && user && <DashboardView user={user} onNavigate={go} onLogout={logout} partnerStatus={partnerStatus} />}
+        {screen === "discomfort" && <DiscomfortView onBack={back} onNavigate={go} onStatusUpdate={setPartnerStatus} />}
         {screen === "mental" && <MentalCareView user={user} onBack={back} onNavigate={go} />}
         {screen === "ai" && user && <AIRecommendView user={user} onBack={back} onNavigate={go} />}
         {screen === "info" && <InfoView onBack={back} onNavigate={go} />}
@@ -3150,6 +3540,7 @@ export default function App() {
         {screen === "diary" && user && <DiaryView user={user} onNavigate={go} />}
         {screen === "profile" && user && <ProfileView user={user} onNavigate={go} />}
         {screen === "settings" && user && <SettingsView user={user} onNavigate={go} onLogout={logout} />}
+        {screen === "appliance" && <ApplianceControlView onNavigate={go} />}
       </div>
     </div>
   );
