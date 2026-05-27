@@ -27,6 +27,13 @@ interface AppUser {
   partnerEmail?: string;
   nickname?: string;
   babyNickname?: string;
+  user_id?: number;
+  parent_user_id?: number | null;
+  connected_pregnant?: {
+    name: string;
+    baby_nickname: string | null;
+    pregnancy_start_date: string;
+  } | null;
 }
 
 interface PartnerStatus {
@@ -639,7 +646,8 @@ function LoginView({
           role: userInfo.role === "PREGNANT" ? "pregnant" : "guardian",
           pregnancyWeek: 0, // 추후 계산 로직 추가 가능
           user_id: userInfo.user_id,
-          parent_user_id: userInfo.parent_user_id
+          parent_user_id: userInfo.parent_user_id,
+          connected_pregnant: userInfo.connected_pregnant
         });
       } else {
         setError(data.detail || "이메일 또는 비밀번호가 올바르지 않습니다.");
@@ -824,7 +832,20 @@ function DashboardView({
   partnerStatus?: PartnerStatus | null;
 }) {
   const isPregnant = user.role === "pregnant";
+  
+  // 🚀 백엔드에서 받아온 실제 연동 임산부 데이터 추출
+  const connected = (user as any).connected_pregnant;
+const getPregnancyWeek = (startDateStr: string | undefined) => {
+    if (!startDateStr) return 0;
+    const start = new Date(startDateStr);
+    const today = new Date();
+    // 며칠이 지났는지 계산 후 7로 나누어 주차(Week) 반환
+    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.floor(diffDays / 7));
+  };
 
+  // 보호자일 경우, 연동된 임산부의 시작일로 주차 계산
+  const displayWeek = connected ? getPregnancyWeek(connected.pregnancy_start_date) : 0;
   const getMissionFromStatus = (status: PartnerStatus | null) => {
     if (!status) return null;
 
@@ -954,8 +975,12 @@ function DashboardView({
               className="rounded-2xl px-5 py-4 mb-3"
               style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}
             >
-              <p className="text-white/80 text-xs font-medium">보호자 모드 {user.babyNickname ? `· ${user.babyNickname}` : ""}</p>
-              <p className="text-xl font-bold">이수진님의 임신 28주차</p>
+              <p className="text-white/80 text-xs font-medium">
+                보호자 모드 {connected?.baby_nickname ? `· ${connected.baby_nickname}` : ""}
+              </p>
+              <p className="text-xl font-bold">
+                {connected ? `${connected.name}님의 임신 ${displayWeek}주차` : "연결된 임산부가 없습니다"}
+              </p>
               <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
             </div>
 

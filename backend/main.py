@@ -21,36 +21,47 @@ app.add_middleware(
 )
 # backend/main.py
 
+
+
+
+
+
+
+
+
+
+
+# 로그인 기능 
+# backend/main.py
+
 @app.post("/api/auth/login")
 def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
-    # 1. 이메일로 유저 찾기
     user = db.query(models.User).filter(models.User.email == request.email).first()
     
-    # 2. 비밀번호 검증 (현재는 평문 비교 중, 추후 암호화 예정)
     if not user or user.password != request.password:
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
-    # 3. 로그인 성공 시 필요한 정보 반환
+    # 🚀 연동된 임산부 정보 조회 (보호자인 경우)
+    pregnant_info = None
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if pregnant_user:
+            pregnant_info = {
+                "name": pregnant_user.name,
+                "baby_nickname": pregnant_user.baby_nickname,
+                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date)
+            }
+    
     return {
         "status": "Success",
         "user": {
             "user_id": user.id,
             "name": user.name,
             "role": user.role,
-            "parent_user_id": user.parent_user_id # 보호자인 경우 연결된 임산부 ID
+            "parent_user_id": user.parent_user_id,
+            "connected_pregnant": pregnant_info # 🚀 실제 연동된 임산부 정보 포함
         }
     }
-
-
-
-
-
-
-
-
-
-
-
 # 회원가입 API
 @app.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
