@@ -614,25 +614,45 @@ function LoginView({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoading(true);
     setError("");
-    setTimeout(() => {
-      const found = DEMO_USERS.find((u) => u.email === email && u.password === password);
-      if (found) {
-        onSuccess({ name: found.name, nickname: found.nickname, babyNickname: found.babyNickname, email: found.email, role: found.role, pregnancyWeek: found.pregnancyWeek, inviteCode: found.inviteCode });
+
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.status === "Success") {
+        // 🚀 서버에서 받은 user 데이터 객체를 그대로 매핑
+        const userInfo = data.user;
+        
+        onSuccess({
+          name: userInfo.name,
+          nickname: userInfo.name, // 닉네임이 DB에 따로 없으면 이름으로 대체
+          babyNickname: userInfo.baby_nickname || "아기", 
+          email: email,
+          role: userInfo.role === "PREGNANT" ? "pregnant" : "guardian",
+          pregnancyWeek: 0, // 추후 계산 로직 추가 가능
+          user_id: userInfo.user_id,
+          parent_user_id: userInfo.parent_user_id
+        });
       } else {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setError(data.detail || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
+    } catch (err) {
+      setError("서버와 통신할 수 없습니다. 백엔드 서버를 확인해주세요.");
+    } finally {
       setLoading(false);
-    }, 700);
+    }
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
-    >
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
       <div className="px-5 py-4">
         <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
           <ArrowLeft size={22} style={{ color: "#C94E70" }} />
@@ -641,82 +661,41 @@ function LoginView({
 
       <div className="flex-1 flex flex-col justify-center px-8 -mt-8">
         <div className="text-center mb-10">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md"
-            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
-          >
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
             <span className="text-3xl">🌸</span>
           </div>
-          <h2
-            className="text-2xl font-bold"
-            style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
-          >
-            다시 오셨군요 👋
-          </h2>
+          <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>다시 오셨군요 👋</h2>
           <p className="text-muted-foreground text-sm mt-1">맘달 계정으로 로그인하세요</p>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="이메일을 입력하세요"
-              className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
-            />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
           </div>
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호를 입력하세요"
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
-            />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" onKeyDown={(e) => e.key === "Enter" && handleLogin()} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
           </div>
 
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <button
-            onClick={handleLogin}
-            disabled={loading || !email || !password}
-            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
-          >
+          <button onClick={handleLogin} disabled={loading || !email || !password} className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed mt-2" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
             {loading ? "로그인 중..." : "로그인"}
           </button>
 
           <div className="pt-2 border-t border-border">
             <p className="text-xs text-muted-foreground text-center mb-3">데모 계정으로 빠른 로그인</p>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => { setEmail("mom@demo.kr"); setPassword("1234"); }}
-                className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-              >
-                🤰 임산부 계정
-              </button>
-              <button
-                onClick={() => { setEmail("dad@demo.kr"); setPassword("1234"); }}
-                className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground transition-colors"
-                style={{}}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#7B68B5"; (e.currentTarget as HTMLElement).style.color = "#7B68B5"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ""; (e.currentTarget as HTMLElement).style.color = ""; }}
-              >
-                👨 보호자 계정
-              </button>
+              <button onClick={() => { setEmail("mom@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors">🤰 임산부 계정</button>
+              <button onClick={() => { setEmail("dad@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground transition-colors hover:border-purple-500 hover:text-purple-500">👨 보호자 계정</button>
             </div>
           </div>
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           아직 계정이 없으신가요?{" "}
-          <button onClick={onRegister} className="font-semibold" style={{ color: "#C94E70" }}>
-            회원가입
-          </button>
+          <button onClick={onRegister} className="font-semibold" style={{ color: "#C94E70" }}>회원가입</button>
         </p>
       </div>
     </div>
@@ -730,48 +709,60 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
   const [babyNickname, setBabyNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("pregnant");
-  const [week, setWeek] = useState("12");
+  const [role, setRole] = useState<"pregnant" | "guardian">("pregnant");
+  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleRegister = () => {
-    if (!name || !nickname || !babyNickname || !email || !password) return;
-
-    if (role === "guardian") {
-      if (!inviteCode.trim()) {
-        setError("임산부의 인증코드를 입력해주세요.");
-        return;
-      }
-      const validCode = "MOMDAL28";
-      if (inviteCode !== validCode) {
-        setError("잘못된 인증코드입니다. 임산부에게 받은 코드를 확인해주세요.");
-        return;
-      }
+  const handleRegister = async () => {
+    // 🚀 필수값 검증 로직만 수정 (태명은 임산부일 때만 필수)
+    if (!name || !nickname || !email || !password || 
+        (role === "pregnant" && !babyNickname) || 
+        (role === "guardian" && !inviteCode)) {
+      setError("모든 필수 항목을 입력해주세요.");
+      return;
     }
 
-    setError("");
     setLoading(true);
-    setTimeout(() => {
-      const generatedCode = role === "pregnant" ? `MOMDAL${Math.floor(Math.random() * 100)}` : undefined;
-      onSuccess({
-        name,
-        nickname,
-        babyNickname,
-        email,
-        role,
-        pregnancyWeek: role === "pregnant" ? parseInt(week) || 12 : 0,
-        inviteCode: generatedCode,
+    setError("");
+
+    try {
+      const response = await fetch("http://localhost:8000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+       // App.tsx -> handleRegister 내 body
+body: JSON.stringify({
+    email: email,
+    password: password,
+    name: name,
+    role: role === "pregnant" ? "PREGNANT" : "GUARDIAN",
+    start_date: startDate,
+    baby_nickname: babyNickname, // 🚀 이 키값이 models.py의 속성명과 같아야 함
+    input_connection_code: inviteCode
+}),
       });
-    }, 900);
+
+      const result = await response.json();
+      
+      if (result.status === "Success") {
+  const msg = result.connection_code 
+    ? `회원가입 완료! 인증코드: ${result.connection_code}` 
+    : "회원가입 완료!";
+  alert(msg);
+  onSuccess({ name, email, role, pregnancyWeek: 0 });
+} else {
+        setError(result.error || "가입 실패");
+      }
+    } catch (e) {
+      setError("서버와 통신할 수 없습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
-    >
+    <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
       <div className="px-5 py-4">
         <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
           <ArrowLeft size={22} style={{ color: "#C94E70" }} />
@@ -780,102 +771,42 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
 
       <div className="px-8 pb-10">
         <div className="text-center mb-8">
-          <h2
-            className="text-2xl font-bold"
-            style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
-          >
-            환영합니다! 🌸
-          </h2>
-          <p className="text-muted-foreground text-sm mt-1">맘달과 함께 시작해요</p>
+          <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>환영합니다! 🌸</h2>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-3">역할 선택</label>
-            <div className="grid grid-cols-2 gap-3">
-              {([["pregnant", "🤰", "임산부"], ["guardian", "👨", "보호자"]] as const).map(([r, emoji, label]) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all"
-                  style={{
-                    borderColor: role === r ? "#C94E70" : "var(--border)",
-                    background: role === r ? "rgba(201, 78, 112, 0.06)" : "transparent",
-                  }}
-                >
-                  <span className="text-2xl">{emoji}</span>
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: role === r ? "#C94E70" : "var(--muted-foreground)" }}
-                  >
-                    {label}
-                  </span>
-                </button>
-              ))}
-            </div>
+          {/* 역할 선택 */}
+          <div className="grid grid-cols-2 gap-3">
+            {([["pregnant", "🤰", "임산부"], ["guardian", "👨", "보호자"]] as const).map(([r, emoji, label]) => (
+              <button key={r} onClick={() => setRole(r as any)} className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all" style={{ borderColor: role === r ? "#C94E70" : "var(--border)", background: role === r ? "rgba(201, 78, 112, 0.06)" : "transparent" }}>
+                <span className="text-2xl">{emoji}</span>
+                <span className="text-sm font-medium" style={{ color: role === r ? "#C94E70" : "var(--muted-foreground)" }}>{label}</span>
+              </button>
+            ))}
           </div>
 
-          {[
-            { label: "이름", value: name, setter: setName, type: "text", placeholder: "이름을 입력하세요" },
-            { label: "닉네임", value: nickname, setter: setNickname, type: "text", placeholder: "커뮤니티에서 사용할 닉네임" },
-            { label: "아기 태명", value: babyNickname, setter: setBabyNickname, type: "text", placeholder: "아기를 부를 애칭을 입력하세요" },
-            { label: "이메일", value: email, setter: setEmail, type: "email", placeholder: "이메일을 입력하세요" },
-            { label: "비밀번호", value: password, setter: setPassword, type: "password", placeholder: "비밀번호를 입력하세요" },
-          ].map(({ label, value, setter, type, placeholder }) => (
-            <div key={label}>
-              <label className="text-sm font-medium text-foreground block mb-2">{label}</label>
-              <input
-                type={type}
-                value={value}
-                onChange={(e) => setter(e.target.value)}
-                placeholder={placeholder}
-                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
-              />
-              {label === "닉네임" && (
-                <p className="text-xs text-muted-foreground mt-1">커뮤니티 게시글에 표시됩니다</p>
-              )}
-              {label === "아기 태명" && (
-                <p className="text-xs text-muted-foreground mt-1">다이어리와 앱 전체에서 사용됩니다</p>
-              )}
-            </div>
-          ))}
-
+          {/* 입력창 리스트 */}
+          <input placeholder="이름" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
+          <input placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
+          
+          {/* 🚀 임산부 전용 태명 UI는 그대로 유지 */}
           {role === "pregnant" && (
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-2">현재 임신 주차</label>
-              <input
-                type="number"
-                value={week}
-                onChange={(e) => setWeek(e.target.value)}
-                min="1"
-                max="42"
-                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm"
-              />
-            </div>
+            <input placeholder="아기 태명" value={babyNickname} onChange={e => setBabyNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           )}
 
-          {role === "guardian" && (
-            <div>
-              <label className="text-sm font-medium text-foreground block mb-2">임산부 인증코드</label>
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="임산부에게 받은 코드를 입력하세요"
-                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm"
-              />
-              <p className="text-xs text-muted-foreground mt-1">임산부의 프로필 화면에서 인증코드를 확인할 수 있습니다</p>
-            </div>
+          <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
+          <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
+
+          {/* 조건부 필드 UI는 그대로 유지 */}
+          {role === "pregnant" ? (
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
+          ) : (
+            <input placeholder="임산부 인증코드" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-pink-300 bg-secondary/40 text-sm" />
           )}
 
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <button
-            onClick={handleRegister}
-            disabled={loading || !name || !nickname || !email || !password}
-            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 mt-2"
-            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
-          >
+          <button onClick={handleRegister} disabled={loading} className="w-full py-3.5 rounded-xl font-semibold text-white mt-2" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
             {loading ? "가입 중..." : "회원가입 완료"}
           </button>
         </div>
@@ -883,7 +814,6 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
     </div>
   );
 }
-
 // ── DASHBOARD VIEW ─────────────────────────────────────────────────────────
 function DashboardView({
   user, onNavigate, onLogout, partnerStatus,
