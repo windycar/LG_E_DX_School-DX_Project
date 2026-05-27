@@ -1,0 +1,3156 @@
+import { useState } from "react";
+import { motion } from "motion/react";
+import {
+  ArrowLeft, LogOut, MessageCircle, Shield, ThumbsUp,
+  Plus, CheckCircle, AlertTriangle, ChevronRight, Star,
+  Home, User, Settings, BookOpen, Calendar, Search, X,
+  Play, Send, Copy,
+} from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid,
+} from "recharts";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+type Screen =
+  | "home" | "login" | "register" | "dashboard"
+  | "discomfort" | "mental" | "ai" | "info" | "community" | "smalltalk"
+  | "diary" | "profile" | "settings";
+type Role = "pregnant" | "guardian";
+
+interface AppUser {
+  name: string;
+  email: string;
+  role: Role;
+  pregnancyWeek: number;
+  inviteCode?: string;
+  partnerEmail?: string;
+  nickname?: string;
+  babyNickname?: string;
+}
+
+// ── Mock data ──────────────────────────────────────────────────────────────
+const DEMO_USERS: Array<AppUser & { password: string }> = [
+  { email: "mom@demo.kr", password: "1234", name: "이수진", role: "pregnant", pregnancyWeek: 28, nickname: "행복한예비맘", babyNickname: "콩이", inviteCode: "MOMDAL28" },
+  { email: "dad@demo.kr", password: "1234", name: "이준혁", role: "guardian", pregnancyWeek: 28, nickname: "든든한아빠", babyNickname: "콩이" },
+];
+
+const MOOD_HISTORY = [
+  { day: "월", score: 3.2 }, { day: "화", score: 2.8 },
+  { day: "수", score: 3.8 }, { day: "목", score: 2.5 },
+  { day: "금", score: 4.1 }, { day: "토", score: 3.6 },
+  { day: "일", score: 4.2 },
+];
+
+const POSTS_INIT = [
+  {
+    id: 1, week: 28, avatar: "🤰", author: "행복한예비맘",
+    content: "28주차 접어들면서 좌골신경통이 너무 심한데 다들 어떻게 관리하시나요? 저는 옆으로 누워서 쿠션 끼는 게 제일 편하더라고요.",
+    likes: 24, comments: 8, time: "2시간 전",
+  },
+  {
+    id: 2, week: 27, avatar: "💕", author: "뽀짝맘",
+    content: "임신 중 배가 고픈게 진짜 배고픈건지 입덧인건지 너무 헷갈려요. 조금씩 자주 먹는 게 최고인 것 같아요 🍎",
+    likes: 36, comments: 12, time: "4시간 전",
+  },
+  {
+    id: 3, week: 29, avatar: "⭐", author: "달빛엄마",
+    content: "요즘 태동이 너무 강해서 잠을 못 자겠어요 ㅠㅠ 근데 느낄 때마다 신기하고 행복해서 참게 되네요 🌟",
+    likes: 58, comments: 21, time: "6시간 전",
+  },
+  {
+    id: 4, week: 28, avatar: "🌸", author: "초보예비맘",
+    content: "첫 임신이라 모르는 게 너무 많아요. 이 앱 덕분에 많이 도움받고 있어요! 다들 건강한 임신하세요 💪",
+    likes: 42, comments: 15, time: "8시간 전",
+  },
+];
+
+const INFO_ITEMS = [
+  { id: 1, category: "영양", emoji: "🥦", title: "임신 중 엽산 섭취의 중요성", summary: "엽산은 태아의 신경관 발달에 필수적입니다. 임신 초기부터 하루 400~600mcg 섭취가 권장됩니다.", source: "대한산부인과학회", badge: "의학 검증" },
+  { id: 2, category: "운동", emoji: "🏊", title: "임산부 안전 운동 가이드", summary: "수영, 가벼운 걷기, 산전 요가는 임신 중 안전한 운동입니다. 주 3회, 30분 이내 권장.", source: "보건복지부", badge: "정부 공인" },
+  { id: 3, category: "정신건강", emoji: "💙", title: "산전 우울증 이해하기", summary: "임산부 10~20%가 경험하는 산전 우울증. 전문가 상담이 중요하며 방치 시 산후 우울증으로 이어질 수 있습니다.", source: "WHO 가이드라인", badge: "WHO 인증" },
+  { id: 4, category: "태아발달", emoji: "👶", title: "28주차 태아 발달 정보", summary: "임신 28주차에는 태아의 뇌가 빠르게 발달하며, 눈을 뜨고 감을 수 있게 됩니다. 체중은 약 1kg.", source: "대한산부인과학회", badge: "의학 검증" },
+  { id: 5, category: "수면", emoji: "😴", title: "임산부 수면 가이드", summary: "좌측 수면 자세가 혈액순환에 가장 좋습니다. 무릎 사이에 베개를 끼우면 더욱 편안합니다.", source: "보건복지부", badge: "정부 공인" },
+];
+
+const GUARDIAN_ENTRIES_INIT = [
+  { id: 1, date: "2026년 5월 21일", content: "오늘 수진이가 많이 힘들어 보였다. 발이 많이 붓고 허리가 아프다고 했는데 내가 도와줄 수 있는 게 별로 없어서 미안했다. 그래도 콩이의 태동을 처음으로 함께 느꼈을 때 정말 감격스러웠다.", mood: "💙" },
+  { id: 2, date: "2026년 5월 19일", content: "수진이를 위해 저염 식사를 준비했다. 오늘은 기분이 좋아 보여서 나도 행복했다. 28주차가 되니 배가 정말 많이 나왔다. 콩이가 얼마나 클지 기대된다.", mood: "😊" },
+];
+
+// ── Shared Components ──────────────────────────────────────────────────────
+function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm sticky top-0 z-10 border-b border-border">
+      <button onClick={onBack} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+        <ArrowLeft size={20} className="text-foreground" />
+      </button>
+      <h1 className="font-semibold text-foreground">{title}</h1>
+    </div>
+  );
+}
+
+function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (s: Screen) => void }) {
+  const tabs: Array<{ id: Screen; icon: typeof Home; label: string }> = [
+    { id: "dashboard", icon: Home, label: "홈" },
+    { id: "diary", icon: BookOpen, label: "다이어리" },
+    { id: "profile", icon: User, label: "내정보" },
+    { id: "settings", icon: Settings, label: "설정" },
+  ];
+
+  return (
+    <div className="sticky bottom-0 bg-card/95 backdrop-blur-sm border-t border-border px-2 py-2 flex justify-around">
+      {tabs.map(({ id, icon: Icon, label }) => (
+        <button
+          key={id}
+          onClick={() => onNavigate(id)}
+          className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors"
+          style={{
+            color: current === id ? "#C94E70" : "var(--muted-foreground)",
+          }}
+        >
+          <Icon size={20} />
+          <span className="text-xs font-medium">{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── HOME VIEW ──────────────────────────────────────────────────────────────
+function HomeView({
+  onLogin, onRegister, onDemoLogin,
+}: {
+  onLogin: () => void;
+  onRegister: () => void;
+  onDemoLogin: (role: Role) => void;
+}) {
+  return (
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 55%, #F5F0FF 100%)" }}
+    >
+      <div className="flex-1 flex flex-col items-center justify-center px-8 pt-16 pb-8">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, type: "spring" }}
+          className="mb-8"
+        >
+          <div
+            className="w-28 h-28 rounded-[2.5rem] flex items-center justify-center shadow-xl"
+            style={{ background: "linear-gradient(135deg, #C94E70 0%, #E8789A 50%, #F4A4C0 100%)" }}
+          >
+            <span className="text-5xl">🌸</span>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="text-center mb-4"
+        >
+          <h1
+            className="text-5xl font-bold mb-2"
+            style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
+          >
+            맘달
+          </h1>
+          <p className="text-xs tracking-[0.3em] font-medium text-muted-foreground uppercase">MomDal Care</p>
+        </motion.div>
+
+        <motion.p
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="text-center text-muted-foreground leading-relaxed mb-8"
+        >
+          임신부터 출산까지,<br />당신의 모든 순간을 함께합니다
+        </motion.p>
+
+        <motion.div
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex flex-wrap gap-2 justify-center mb-10"
+        >
+          {["🏠 스마트 가전", "💙 정신 케어 & 보호자", "🤖 AI 추천", "📋 검증 정보", "💬 커뮤니티"].map((f) => (
+            <span
+              key={f}
+              className="text-xs px-3 py-1.5 rounded-full font-medium"
+              style={{ background: "rgba(201, 78, 112, 0.1)", color: "#C94E70" }}
+            >
+              {f}
+            </span>
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="w-full max-w-xs flex flex-col gap-3"
+        >
+          <button
+            onClick={onLogin}
+            className="w-full py-4 rounded-2xl font-semibold text-white text-lg shadow-lg transition-all active:scale-95 hover:shadow-xl"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            로그인
+          </button>
+          <button
+            onClick={onRegister}
+            className="w-full py-4 rounded-2xl font-semibold text-lg transition-all active:scale-95 border-2 bg-white"
+            style={{ borderColor: "#C94E70", color: "#C94E70" }}
+          >
+            회원가입
+          </button>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-8 text-center"
+        >
+          <p className="text-xs text-muted-foreground mb-3">데모 계정으로 빠른 체험</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => onDemoLogin("pregnant")}
+              className="text-xs px-4 py-2 rounded-full border-2 transition-all hover:text-white"
+              style={{ borderColor: "#C94E70", color: "#C94E70" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#C94E70"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >
+              🤰 임산부 계정
+            </button>
+            <button
+              onClick={() => onDemoLogin("guardian")}
+              className="text-xs px-4 py-2 rounded-full border-2 transition-all hover:text-white"
+              style={{ borderColor: "#7B68B5", color: "#7B68B5" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#7B68B5"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+            >
+              👨 보호자 계정
+            </button>
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="py-6 text-center">
+        <p className="text-xs text-muted-foreground">대한산부인과학회 · 보건복지부 · WHO 기반 검증 정보</p>
+      </div>
+    </div>
+  );
+}
+
+// ── LOGIN VIEW ─────────────────────────────────────────────────────────────
+function LoginView({
+  onBack, onSuccess, onRegister,
+}: {
+  onBack: () => void;
+  onSuccess: (u: AppUser) => void;
+  onRegister: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = () => {
+    setLoading(true);
+    setError("");
+    setTimeout(() => {
+      const found = DEMO_USERS.find((u) => u.email === email && u.password === password);
+      if (found) {
+        onSuccess({ name: found.name, nickname: found.nickname, babyNickname: found.babyNickname, email: found.email, role: found.role, pregnancyWeek: found.pregnancyWeek, inviteCode: found.inviteCode });
+      } else {
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      }
+      setLoading(false);
+    }, 700);
+  };
+
+  return (
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
+    >
+      <div className="px-5 py-4">
+        <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
+          <ArrowLeft size={22} style={{ color: "#C94E70" }} />
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center px-8 -mt-8">
+        <div className="text-center mb-10">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            <span className="text-3xl">🌸</span>
+          </div>
+          <h2
+            className="text-2xl font-bold"
+            style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
+          >
+            다시 오셨군요 👋
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">맘달 계정으로 로그인하세요</p>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="이메일을 입력하세요"
+              className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-2">비밀번호</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="비밀번호를 입력하세요"
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
+            />
+          </div>
+
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+          <button
+            onClick={handleLogin}
+            disabled={loading || !email || !password}
+            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            {loading ? "로그인 중..." : "로그인"}
+          </button>
+
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center mb-3">데모 계정으로 빠른 로그인</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { setEmail("mom@demo.kr"); setPassword("1234"); }}
+                className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                🤰 임산부 계정
+              </button>
+              <button
+                onClick={() => { setEmail("dad@demo.kr"); setPassword("1234"); }}
+                className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground transition-colors"
+                style={{}}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#7B68B5"; (e.currentTarget as HTMLElement).style.color = "#7B68B5"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ""; (e.currentTarget as HTMLElement).style.color = ""; }}
+              >
+                👨 보호자 계정
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          아직 계정이 없으신가요?{" "}
+          <button onClick={onRegister} className="font-semibold" style={{ color: "#C94E70" }}>
+            회원가입
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── REGISTER VIEW ──────────────────────────────────────────────────────────
+function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
+  const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [babyNickname, setBabyNickname] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<Role>("pregnant");
+  const [week, setWeek] = useState("12");
+  const [inviteCode, setInviteCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleRegister = () => {
+    if (!name || !nickname || !babyNickname || !email || !password) return;
+
+    if (role === "guardian") {
+      if (!inviteCode.trim()) {
+        setError("임산부의 인증코드를 입력해주세요.");
+        return;
+      }
+      const validCode = "MOMDAL28";
+      if (inviteCode !== validCode) {
+        setError("잘못된 인증코드입니다. 임산부에게 받은 코드를 확인해주세요.");
+        return;
+      }
+    }
+
+    setError("");
+    setLoading(true);
+    setTimeout(() => {
+      const generatedCode = role === "pregnant" ? `MOMDAL${Math.floor(Math.random() * 100)}` : undefined;
+      onSuccess({
+        name,
+        nickname,
+        babyNickname,
+        email,
+        role,
+        pregnancyWeek: role === "pregnant" ? parseInt(week) || 12 : 0,
+        inviteCode: generatedCode,
+      });
+    }, 900);
+  };
+
+  return (
+    <div
+      className="min-h-screen"
+      style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
+    >
+      <div className="px-5 py-4">
+        <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
+          <ArrowLeft size={22} style={{ color: "#C94E70" }} />
+        </button>
+      </div>
+
+      <div className="px-8 pb-10">
+        <div className="text-center mb-8">
+          <h2
+            className="text-2xl font-bold"
+            style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
+          >
+            환영합니다! 🌸
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">맘달과 함께 시작해요</p>
+        </div>
+
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-3">역할 선택</label>
+            <div className="grid grid-cols-2 gap-3">
+              {([["pregnant", "🤰", "임산부"], ["guardian", "👨", "보호자"]] as const).map(([r, emoji, label]) => (
+                <button
+                  key={r}
+                  onClick={() => setRole(r)}
+                  className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all"
+                  style={{
+                    borderColor: role === r ? "#C94E70" : "var(--border)",
+                    background: role === r ? "rgba(201, 78, 112, 0.06)" : "transparent",
+                  }}
+                >
+                  <span className="text-2xl">{emoji}</span>
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: role === r ? "#C94E70" : "var(--muted-foreground)" }}
+                  >
+                    {label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {[
+            { label: "이름", value: name, setter: setName, type: "text", placeholder: "이름을 입력하세요" },
+            { label: "닉네임", value: nickname, setter: setNickname, type: "text", placeholder: "커뮤니티에서 사용할 닉네임" },
+            { label: "아기 태명", value: babyNickname, setter: setBabyNickname, type: "text", placeholder: "아기를 부를 애칭을 입력하세요" },
+            { label: "이메일", value: email, setter: setEmail, type: "email", placeholder: "이메일을 입력하세요" },
+            { label: "비밀번호", value: password, setter: setPassword, type: "password", placeholder: "비밀번호를 입력하세요" },
+          ].map(({ label, value, setter, type, placeholder }) => (
+            <div key={label}>
+              <label className="text-sm font-medium text-foreground block mb-2">{label}</label>
+              <input
+                type={type}
+                value={value}
+                onChange={(e) => setter(e.target.value)}
+                placeholder={placeholder}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors"
+              />
+              {label === "닉네임" && (
+                <p className="text-xs text-muted-foreground mt-1">커뮤니티 게시글에 표시됩니다</p>
+              )}
+              {label === "아기 태명" && (
+                <p className="text-xs text-muted-foreground mt-1">다이어리와 앱 전체에서 사용됩니다</p>
+              )}
+            </div>
+          ))}
+
+          {role === "pregnant" && (
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">현재 임신 주차</label>
+              <input
+                type="number"
+                value={week}
+                onChange={(e) => setWeek(e.target.value)}
+                min="1"
+                max="42"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+          )}
+
+          {role === "guardian" && (
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">임산부 인증코드</label>
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="임산부에게 받은 코드를 입력하세요"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">임산부의 프로필 화면에서 인증코드를 확인할 수 있습니다</p>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+          <button
+            onClick={handleRegister}
+            disabled={loading || !name || !nickname || !email || !password}
+            className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 mt-2"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            {loading ? "가입 중..." : "회원가입 완료"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DASHBOARD VIEW ─────────────────────────────────────────────────────────
+function DashboardView({
+  user, onNavigate, onLogout,
+}: {
+  user: AppUser;
+  onNavigate: (s: Screen) => void;
+  onLogout: () => void;
+}) {
+  const isPregnant = user.role === "pregnant";
+
+  const features: Array<{ id: Screen; icon: string; title: string; subtitle: string; grad: [string, string]; available: boolean }> = [
+    { id: "discomfort", icon: "🏠", title: "오늘의 상태 체크", subtitle: "불편 증상 & 가전 자동 제어", grad: ["#FFB3C6", "#FF8FAB"], available: true },
+    { id: "mental", icon: "💙", title: "정신 케어", subtitle: "감정 일기 & 보호자 다이어리", grad: ["#C3B1E1", "#9B8EC4"], available: true },
+    { id: "ai", icon: "🤖", title: "AI 맞춤 추천", subtitle: `${user.pregnancyWeek}주차 맞춤 가이드`, grad: ["#FFDAA5", "#FFB74D"], available: isPregnant },
+    { id: "info", icon: "📋", title: "신뢰 정보", subtitle: "검증된 의학 정보만", grad: ["#A8E6CF", "#69C99A"], available: true },
+    { id: "community", icon: "💬", title: "커뮤니티", subtitle: "같은 시기 예비맘들과 소통", grad: ["#B5EAD7", "#78C9A0"], available: true },
+    { id: "smalltalk", icon: "💕", title: "스몰토크", subtitle: "매일 질문으로 대화하기", grad: ["#FFD3B6", "#FFA882"], available: true },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div
+        className="px-5 pt-12 pb-6"
+        style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-sm text-muted-foreground">안녕하세요 👋</p>
+            <h2
+              className="text-2xl font-bold"
+              style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
+            >
+              {user.name}님
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
+              style={{ background: "rgba(201, 78, 112, 0.1)" }}
+            >
+              {isPregnant ? "🤰" : "👨"}
+            </div>
+            <button
+              onClick={onLogout}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/60 transition-colors"
+            >
+              <LogOut size={16} className="text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+
+        {isPregnant ? (
+          <div
+            className="rounded-2xl px-5 py-4 flex items-center justify-between"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)", color: "white" }}
+          >
+            <div>
+              <p className="text-white/80 text-xs font-medium">{user.babyNickname ? `${user.babyNickname}와 함께` : "현재 임신"}</p>
+              <p className="text-3xl font-bold">{user.pregnancyWeek}주차</p>
+              <p className="text-white/80 text-xs mt-0.5">오늘도 잘 하고 있어요 ✨</p>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+              <span className="text-3xl">👶</span>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl px-5 py-4"
+            style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}
+          >
+            <p className="text-white/80 text-xs font-medium">보호자 모드 {user.babyNickname ? `· ${user.babyNickname}` : ""}</p>
+            <p className="text-xl font-bold">이수진님의 임신 28주차</p>
+            <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
+          </div>
+        )}
+      </div>
+
+      <div className="px-5 py-5">
+        <p className="font-semibold text-foreground mb-4">무엇이 필요하세요?</p>
+        <div className="grid grid-cols-2 gap-3">
+          {features.map((feat, i) => (
+            <motion.button
+              key={feat.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.07 }}
+              onClick={() => feat.available && onNavigate(feat.id)}
+              className="bg-card rounded-2xl p-4 text-left border border-border hover:shadow-md transition-all active:scale-95 relative overflow-hidden"
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-2xl"
+                style={{ background: `linear-gradient(135deg, ${feat.grad[0]}, ${feat.grad[1]})` }}
+              >
+                {feat.icon}
+              </div>
+              <p className="font-semibold text-foreground text-sm leading-tight">{feat.title}</p>
+              <p className="text-xs text-muted-foreground mt-1">{feat.subtitle}</p>
+              {!feat.available && (
+                <div className="absolute inset-0 bg-card/80 rounded-2xl flex items-center justify-center">
+                  <span className="text-xs text-muted-foreground">임산부 전용</span>
+                </div>
+              )}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      <div className="px-5 pb-8 flex-1">
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: "linear-gradient(135deg, #FFF0F5, #F9E4EC)" }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Star size={14} style={{ color: "#C94E70" }} />
+            <p className="text-xs font-semibold" style={{ color: "#C94E70" }}>오늘의 팁</p>
+          </div>
+          <p className="text-sm text-foreground font-medium">28주차에는 좌측 수면 자세가 혈액순환에 좋아요</p>
+          <p className="text-xs text-muted-foreground mt-1">무릎 사이에 베개를 끼우면 더욱 편안합니다 💤</p>
+        </div>
+      </div>
+
+      <BottomNav current="dashboard" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+// ── DISCOMFORT VIEW ────────────────────────────────────────────────────────
+function DiscomfortView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const ALL_SYMPTOMS = [
+    "입덧", "붓기", "두통", "피로감", "허리통증", "수면장애", "소화불량", "역류 증상",
+    "변비", "어지러움", "빈혈", "가슴통증", "손발저림", "다리경련", "치질", "정맥류",
+    "잇몸출혈", "코막힘", "코피", "배뇨통", "요실금", "질분비물", "골반통", "좌골신경통"
+  ];
+  const EMOTIONS = [
+    { text: "불안", emoji: "😰" },
+    { text: "예민함", emoji: "😤" },
+    { text: "우울감", emoji: "😢" },
+    { text: "스트레스", emoji: "😫" },
+    { text: "외로움", emoji: "😔" },
+    { text: "긴장", emoji: "😖" },
+  ];
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selSymptoms, setSelSymptoms] = useState<string[]>([]);
+  const [selEmotions, setSelEmotions] = useState<string[]>([]);
+  const [stress, setStress] = useState(5);
+  const [submitted, setSubmitted] = useState(false);
+  const [appliances, setAppliances] = useState<Record<string, boolean>>({
+    airPurifier: true, aircon: true, humidifier: false, dehumidifier: false,
+  });
+  const [applianceSettings, setApplianceSettings] = useState<Record<string, any>>({
+    airPurifier: { speed: 2, mode: "자동", power: true },
+    aircon: { temp: 24, mode: "냉방", fan: 2, power: true },
+    humidifier: { humidity: 55, intensity: 2, power: false },
+    dehumidifier: { humidity: 50, intensity: 2, power: false },
+  });
+  const [selectedAppliance, setSelectedAppliance] = useState<string | null>(null);
+
+  const filteredSymptoms = ALL_SYMPTOMS.filter((s) =>
+    s.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const toggleArr = (arr: string[], val: string, set: (v: string[]) => void) =>
+    set(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);
+
+  const getRecs = () => {
+    const map: Record<string, { key: string; name: string; action: string; icon: string; reason: string }> = {};
+    if (selSymptoms.includes("입덧")) {
+      map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "냄새 차단으로 입덧 완화" };
+      map.aircon = { key: "aircon", name: "에어컨", action: "18~20℃ 냉방", icon: "❄️", reason: "시원한 공기로 열기 차단" };
+    }
+    if (selSymptoms.includes("붓기") || selSymptoms.includes("수면장애")) {
+      map.humidifier = { key: "humidifier", name: "가습기", action: "50~60% 유지", icon: "💧", reason: "쾌적한 수면 환경" };
+      map.dehumidifier = { key: "dehumidifier", name: "제습기", action: "45~50% 유지", icon: "🌊", reason: "붓기 완화를 위한 습도 조절" };
+    }
+    if (selSymptoms.includes("코막힘") || selSymptoms.includes("코피")) {
+      map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 호흡 개선" };
+      map.humidifier = { key: "humidifier", name: "가습기", action: "55~60% 유지", icon: "💧", reason: "건조함 완화" };
+    }
+    if (selEmotions.includes("스트레스") || selEmotions.includes("불안") || stress >= 7) {
+      map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 기분 전환" };
+      map.aircon = { key: "aircon", name: "에어컨", action: "쾌적 온도 유지", icon: "❄️", reason: "편안한 실내 온도" };
+    }
+    return Object.values(map);
+  };
+
+  const handleSubmit = () => {
+    const next = { ...appliances };
+    getRecs().forEach((r) => { next[r.key] = true; });
+    setAppliances(next);
+    setSubmitted(true);
+  };
+
+  const APPLIANCE_LIST = [
+    { key: "airPurifier", name: "공기청정기", icon: "💨" },
+    { key: "aircon", name: "에어컨", icon: "❄️" },
+    { key: "humidifier", name: "가습기", icon: "💧" },
+    { key: "dehumidifier", name: "제습기", icon: "🌊" },
+  ];
+
+  const getApplianceStatus = (key: string) => {
+    const settings = applianceSettings[key];
+    if (!settings) return "설정 없음";
+    switch (key) {
+      case "airPurifier":
+        return `${settings.mode} • 풍량 ${settings.speed}`;
+      case "aircon":
+        return `${settings.mode} ${settings.temp}℃ • 풍량 ${settings.fan}`;
+      case "humidifier":
+        return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
+      case "dehumidifier":
+        return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
+      default:
+        return "설정됨";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="오늘의 상태 체크" onBack={onBack} />
+      <div className="px-5 py-6 space-y-6 flex-1 overflow-y-auto pb-20">
+        {!submitted ? (
+          <>
+            <div>
+              <p className="font-semibold text-foreground mb-3">현재 가전 상태</p>
+              <div className="grid grid-cols-2 gap-2">
+                {APPLIANCE_LIST.map((app) => (
+                  <div
+                    key={app.key}
+                    className="bg-card rounded-xl p-3 border border-border"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">{app.icon}</span>
+                      <p className="text-xs font-semibold text-foreground">{app.name}</p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{getApplianceStatus(app.key)}</p>
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: applianceSettings[app.key]?.power ? "#69C99A" : "#E5E7EB" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="font-semibold text-foreground mb-3">신체 불편 증상</p>
+              <div className="relative mb-3">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="증상 검색 (예: 허리, 붓기, 두통...)"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    <X size={16} className="text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {filteredSymptoms.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-3">검색 결과가 없습니다</p>
+                ) : (
+                  filteredSymptoms.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => toggleArr(selSymptoms, s, setSelSymptoms)}
+                      className="px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                      style={{
+                        background: selSymptoms.includes(s) ? "rgba(201,78,112,0.1)" : "var(--card)",
+                        border: `1.5px solid ${selSymptoms.includes(s) ? "#C94E70" : "var(--border)"}`,
+                        color: selSymptoms.includes(s) ? "#C94E70" : "var(--muted-foreground)",
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="font-semibold text-foreground mb-3">감정 상태</p>
+              <div className="grid grid-cols-2 gap-2">
+                {EMOTIONS.map((e) => (
+                  <button
+                    key={e.text}
+                    onClick={() => toggleArr(selEmotions, e.text, setSelEmotions)}
+                    className="px-3 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                    style={{
+                      background: selEmotions.includes(e.text) ? "rgba(123,104,181,0.1)" : "var(--card)",
+                      border: `1.5px solid ${selEmotions.includes(e.text) ? "#7B68B5" : "var(--border)"}`,
+                      color: selEmotions.includes(e.text) ? "#7B68B5" : "var(--muted-foreground)",
+                    }}
+                  >
+                    <span className="text-xl">{e.emoji}</span>
+                    <span>{e.text}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-semibold text-foreground">스트레스 지수</p>
+                <span
+                  className="text-lg font-bold px-3 py-1 rounded-xl"
+                  style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+                >
+                  {stress}
+                </span>
+              </div>
+              <input
+                type="range" min="1" max="10" value={stress}
+                onChange={(e) => setStress(parseInt(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                style={{ accentColor: "#C94E70" }}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>매우 낮음</span><span>매우 높음</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95"
+              style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+            >
+              분석하고 가전 제어하기
+            </button>
+          </>
+        ) : (
+          <>
+            <div
+              className="rounded-2xl p-4 flex items-center gap-3"
+              style={{ background: "rgba(105,201,154,0.1)", border: "1.5px solid rgba(105,201,154,0.3)" }}
+            >
+              <CheckCircle size={20} style={{ color: "#69C99A" }} />
+              <div>
+                <p className="font-semibold text-sm" style={{ color: "#2D5A4A" }}>분석 완료!</p>
+                <p className="text-xs text-muted-foreground">상태에 맞는 가전을 자동 설정했어요</p>
+              </div>
+            </div>
+
+            {getRecs().length > 0 && (
+              <div>
+                <p className="font-semibold text-foreground mb-3">AI 추천 이유</p>
+                <div className="space-y-2">
+                  {getRecs().map((r) => (
+                    <div key={r.key} className="bg-card rounded-xl p-3 border border-border flex items-center gap-3">
+                      <span className="text-xl">{r.icon}</span>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{r.name} — {r.action}</p>
+                        <p className="text-xs text-muted-foreground">{r.reason}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="font-semibold text-foreground mb-3">LG ThinQ 가전 제어</p>
+              <div className="space-y-3">
+                {APPLIANCE_LIST.map((app) => (
+                  <div key={app.key} className="bg-card rounded-2xl p-4 border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{app.icon}</span>
+                        <div>
+                          <p className="font-medium text-sm text-foreground">{app.name}</p>
+                          <p className="text-xs text-muted-foreground">{getApplianceStatus(app.key)}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setAppliances((prev) => ({ ...prev, [app.key]: !prev[app.key] }))}
+                        className="relative w-12 h-6 rounded-full transition-all"
+                        style={{ background: appliances[app.key] ? "#C94E70" : "#E5E7EB" }}
+                      >
+                        <span
+                          className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                          style={{ transform: appliances[app.key] ? "translateX(24px)" : "translateX(0)" }}
+                        />
+                      </button>
+                    </div>
+                    {appliances[app.key] && (
+                      <button
+                        onClick={() => setSelectedAppliance(app.key)}
+                        className="w-full mt-2 py-2 rounded-xl text-xs font-medium border border-border text-muted-foreground hover:bg-secondary/50 transition-colors"
+                      >
+                        상세 설정
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSubmitted(false)}
+              className="w-full py-3.5 rounded-2xl font-semibold border-2 transition-all active:scale-95"
+              style={{ borderColor: "#C94E70", color: "#C94E70" }}
+            >
+              다시 입력하기
+            </button>
+          </>
+        )}
+      </div>
+
+      {selectedAppliance && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={() => setSelectedAppliance(null)}>
+          <div className="bg-background rounded-t-3xl p-5 w-full max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-foreground">
+                {APPLIANCE_LIST.find((a) => a.key === selectedAppliance)?.name} 설정
+              </h3>
+              <button onClick={() => setSelectedAppliance(null)}>
+                <X size={20} className="text-muted-foreground" />
+              </button>
+            </div>
+
+            {selectedAppliance === "aircon" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">모드</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["냉방", "난방", "송풍"].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          aircon: { ...prev.aircon, mode },
+                        }))}
+                        className="py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.aircon.mode === mode ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.aircon.mode === mode ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.aircon.mode === mode ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">온도 설정</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setApplianceSettings((prev) => ({
+                        ...prev,
+                        aircon: { ...prev.aircon, temp: Math.max(16, prev.aircon.temp - 1) },
+                      }))}
+                      className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold"
+                    >
+                      -
+                    </button>
+                    <span className="text-3xl font-bold flex-1 text-center" style={{ color: "#C94E70" }}>
+                      {applianceSettings.aircon.temp}℃
+                    </span>
+                    <button
+                      onClick={() => setApplianceSettings((prev) => ({
+                        ...prev,
+                        aircon: { ...prev.aircon, temp: Math.min(30, prev.aircon.temp + 1) },
+                      }))}
+                      className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center font-semibold"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">풍량</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((speed) => (
+                      <button
+                        key={speed}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          aircon: { ...prev.aircon, fan: speed },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.aircon.fan === speed ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.aircon.fan === speed ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.aircon.fan === speed ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {speed}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "airPurifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">모드</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["자동", "수동", "수면"].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          airPurifier: { ...prev.airPurifier, mode },
+                        }))}
+                        className="py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.airPurifier.mode === mode ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.airPurifier.mode === mode ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.airPurifier.mode === mode ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">풍량</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((speed) => (
+                      <button
+                        key={speed}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          airPurifier: { ...prev.airPurifier, speed },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.airPurifier.speed === speed ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.airPurifier.speed === speed ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.airPurifier.speed === speed ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {speed}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "humidifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">목표 습도: {applianceSettings.humidifier.humidity}%</p>
+                  <input
+                    type="range"
+                    min="40"
+                    max="70"
+                    value={applianceSettings.humidifier.humidity}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      humidifier: { ...prev.humidifier, humidity: parseInt(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">강도</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((intensity) => (
+                      <button
+                        key={intensity}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          humidifier: { ...prev.humidifier, intensity },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.humidifier.intensity === intensity ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.humidifier.intensity === intensity ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.humidifier.intensity === intensity ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {intensity}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedAppliance === "dehumidifier" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">목표 습도: {applianceSettings.dehumidifier.humidity}%</p>
+                  <input
+                    type="range"
+                    min="30"
+                    max="60"
+                    value={applianceSettings.dehumidifier.humidity}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      dehumidifier: { ...prev.dehumidifier, humidity: parseInt(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">강도</p>
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map((intensity) => (
+                      <button
+                        key={intensity}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          dehumidifier: { ...prev.dehumidifier, intensity },
+                        }))}
+                        className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                        style={{
+                          background: applianceSettings.dehumidifier.intensity === intensity ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.dehumidifier.intensity === intensity ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.dehumidifier.intensity === intensity ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {intensity}단
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setSelectedAppliance(null)}
+              className="w-full mt-4 py-3 rounded-2xl font-semibold text-white"
+              style={{ background: "#C94E70" }}
+            >
+              적용하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── MENTAL CARE VIEW ───────────────────────────────────────────────────────
+function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const [mood, setMood] = useState<number | null>(null);
+  const [journal, setJournal] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState<"today" | "report" | "content" | "diary">("today");
+  const [entries, setEntries] = useState(GUARDIAN_ENTRIES_INIT);
+  const [newEntry, setNewEntry] = useState("");
+  const [showForm, setShowForm] = useState(false);
+
+  const isGuardian = user?.role === "guardian";
+
+  const MOODS = [
+    { score: 1, emoji: "😔", label: "매우 힘든" },
+    { score: 2, emoji: "😟", label: "힘든" },
+    { score: 3, emoji: "😐", label: "보통" },
+    { score: 4, emoji: "🙂", label: "좋은" },
+    { score: 5, emoji: "😊", label: "매우 좋은" },
+  ];
+
+  const CONTENT = [
+    { emoji: "🧘", title: "임산부 호흡 명상 5분", type: "명상", dur: "5분" },
+    { emoji: "🌸", title: "긍정 확언 — 나는 좋은 엄마가 될 수 있어", type: "확언", dur: "3분" },
+    { emoji: "🎵", title: "태교 음악 — 모차르트 클래식", type: "음악", dur: "20분" },
+    { emoji: "📖", title: "산전 불안 이해하고 극복하기", type: "읽기", dur: "10분" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="정신 케어" onBack={onBack} />
+
+      <div className="flex border-b border-border overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {([["today", "오늘의 감정"], ["report", "주간 리포트"], ["content", "추천 콘텐츠"], ["diary", "보호자 다이어리"]] as const).map(([t, label]) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className="shrink-0 px-4 py-3 text-sm font-medium transition-colors"
+            style={{
+              color: tab === t ? "#7B68B5" : "var(--muted-foreground)",
+              borderBottom: tab === t ? "2px solid #7B68B5" : "2px solid transparent",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-5 py-6 flex-1 overflow-y-auto pb-20">
+        {tab === "today" && (
+          <div className="space-y-6">
+            <div>
+              <p className="font-semibold text-foreground mb-3">오늘의 감정 일기</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                💡 기분은 입력하신 내용에서 자동으로 분석됩니다
+              </p>
+              <textarea
+                value={journal}
+                onChange={(e) => setJournal(e.target.value)}
+                placeholder="오늘 마음이 어떤지 자유롭게 적어보세요. 여기서는 모든 감정이 유효해요 💙"
+                rows={6}
+                className="w-full px-4 py-3 rounded-2xl border border-border bg-card focus:outline-none focus:border-primary text-sm resize-none leading-relaxed"
+              />
+            </div>
+
+            {!saved ? (
+              <button
+                onClick={() => { if (journal) setSaved(true); }}
+                disabled={!journal}
+                className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)" }}
+              >
+                오늘의 감정 저장하기
+              </button>
+            ) : (
+              <div
+                className="rounded-2xl p-5 text-center"
+                style={{ background: "rgba(123,104,181,0.08)", border: "1.5px solid rgba(123,104,181,0.2)" }}
+              >
+                <p className="text-2xl mb-2">💙</p>
+                <p className="font-semibold text-foreground">오늘의 감정이 기록되었어요</p>
+                <p className="text-sm text-muted-foreground mt-1">소중한 감정을 나눠주셔서 감사해요</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "report" && (
+          <div className="space-y-6">
+            <div>
+              <p className="font-semibold text-foreground mb-1">이번 주 감정 변화</p>
+              <p className="text-xs text-muted-foreground mb-4">5점 만점 기준</p>
+              <div className="bg-card rounded-2xl p-4 border border-border">
+                <ResponsiveContainer width="100%" height={180}>
+                  <LineChart data={MOOD_HISTORY}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+                    <XAxis dataKey="day" tick={{ fontSize: 12, fill: "#967A86" }} axisLine={false} tickLine={false} />
+                    <YAxis domain={[1, 5]} tick={{ fontSize: 11, fill: "#967A86" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ border: "none", borderRadius: "12px", background: "white", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}
+                      formatter={(v: number) => [`${v}점`, "기분"]}
+                    />
+                    <Line type="monotone" dataKey="score" stroke="#7B68B5" strokeWidth={2.5} dot={{ fill: "#7B68B5", r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "평균 기분", value: "3.5점", emoji: "🙂" },
+                { label: "최고의 날", value: "일요일", emoji: "😊" },
+                { label: "기록 일수", value: "7일", emoji: "📅" },
+              ].map((s) => (
+                <div key={s.label} className="bg-card rounded-2xl p-3 border border-border text-center">
+                  <p className="text-xl mb-1">{s.emoji}</p>
+                  <p className="font-bold text-sm text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="rounded-2xl p-4"
+              style={{ background: "rgba(123,104,181,0.06)", border: "1.5px solid rgba(123,104,181,0.15)" }}
+            >
+              <p className="font-semibold text-sm" style={{ color: "#7B68B5" }}>💜 이번 주 분석</p>
+              <p className="text-sm text-foreground mt-2 leading-relaxed">
+                전반적으로 안정적인 감정 패턴을 보이고 있어요. 목요일 기분이 낮았는데, 휴식을 충분히 취하셨나요? 꾸준한 기록이 큰 도움이 됩니다 💙
+              </p>
+            </div>
+          </div>
+        )}
+
+        {tab === "content" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">감정 패턴에 맞춘 추천 콘텐츠예요</p>
+            {CONTENT.map((c, i) => (
+              <div key={i} className="bg-card rounded-2xl p-4 border border-border flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                  style={{ background: "rgba(123,104,181,0.1)" }}
+                >
+                  {c.emoji}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm text-foreground">{c.title}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(123,104,181,0.1)", color: "#7B68B5" }}>
+                      {c.type}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{c.dur}</span>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </div>
+            ))}
+
+            <div
+              className="rounded-2xl p-4 text-center mt-2"
+              style={{ background: "rgba(201,78,112,0.05)", border: "1.5px solid rgba(201,78,112,0.1)" }}
+            >
+              <p className="text-sm font-medium text-foreground">우울·불안 지수가 높을 때는</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-3">전문 상담사와 연결되어 도움받을 수 있어요</p>
+              <button className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#C94E70" }}>
+                전문 상담 연결하기
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "diary" && (
+          <div className="space-y-5">
+            {isGuardian && (
+              <div
+                className="rounded-2xl p-4"
+                style={{ background: "linear-gradient(135deg, #FFE8EE, #FFF5F7)", border: "1px solid rgba(201,78,112,0.1)" }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">🤰</span>
+                  <p className="font-semibold text-foreground">이수진님 오늘의 컨디션</p>
+                  <span className="text-xs text-muted-foreground ml-auto">공개된 정보</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "붓기", status: "심함", color: "#E8789A" },
+                    { label: "기분", status: "보통", color: "#9B8EC4" },
+                    { label: "수면", status: "불편", color: "#FFAB76" },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-white rounded-xl p-2 text-center">
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className="text-sm font-semibold mt-0.5" style={{ color: item.color }}>{item.status}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-foreground">
+                {isGuardian ? "나의 다이어리" : "파트너의 다이어리"}
+              </p>
+              {isGuardian && (
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium text-white"
+                  style={{ background: "#C94E70" }}
+                >
+                  <Plus size={14} />새 기록
+                </button>
+              )}
+            </div>
+
+            {showForm && isGuardian && (
+              <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
+                <textarea
+                  value={newEntry}
+                  onChange={(e) => setNewEntry(e.target.value)}
+                  placeholder="오늘의 감정과 경험을 자유롭게 적어보세요..."
+                  rows={4}
+                  className="w-full text-sm px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (!newEntry.trim()) return;
+                      setEntries((prev) => [{ id: Date.now(), date: "2026년 5월 21일", content: newEntry, mood: "💙" }, ...prev]);
+                      setNewEntry("");
+                      setShowForm(false);
+                    }}
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
+                    style={{ background: "#C94E70" }}
+                  >
+                    저장
+                  </button>
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground">취소</button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {entries.map((entry) => (
+                <div key={entry.id} className="bg-card rounded-2xl p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span>{entry.mood}</span>
+                    <p className="text-xs text-muted-foreground">{entry.date}</p>
+                  </div>
+                  <p className="text-sm text-foreground leading-relaxed">{entry.content}</p>
+                </div>
+              ))}
+            </div>
+
+            {!isGuardian && (
+              <div
+                className="rounded-2xl p-4 text-center"
+                style={{ background: "rgba(201,78,112,0.05)", border: "1px solid rgba(201,78,112,0.1)" }}
+              >
+                <p className="text-sm font-medium text-foreground">파트너 초대하기</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">보호자가 내 상태를 확인하고 다이어리를 쓸 수 있어요</p>
+                <button className="px-4 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#C94E70" }}>
+                  초대 링크 보내기
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── AI RECOMMEND VIEW ──────────────────────────────────────────────────────
+function AIRecommendView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const w = user.pregnancyWeek;
+  const [tab, setTab] = useState<"recommend" | "stretch" | "content">("recommend");
+
+  const STRETCH_VIDEOS = [
+    { id: 1, title: "임신 초기 전신 스트레칭", week: "1-12주", duration: "10분", thumbnail: "🧘‍♀️", category: "주차별" },
+    { id: 2, title: "임신 중기 골반 강화 운동", week: "13-27주", duration: "15분", thumbnail: "🤸‍♀️", category: "주차별" },
+    { id: 3, title: "임신 후기 부종 완화 스트레칭", week: "28-40주", duration: "12분", thumbnail: "🦵", category: "주차별" },
+    { id: 4, title: "입덧 완화를 위한 호흡법", duration: "5분", thumbnail: "🌬️", category: "상황별", situation: "입덧" },
+    { id: 5, title: "허리 통증 완화 스트레칭", duration: "8분", thumbnail: "💆‍♀️", category: "상황별", situation: "허리통증" },
+    { id: 6, title: "수면 전 이완 요가", duration: "10분", thumbnail: "🌙", category: "상황별", situation: "수면장애" },
+    { id: 7, title: "붓기 완화 다리 마사지", duration: "7분", thumbnail: "🦶", category: "상황별", situation: "붓기" },
+  ];
+
+  const CONTENT_ITEMS = [
+    { id: 1, title: "28주차 태아 발달 이야기", type: "뉴스레터", emoji: "📰", week: 28 },
+    { id: 2, title: "임신 중 영양 관리 가이드", type: "영상", emoji: "🎥", week: null },
+    { id: 3, title: "출산 준비 체크리스트", type: "뉴스레터", emoji: "📋", week: 32 },
+    { id: 4, title: "임신성 당뇨 예방법", type: "영상", emoji: "🎬", week: null },
+  ];
+
+  const getData = (wk: number) => {
+    if (wk <= 12) return {
+      fetalSize: "라임", fetalWeight: "14g",
+      highlight: "주요 장기가 형성되는 중요한 시기입니다",
+      foods: ["엽산 풍부한 시금치", "단백질 풍부한 달걀", "생강차 (입덧 완화)", "냉수 조금씩 자주"],
+      activities: ["가벼운 산책 15분", "심호흡 운동", "명상 10분"],
+      warnings: ["날 해산물 피하기", "카페인 하루 200mg 이하", "격렬한 운동 금지"],
+    };
+    if (wk <= 27) return {
+      fetalSize: "코코넛", fetalWeight: "660g",
+      highlight: "태동이 활발해지는 시기입니다",
+      foods: ["철분 풍부한 시금치", "칼슘 풍부한 두부", "비타민D를 위한 달걀 노른자", "오메가3를 위한 연어"],
+      activities: ["수영 30분", "산전 요가", "좌측 수면 연습"],
+      warnings: ["배 압박 자세 피하기", "장시간 서있기 자제", "무거운 물건 들기 금지"],
+    };
+    return {
+      fetalSize: "수박", fetalWeight: "약 1kg",
+      highlight: "태아가 빠르게 성장하는 시기입니다",
+      foods: ["저염 식단 실천", "수분 충분히 섭취", "소량 자주 식사", "철분제 꾸준히"],
+      activities: ["가벼운 산책", "골반 운동", "좌측 수면 자세"],
+      warnings: ["붓기 심하면 즉시 병원", "급격한 체중 증가 주의", "좌식 자세 오래 하지 않기"],
+    };
+  };
+
+  const data = getData(w);
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="AI 맞춤 추천" onBack={onBack} />
+
+      <div className="flex border-b border-border">
+        {([["recommend", "주차별 추천"], ["stretch", "스트레칭"], ["content", "콘텐츠"]] as const).map(([t, label]) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className="flex-1 py-3 text-sm font-medium transition-colors"
+            style={{
+              color: tab === t ? "#FFAB76" : "var(--muted-foreground)",
+              borderBottom: tab === t ? "2px solid #FFAB76" : "2px solid transparent",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-5 py-6 space-y-5 flex-1 overflow-y-auto pb-20">
+        {tab === "recommend" && (
+          <>
+            <div
+              className="rounded-2xl p-5 text-white"
+              style={{ background: "linear-gradient(135deg, #FFAB76, #FF7A45)" }}
+            >
+              <p className="text-white/80 text-xs mb-1">현재 임신 주차</p>
+              <div className="flex items-end gap-3 mb-2">
+                <span className="text-4xl font-bold">{w}주차</span>
+                <span className="text-white/80 text-sm mb-1">{user.babyNickname || "태아"} 크기: {data.fetalSize} ({data.fetalWeight})</span>
+              </div>
+              <p className="text-white/90 text-sm">{data.highlight}</p>
+            </div>
+
+        <div
+          className="rounded-xl p-3 flex items-center gap-2 text-sm"
+          style={{ background: "rgba(201,78,112,0.06)", border: "1px solid rgba(201,78,112,0.15)" }}
+        >
+          <span>🤖</span>
+          <p className="text-muted-foreground">
+            오늘 기록한 상태와 <span className="font-semibold" style={{ color: "#C94E70" }}>{w}주차 가이드라인</span>을 함께 분석했어요
+          </p>
+        </div>
+
+        {[
+          { icon: "🍎", title: "추천 식품", items: data.foods, indicator: <CheckCircle size={16} style={{ color: "#69C99A", flexShrink: 0 }} />, grid: true },
+          { icon: "🏃", title: "권장 활동", items: data.activities, indicator: <CheckCircle size={16} style={{ color: "#69C99A", flexShrink: 0 }} />, grid: false },
+          { icon: "⚠️", title: "주의 사항", items: data.warnings, indicator: <AlertTriangle size={16} style={{ color: "#FF9A56", flexShrink: 0 }} />, grid: false },
+        ].map((section) => (
+          <div key={section.title}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">{section.icon}</span>
+              <p className="font-semibold text-foreground">{section.title}</p>
+            </div>
+            {section.grid ? (
+              <div className="grid grid-cols-2 gap-2">
+                {section.items.map((item, i) => (
+                  <div key={i} className="bg-card rounded-xl p-3 border border-border">
+                    <p className="text-sm text-foreground">{item}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {section.items.map((item, i) => (
+                  <div key={i} className="bg-card rounded-xl p-3 border border-border flex items-center gap-3">
+                    {section.indicator}
+                    <p className="text-sm text-foreground">{item}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+            <p className="text-xs text-center text-muted-foreground pb-2">
+              이 정보는 대한산부인과학회 가이드라인 기준입니다 · 의사 상담을 대체하지 않습니다
+            </p>
+          </>
+        )}
+
+        {tab === "stretch" && (
+          <>
+            <div
+              className="rounded-xl p-3 flex items-center gap-2 text-sm"
+              style={{ background: "rgba(255,171,118,0.06)", border: "1px solid rgba(255,171,118,0.15)" }}
+            >
+              <span>🧘‍♀️</span>
+              <p className="text-muted-foreground">
+                <span className="font-semibold" style={{ color: "#FFAB76" }}>{w}주차</span>에 맞는 스트레칭을 추천해드려요
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-foreground mb-3">주차별 추천</p>
+              <div className="space-y-3">
+                {STRETCH_VIDEOS.filter((v) => v.category === "주차별").map((video) => (
+                  <div key={video.id} className="bg-card rounded-2xl p-4 border border-border flex items-center gap-4">
+                    <div
+                      className="w-16 h-16 rounded-xl flex items-center justify-center text-3xl shrink-0"
+                      style={{ background: "rgba(255,171,118,0.1)" }}
+                    >
+                      {video.thumbnail}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-foreground">{video.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(255,171,118,0.1)", color: "#FFAB76" }}>
+                          {video.week}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{video.duration}</span>
+                      </div>
+                    </div>
+                    <button className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#FFAB76" }}>
+                      <Play size={16} className="text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-foreground mb-3">상황별 스트레칭</p>
+              <div className="space-y-3">
+                {STRETCH_VIDEOS.filter((v) => v.category === "상황별").map((video) => (
+                  <div key={video.id} className="bg-card rounded-2xl p-4 border border-border flex items-center gap-4">
+                    <div
+                      className="w-16 h-16 rounded-xl flex items-center justify-center text-3xl shrink-0"
+                      style={{ background: "rgba(255,171,118,0.1)" }}
+                    >
+                      {video.thumbnail}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-foreground">{video.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(123,104,181,0.1)", color: "#7B68B5" }}>
+                          {video.situation}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{video.duration}</span>
+                      </div>
+                    </div>
+                    <button className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#FFAB76" }}>
+                      <Play size={16} className="text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {tab === "content" && (
+          <>
+            <div
+              className="rounded-xl p-3 flex items-center gap-2 text-sm"
+              style={{ background: "rgba(255,171,118,0.06)", border: "1px solid rgba(255,171,118,0.15)" }}
+            >
+              <span>📚</span>
+              <p className="text-muted-foreground">
+                임신 단계별 유용한 콘텐츠를 모았어요
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {CONTENT_ITEMS.map((item) => (
+                <div key={item.id} className="bg-card rounded-2xl p-4 border border-border">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                      style={{ background: "rgba(255,171,118,0.1)" }}
+                    >
+                      {item.emoji}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{ background: "rgba(255,171,118,0.1)", color: "#FFAB76" }}
+                        >
+                          {item.type}
+                        </span>
+                        {item.week && (
+                          <span className="text-xs text-muted-foreground">{item.week}주차</span>
+                        )}
+                      </div>
+                      <p className="font-medium text-sm text-foreground">{item.title}</p>
+                    </div>
+                    <ChevronRight size={16} className="text-muted-foreground mt-1" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── INFO VIEW ──────────────────────────────────────────────────────────────
+function InfoView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const [cat, setCat] = useState("전체");
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
+    { role: "assistant", text: "안녕하세요! 임신 관련 의학 정보를 도와드리겠습니다. 궁금하신 점을 물어보세요." },
+  ]);
+  const [input, setInput] = useState("");
+
+  const CATS = ["전체", "영양", "운동", "정신건강", "태아발달", "수면"];
+  const filtered = cat === "전체" ? INFO_ITEMS : INFO_ITEMS.filter((i) => i.category === cat);
+
+  const handleSendMessage = () => {
+    if (!input.trim()) return;
+
+    const userMsg = input.trim();
+    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+    setInput("");
+
+    setTimeout(() => {
+      let response = "";
+      if (userMsg.includes("엽산") || userMsg.includes("영양")) {
+        response = "엽산은 임신 초기 태아의 신경관 발달에 매우 중요합니다. 임신 전부터 임신 12주까지 하루 400~600mcg 섭취가 권장됩니다. 시금치, 브로콜리, 강화 시리얼 등에 풍부하게 들어있습니다.";
+      } else if (userMsg.includes("운동") || userMsg.includes("걷기")) {
+        response = "임신 중 적절한 운동은 체중 관리와 출산 준비에 도움이 됩니다. 걷기, 수영, 산전 요가가 안전합니다. 주 3회, 30분 이내로 진행하며, 과도한 운동은 피해주세요. 운동 전 의사와 상담을 권장합니다.";
+      } else if (userMsg.includes("입덧") || userMsg.includes("구토")) {
+        response = "입덧은 임신 초기에 흔한 증상으로, 대부분 12~16주 이후 호전됩니다. 소량씩 자주 먹고, 생강차나 레몬이 도움이 될 수 있습니다. 심한 경우 의사와 상담하여 약물 치료를 고려해보세요.";
+      } else if (userMsg.includes("수면") || userMsg.includes("잠")) {
+        response = "임신 중 좌측 수면 자세가 혈액 순환에 가장 좋습니다. 무릎 사이에 베개를 끼우면 더 편안합니다. 카페인을 피하고, 취침 전 따뜻한 물로 샤워하는 것도 도움이 됩니다.";
+      } else {
+        response = "궁금하신 내용에 대해 더 구체적으로 말씀해 주시면 도움을 드리겠습니다. 또는 아래 검증된 정보 항목들을 참고해주세요. 심각한 증상이 있다면 즉시 의사와 상담하시기 바랍니다.";
+      }
+      setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+    }, 800);
+  };
+
+  const BADGE_COLORS: Record<string, string> = {
+    "의학 검증": "#2D7A9A",
+    "정부 공인": "#2D6B45",
+    "WHO 인증": "#6B5D2D",
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="신뢰할 수 있는 정보" onBack={onBack} />
+      <div className="px-5 py-5 space-y-5 flex-1 overflow-y-auto pb-20">
+        <div
+          className="rounded-2xl p-4 flex items-center gap-3"
+          style={{ background: "rgba(45,122,154,0.08)", border: "1px solid rgba(45,122,154,0.2)" }}
+        >
+          <Shield size={18} style={{ color: "#2D7A9A" }} />
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">검증된 출처만</span> — 대한산부인과학회, 보건복지부, WHO 기반
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowChatbot(true)}
+          className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #2D7A9A, #4A9AB8)" }}
+        >
+          <MessageCircle size={18} />
+          의학 정보 AI 챗봇 상담
+        </button>
+
+        <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          {CATS.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCat(c)}
+              className="shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all"
+              style={{
+                background: cat === c ? "#C94E70" : "var(--secondary)",
+                color: cat === c ? "white" : "var(--muted-foreground)",
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          {filtered.map((item) => (
+            <div key={item.id} className="bg-card rounded-2xl border border-border overflow-hidden">
+              <button
+                onClick={() => setExpanded(expanded === item.id ? null : item.id)}
+                className="w-full p-4 text-left"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">{item.emoji}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-medium text-white"
+                        style={{ background: BADGE_COLORS[item.badge] || "#888" }}
+                      >
+                        {item.badge}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{item.source}</span>
+                    </div>
+                    <p className="font-semibold text-sm text-foreground">{item.title}</p>
+                  </div>
+                  <ChevronRight
+                    size={16}
+                    className="text-muted-foreground mt-1 transition-transform duration-200"
+                    style={{ transform: expanded === item.id ? "rotate(90deg)" : "rotate(0)" }}
+                  />
+                </div>
+              </button>
+              {expanded === item.id && (
+                <div className="px-4 pb-4 border-t border-border">
+                  <p className="text-sm text-foreground leading-relaxed mt-3">{item.summary}</p>
+                  <button className="mt-3 text-xs font-medium" style={{ color: "#C94E70" }}>
+                    원문 출처 보기 →
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {showChatbot && (
+        <div className="absolute inset-0 bg-background z-50 flex flex-col">
+          <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm border-b border-border">
+            <button onClick={() => setShowChatbot(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+              <ArrowLeft size={20} className="text-foreground" />
+            </button>
+            <h1 className="font-semibold text-foreground">의학 정보 AI 상담</h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className="max-w-[80%] px-4 py-3 rounded-2xl"
+                  style={{
+                    background: msg.role === "user" ? "#C94E70" : "var(--card)",
+                    color: msg.role === "user" ? "white" : "var(--foreground)",
+                    border: msg.role === "assistant" ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <p className="text-sm leading-relaxed">{msg.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-5 py-4 bg-card/90 backdrop-blur-sm border-t border-border">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                placeholder="궁금한 점을 물어보세요..."
+                className="flex-1 px-4 py-3 rounded-xl border border-border bg-background focus:outline-none focus:border-primary text-sm"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!input.trim()}
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-white disabled:opacity-50"
+                style={{ background: "#C94E70" }}
+              >
+                <Send size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              이 정보는 의사 상담을 대체하지 않습니다. 심각한 증상은 즉시 병원을 방문하세요.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── DIARY VIEW ─────────────────────────────────────────────────────────────
+function DiaryView({ user, onNavigate }: { user: AppUser; onNavigate: (s: Screen) => void }) {
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [entries, setEntries] = useState([
+    { id: 1, date: "2026-05-26", mood: "😊", content: "오늘 태동을 많이 느꼈어요. 아기가 건강한 것 같아 행복합니다.", images: [], type: "daily" as const, letter: null },
+    { id: 2, date: "2026-05-25", mood: "😐", content: "허리가 좀 아팠지만 산책하니 괜찮아졌어요.", images: [], type: "daily" as const, letter: null },
+    { id: 3, date: "2026-05-24", mood: "🙂", content: "남편이 맛있는 저녁을 준비해줘서 감동이에요.", images: [], type: "daily" as const, letter: null },
+  ]);
+  const [showForm, setShowForm] = useState(false);
+  const [entryType, setEntryType] = useState<"daily" | "ultrasound" | "letter">("daily");
+  const [newContent, setNewContent] = useState("");
+  const [newMood, setNewMood] = useState<string | null>(null);
+  const [weekNumber, setWeekNumber] = useState("");
+  const [events, setEvents] = useState([
+    { id: 1, date: "2026-06-10", title: "정기 검진", type: "hospital" },
+    { id: 2, date: "2026-06-15", title: "태교 요가 수업", type: "activity" },
+  ]);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEventDate, setNewEventDate] = useState("");
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventType, setNewEventType] = useState<"hospital" | "activity">("hospital");
+
+  const MOODS = ["😔", "😟", "😐", "🙂", "😊"];
+
+  const analyzeMood = (text: string): string => {
+    const lowerText = text.toLowerCase();
+    const positiveWords = ["행복", "좋", "기쁨", "감동", "사랑", "건강", "편안", "즐거", "웃", "만족"];
+    const negativeWords = ["힘들", "아프", "슬프", "우울", "불안", "스트레스", "걱정", "외로", "피곤", "지쳐"];
+    const neutralWords = ["보통", "그냥", "평범"];
+
+    let positiveCount = 0;
+    let negativeCount = 0;
+
+    positiveWords.forEach((word) => {
+      if (lowerText.includes(word)) positiveCount++;
+    });
+    negativeWords.forEach((word) => {
+      if (lowerText.includes(word)) negativeCount++;
+    });
+
+    if (positiveCount > negativeCount * 1.5) return "😊";
+    if (positiveCount > negativeCount) return "🙂";
+    if (negativeCount > positiveCount * 1.5) return "😔";
+    if (negativeCount > positiveCount) return "😟";
+    return "😐";
+  };
+
+  const addEntry = () => {
+    if (!newContent.trim()) return;
+    const today = new Date().toISOString().split("T")[0];
+    const analyzedMood = newMood || (entryType === "daily" ? analyzeMood(newContent) : "💙");
+
+    const newEntry: any = {
+      id: Date.now(),
+      date: today,
+      mood: analyzedMood,
+      content: newContent,
+      images: [],
+      type: entryType,
+      letter: entryType === "letter" ? newContent : null,
+    };
+
+    if (entryType === "ultrasound" && weekNumber) {
+      newEntry.weekNumber = parseInt(weekNumber);
+    }
+
+    setEntries((prev) => [newEntry, ...prev]);
+    setNewContent("");
+    setNewMood(null);
+    setWeekNumber("");
+    setEntryType("daily");
+    setShowForm(false);
+  };
+
+  const getDaysInMonth = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+      const entry = entries.find((e) => e.date === dateStr);
+      const event = events.find((e) => e.date === dateStr);
+      days.push({ day: i, date: dateStr, mood: entry?.mood, hasEvent: !!event });
+    }
+    return days;
+  };
+
+  const addEvent = () => {
+    if (!newEventDate || !newEventTitle.trim()) return;
+    setEvents((prev) => [
+      ...prev,
+      { id: Date.now(), date: newEventDate, title: newEventTitle, type: newEventType },
+    ]);
+    setNewEventDate("");
+    setNewEventTitle("");
+    setNewEventType("hospital");
+    setShowEventForm(false);
+  };
+
+  const filteredEntries = selectedDate
+    ? entries.filter((e) => e.date === selectedDate)
+    : entries;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="px-5 pt-12 pb-5" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-sm text-muted-foreground">나의 임신 일기</p>
+            <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
+              다이어리
+            </h2>
+          </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-foreground">
+              {new Date().toLocaleDateString("ko-KR", { year: "numeric", month: "long" })}
+            </p>
+            <button
+              onClick={() => setShowEventForm(true)}
+              className="text-xs px-2 py-1 rounded-lg font-medium"
+              style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+            >
+              + 일정
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+              <div key={day} className="text-center text-xs text-muted-foreground font-medium py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {getDaysInMonth().map((item, i) => (
+              <button
+                key={i}
+                onClick={() => item && setSelectedDate(selectedDate === item.date ? null : item.date)}
+                className="aspect-square flex flex-col items-center justify-center rounded-lg text-xs transition-colors relative"
+                style={{
+                  background: item && selectedDate === item.date ? "rgba(201,78,112,0.1)" : "transparent",
+                  border: item && selectedDate === item.date ? "1.5px solid #C94E70" : "1px solid transparent",
+                  color: item ? "var(--foreground)" : "transparent",
+                }}
+                disabled={!item}
+              >
+                {item && (
+                  <>
+                    <span className="font-medium">{item.day}</span>
+                    {item.mood && <span className="text-base">{item.mood}</span>}
+                    {item.hasEvent && (
+                      <span className="absolute bottom-0.5 w-1 h-1 rounded-full" style={{ background: "#7B68B5" }} />
+                    )}
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-5 flex-1 overflow-y-auto">
+        {showEventForm && (
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-3 mb-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">새 일정 추가</p>
+              <button onClick={() => setShowEventForm(false)}>
+                <X size={18} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">날짜</label>
+              <input
+                type="date"
+                value={newEventDate}
+                onChange={(e) => setNewEventDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">일정 제목</label>
+              <input
+                type="text"
+                value={newEventTitle}
+                onChange={(e) => setNewEventTitle(e.target.value)}
+                placeholder="예: 정기 검진"
+                className="w-full px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">유형</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNewEventType("hospital")}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    background: newEventType === "hospital" ? "rgba(123,104,181,0.1)" : "var(--secondary)",
+                    border: `1.5px solid ${newEventType === "hospital" ? "#7B68B5" : "transparent"}`,
+                    color: newEventType === "hospital" ? "#7B68B5" : "var(--muted-foreground)",
+                  }}
+                >
+                  🏥 병원/검진
+                </button>
+                <button
+                  onClick={() => setNewEventType("activity")}
+                  className="flex-1 py-2 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    background: newEventType === "activity" ? "rgba(255,171,118,0.1)" : "var(--secondary)",
+                    border: `1.5px solid ${newEventType === "activity" ? "#FFAB76" : "transparent"}`,
+                    color: newEventType === "activity" ? "#FFAB76" : "var(--muted-foreground)",
+                  }}
+                >
+                  🎯 활동
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={addEvent}
+              disabled={!newEventDate || !newEventTitle.trim()}
+              className="w-full py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: "#C94E70" }}
+            >
+              추가하기
+            </button>
+          </div>
+        )}
+
+        {events.length > 0 && (
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-foreground mb-3">다가오는 일정</p>
+            <div className="space-y-2">
+              {events.slice(0, 3).map((event) => (
+                <div key={event.id} className="bg-card rounded-xl p-3 border border-border flex items-center gap-3">
+                  <span className="text-lg">{event.type === "hospital" ? "🏥" : "🎯"}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">{event.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(event.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showForm && (
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-3 mb-4">
+            <div className="flex gap-2">
+              {[
+                ["daily", "일상 기록"],
+                ["ultrasound", "초음파"],
+                ["letter", `${user.babyNickname || "태아"}에게`],
+              ].map(([type, label]) => (
+                <button
+                  key={type}
+                  onClick={() => setEntryType(type as any)}
+                  className="flex-1 py-2 rounded-xl text-xs font-medium transition-all"
+                  style={{
+                    background: entryType === type ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                    border: `1.5px solid ${entryType === type ? "#C94E70" : "transparent"}`,
+                    color: entryType === type ? "#C94E70" : "var(--muted-foreground)",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {entryType === "daily" && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  💡 기분은 자동으로 분석되지만, 직접 선택할 수도 있어요
+                </p>
+                <div className="flex gap-2 justify-center mb-2">
+                  {MOODS.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setNewMood(m)}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-all"
+                      style={{
+                        background: newMood === m ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                        border: `1.5px solid ${newMood === m ? "#C94E70" : "transparent"}`,
+                      }}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {entryType === "ultrasound" && (
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">주수</label>
+                <input
+                  type="number"
+                  value={weekNumber}
+                  onChange={(e) => setWeekNumber(e.target.value)}
+                  placeholder="예: 20"
+                  className="w-full px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary text-sm"
+                />
+              </div>
+            )}
+
+            <textarea
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              placeholder={
+                entryType === "daily"
+                  ? "오늘 하루는 어땠나요? 자유롭게 기록해보세요..."
+                  : entryType === "ultrasound"
+                  ? "초음파 검사 소감과 아기 상태를 기록해보세요..."
+                  : "우리 아기에게 전하고 싶은 이야기를 써보세요..."
+              }
+              rows={4}
+              className="w-full text-sm px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary resize-none"
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={addEntry}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
+                style={{ background: "#C94E70" }}
+              >
+                저장
+              </button>
+              <button
+                onClick={() => {
+                  setShowForm(false);
+                  setNewContent("");
+                  setNewMood(null);
+                  setWeekNumber("");
+                  setEntryType("daily");
+                }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {selectedDate && (
+          <div className="mb-3 flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {new Date(selectedDate).toLocaleDateString("ko-KR", { month: "long", day: "numeric" })} 일기
+            </p>
+            <button
+              onClick={() => setSelectedDate(null)}
+              className="text-xs px-2 py-1 rounded-full"
+              style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+            >
+              전체보기
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-3 pb-20">
+          {filteredEntries.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <p className="text-3xl mb-3">📖</p>
+              <p className="text-sm">아직 일기가 없어요</p>
+              <p className="text-xs mt-1">오늘의 이야기를 기록해보세요!</p>
+            </div>
+          ) : (
+            filteredEntries.map((entry) => (
+              <div
+                key={entry.id}
+                className="bg-card rounded-2xl p-4 border-2 border-border"
+                style={{
+                  borderColor: entry.type === "ultrasound" ? "#9B8EC4" : entry.type === "letter" ? "#FFB3C6" : "var(--border)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">{entry.mood}</span>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}
+                  </p>
+                  {entry.type === "ultrasound" && (
+                    <span className="text-xs px-2 py-0.5 rounded-full ml-auto" style={{ background: "rgba(155,142,196,0.1)", color: "#9B8EC4" }}>
+                      🔬 {entry.weekNumber}주차 초음파
+                    </span>
+                  )}
+                  {entry.type === "letter" && (
+                    <span className="text-xs px-2 py-0.5 rounded-full ml-auto" style={{ background: "rgba(255,179,198,0.1)", color: "#FFB3C6" }}>
+                      💌 {user.babyNickname || "태아"}에게
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-foreground leading-relaxed">{entry.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <BottomNav current="diary" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+// ── PROFILE VIEW ───────────────────────────────────────────────────────────
+function ProfileView({ user, onNavigate }: { user: AppUser; onNavigate: (s: Screen) => void }) {
+  const isPregnant = user.role === "pregnant";
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
+        <h2 className="text-2xl font-bold mb-5" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
+          내 정보
+        </h2>
+
+        <div className="flex items-center gap-4 mb-5">
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center text-3xl"
+            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}
+          >
+            {isPregnant ? "🤰" : "👨"}
+          </div>
+          <div>
+            <p className="font-bold text-xl text-foreground">{user.name}</p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
+            {user.babyNickname && (
+              <p className="text-xs text-muted-foreground mt-0.5">아기 태명: {user.babyNickname}</p>
+            )}
+            <span
+              className="inline-block mt-1 text-xs px-3 py-1 rounded-full font-medium"
+              style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+            >
+              {isPregnant ? "임산부" : "보호자"}
+            </span>
+          </div>
+        </div>
+
+        {isPregnant && (
+          <>
+            <div
+              className="rounded-2xl px-5 py-4"
+              style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)", color: "white" }}
+            >
+              <p className="text-white/80 text-xs font-medium">현재 임신</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold">{user.pregnancyWeek}주차</p>
+                  <p className="text-white/80 text-xs mt-0.5">D+{user.pregnancyWeek * 7}일</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-white/80 text-xs">출산 예정일까지</p>
+                  <p className="text-xl font-bold">{280 - user.pregnancyWeek * 7}일</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">보호자 초대 인증코드</p>
+                  <p className="text-xl font-bold mt-1" style={{ color: "#C94E70", letterSpacing: "2px" }}>
+                    {user.inviteCode || "MOMDAL28"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.inviteCode || "MOMDAL28");
+                    alert("인증코드가 복사되었습니다!");
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-white"
+                  style={{ background: "#C94E70" }}
+                >
+                  복사
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">보호자 회원가입 시 이 코드를 입력해야 합니다</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="px-5 py-5 flex-1 space-y-4 overflow-y-auto pb-20">
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">활동 통계</p>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "일기 작성", value: "12회", emoji: "📖" },
+              { label: "감정 기록", value: "18회", emoji: "💙" },
+              { label: "커뮤니티", value: "5개", emoji: "💬" },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-card rounded-2xl p-3 border border-border text-center">
+                <p className="text-xl mb-1">{stat.emoji}</p>
+                <p className="font-bold text-sm text-foreground">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {isPregnant && (
+          <div>
+            <p className="text-sm font-semibold text-foreground mb-3">임신 정보</p>
+            <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
+              {[
+                { label: "출산 예정일", value: "2026년 10월 15일" },
+                { label: "최근 검진일", value: "2026년 5월 20일" },
+                { label: "다음 검진일", value: "2026년 6월 10일" },
+                { label: "혈액형", value: "A형 Rh+" },
+              ].map((info) => (
+                <div key={info.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <p className="text-sm text-muted-foreground">{info.label}</p>
+                  <p className="text-sm font-medium text-foreground">{info.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">건강 기록</p>
+          <div className="bg-card rounded-2xl p-4 border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-foreground">평균 기분 점수</p>
+              <p className="font-bold text-foreground">3.5 / 5.0</p>
+            </div>
+            <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: "70%", background: "#7B68B5" }} />
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="rounded-2xl p-4 text-center"
+          style={{ background: "rgba(201,78,112,0.05)", border: "1px solid rgba(201,78,112,0.1)" }}
+        >
+          <p className="text-sm font-medium text-foreground">더 많은 정보를 관리하고 싶으신가요?</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">설정에서 상세 정보를 수정할 수 있어요</p>
+          <button
+            onClick={() => onNavigate("settings")}
+            className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
+            style={{ background: "#C94E70" }}
+          >
+            설정으로 이동
+          </button>
+        </div>
+      </div>
+
+      <BottomNav current="profile" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+// ── SETTINGS VIEW ──────────────────────────────────────────────────────────
+function SettingsView({ user, onNavigate, onLogout }: { user: AppUser; onNavigate: (s: Screen) => void; onLogout: () => void }) {
+  const [notifications, setNotifications] = useState({ daily: true, weekly: true, partner: true });
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [showGuardianManage, setShowGuardianManage] = useState(false);
+
+  const isPregnant = user.role === "pregnant";
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
+        <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
+          설정
+        </h2>
+      </div>
+
+      <div className="px-5 py-5 flex-1 space-y-4 overflow-y-auto pb-20">
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">알림 설정</p>
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-4">
+            {[
+              { key: "daily" as const, label: "일일 건강 체크 알림", desc: "매일 오전 9시" },
+              { key: "weekly" as const, label: "주간 리포트 알림", desc: "매주 월요일" },
+              { key: "partner" as const, label: "보호자 활동 알림", desc: "새 메시지가 있을 때" },
+            ].map((item) => (
+              <div key={item.key} className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                </div>
+                <button
+                  onClick={() => setNotifications((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+                  className="relative w-12 h-6 rounded-full transition-all"
+                  style={{ background: notifications[item.key] ? "#C94E70" : "#E5E7EB" }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200"
+                    style={{ transform: notifications[item.key] ? "translateX(24px)" : "translateX(0)" }}
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">계정</p>
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            {[
+              { label: "프로필 수정", action: () => setShowProfileEdit(true) },
+              { label: "비밀번호 변경", action: () => setShowPasswordChange(true) },
+              { label: "보호자 연결 관리", action: () => setShowGuardianManage(true) },
+            ].map((item) => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                className="w-full px-4 py-3 flex items-center justify-between border-b border-border last:border-0 hover:bg-secondary/50 transition-colors"
+              >
+                <p className="text-sm text-foreground">{item.label}</p>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">앱 정보</p>
+          <div className="bg-card rounded-2xl border border-border overflow-hidden">
+            {[
+              { label: "버전 정보", value: "1.0.0" },
+              { label: "이용약관", action: () => {} },
+              { label: "개인정보 처리방침", action: () => {} },
+              { label: "오픈소스 라이선스", action: () => {} },
+            ].map((item) => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                className="w-full px-4 py-3 flex items-center justify-between border-b border-border last:border-0 hover:bg-secondary/50 transition-colors"
+              >
+                <p className="text-sm text-foreground">{item.label}</p>
+                {"value" in item ? (
+                  <p className="text-sm text-muted-foreground">{item.value}</p>
+                ) : (
+                  <ChevronRight size={16} className="text-muted-foreground" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={onLogout}
+          className="w-full py-3 rounded-2xl font-semibold border-2 transition-all active:scale-95"
+          style={{ borderColor: "#C94E70", color: "#C94E70" }}
+        >
+          로그아웃
+        </button>
+
+        <div className="text-center pt-4">
+          <p className="text-xs text-muted-foreground">대한산부인과학회 · 보건복지부 · WHO 기반 검증 정보</p>
+        </div>
+      </div>
+
+      {showProfileEdit && (
+        <div className="fixed inset-0 bg-background z-50 flex flex-col max-w-[430px] mx-auto">
+          <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm border-b border-border">
+            <button onClick={() => setShowProfileEdit(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+              <ArrowLeft size={20} className="text-foreground" />
+            </button>
+            <h1 className="font-semibold text-foreground">프로필 수정</h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-20">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">닉네임</label>
+              <input
+                type="text"
+                defaultValue={user.nickname || ""}
+                placeholder="커뮤니티에서 사용할 닉네임"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">커뮤니티에서 표시되는 이름입니다</p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">아기 태명</label>
+              <input
+                type="text"
+                defaultValue={user.babyNickname || ""}
+                placeholder="아기를 부를 애칭"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">다이어리와 앱 전체에서 사용됩니다</p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">이름</label>
+              <input
+                type="text"
+                defaultValue={user.name}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
+              <input
+                type="email"
+                defaultValue={user.email}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm"
+                disabled
+              />
+              <p className="text-xs text-muted-foreground mt-1">이메일은 변경할 수 없습니다</p>
+            </div>
+
+            {isPregnant && (
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">현재 임신 주차</label>
+                <input
+                  type="number"
+                  defaultValue={user.pregnancyWeek}
+                  min="1"
+                  max="42"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">역할</label>
+              <div className="bg-secondary/40 px-4 py-3 rounded-xl">
+                <p className="text-sm text-foreground">
+                  {isPregnant ? "🤰 임산부" : "👨 보호자"}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">역할은 변경할 수 없습니다</p>
+            </div>
+
+            <button
+              onClick={() => {
+                alert("프로필이 수정되었습니다!");
+                setShowProfileEdit(false);
+              }}
+              className="w-full py-3 rounded-2xl font-semibold text-white"
+              style={{ background: "#C94E70" }}
+            >
+              저장하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPasswordChange && (
+        <div className="fixed inset-0 bg-background z-50 flex flex-col max-w-[430px] mx-auto">
+          <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm border-b border-border">
+            <button onClick={() => setShowPasswordChange(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+              <ArrowLeft size={20} className="text-foreground" />
+            </button>
+            <h1 className="font-semibold text-foreground">비밀번호 변경</h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-20">
+            <div
+              className="rounded-xl p-3 flex items-center gap-2 text-sm"
+              style={{ background: "rgba(201,78,112,0.05)", border: "1px solid rgba(201,78,112,0.1)" }}
+            >
+              <Shield size={16} style={{ color: "#C94E70" }} />
+              <p className="text-muted-foreground text-xs">
+                보안을 위해 현재 비밀번호를 확인합니다
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">현재 비밀번호</label>
+              <input
+                type="password"
+                placeholder="현재 비밀번호를 입력하세요"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">새 비밀번호</label>
+              <input
+                type="password"
+                placeholder="새 비밀번호를 입력하세요"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">8자 이상 입력해주세요</p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">새 비밀번호 확인</label>
+              <input
+                type="password"
+                placeholder="새 비밀번호를 다시 입력하세요"
+                className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                alert("비밀번호가 변경되었습니다!");
+                setShowPasswordChange(false);
+              }}
+              className="w-full py-3 rounded-2xl font-semibold text-white"
+              style={{ background: "#C94E70" }}
+            >
+              비밀번호 변경
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showGuardianManage && (
+        <div className="fixed inset-0 bg-background z-50 flex flex-col max-w-[430px] mx-auto">
+          <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm border-b border-border">
+            <button onClick={() => setShowGuardianManage(false)} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+              <ArrowLeft size={20} className="text-foreground" />
+            </button>
+            <h1 className="font-semibold text-foreground">보호자 연결 관리</h1>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 pb-20">
+            {isPregnant ? (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">연결된 보호자</p>
+                  <div className="bg-card rounded-2xl p-4 border border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                        style={{ background: "rgba(123,104,181,0.1)" }}
+                      >
+                        👨
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">이준혁</p>
+                        <p className="text-xs text-muted-foreground">dad@demo.kr</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(105,201,154,0.1)", color: "#69C99A" }}>
+                        ✓ 연결됨
+                      </span>
+                    </div>
+                    <div className="pt-3 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-1">연결된 날짜</p>
+                      <p className="text-sm text-foreground">2026년 4월 15일</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">보호자 초대 인증코드</p>
+                  <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#C94E70" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">회원가입 시 입력할 코드</p>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(user.inviteCode || "MOMDAL28");
+                          alert("인증코드가 복사되었습니다!");
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                        style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+                      >
+                        <Copy size={12} />
+                        복사
+                      </button>
+                    </div>
+                    <p className="text-2xl font-bold text-center py-3" style={{ color: "#C94E70", letterSpacing: "4px" }}>
+                      {user.inviteCode || "MOMDAL28"}
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground">
+                      이 코드를 보호자에게 전달하여 회원가입 시 입력하도록 안내하세요
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ background: "rgba(255,171,118,0.05)", border: "1px solid rgba(255,171,118,0.15)" }}
+                >
+                  <p className="text-sm font-medium text-foreground mb-1">💡 안내</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    • 보호자는 회원가입 시 이 인증코드를 입력해야 합니다<br />
+                    • 연결된 보호자는 내 상태를 확인하고 다이어리를 작성할 수 있습니다<br />
+                    • 연결 해제는 고객센터를 통해 가능합니다
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">연결된 임산부</p>
+                  <div className="bg-card rounded-2xl p-4 border border-border">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                        style={{ background: "rgba(201,78,112,0.1)" }}
+                      >
+                        🤰
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">이수진</p>
+                        <p className="text-xs text-muted-foreground">mom@demo.kr</p>
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(105,201,154,0.1)", color: "#69C99A" }}>
+                        ✓ 연결됨
+                      </span>
+                    </div>
+                    <div className="pt-3 border-t border-border grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">임신 주차</p>
+                        <p className="text-sm font-semibold text-foreground">28주차</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">연결된 날짜</p>
+                        <p className="text-sm text-foreground">2026.04.15</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">사용한 인증코드</p>
+                  <div className="bg-secondary/40 rounded-2xl p-4 border border-border">
+                    <p className="text-center text-xl font-bold" style={{ color: "#7B68B5", letterSpacing: "3px" }}>
+                      MOMDAL28
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground mt-2">
+                      회원가입 시 입력한 인증코드입니다
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ background: "rgba(123,104,181,0.05)", border: "1px solid rgba(123,104,181,0.15)" }}
+                >
+                  <p className="text-sm font-medium text-foreground mb-1">💡 안내</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    • 임산부의 상태와 일정을 확인할 수 있습니다<br />
+                    • 보호자 다이어리를 작성하여 소통할 수 있습니다<br />
+                    • 연결 해제는 고객센터를 통해 가능합니다
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <BottomNav current="settings" onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+// ── SMALLTALK VIEW ─────────────────────────────────────────────────────────
+function SmalltalkView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const isPregnant = user.role === "pregnant";
+  const [myAnswer, setMyAnswer] = useState("");
+  const [mySubmitted, setMySubmitted] = useState(false);
+  const [partnerSubmitted, setPartnerSubmitted] = useState(true); // 데모용
+
+  const QUESTION = "오늘 가장 행복했던 순간은 언제인가요?";
+  const babyName = user.babyNickname || "아기";
+  const PARTNER_ANSWER = isPregnant
+    ? `수진이가 웃으면서 태동 이야기를 해줄 때 정말 행복했어요. 함께 손을 배에 대고 ${babyName}를 느낄 수 있어서 좋았습니다 😊`
+    : `${babyName}의 태동을 느꼈을 때가 가장 행복했어요. 작은 생명이 자라고 있다는 걸 실감할 수 있어서 너무 신기하고 감사했습니다 💕`;
+
+  const handleSubmit = () => {
+    if (myAnswer.trim()) {
+      setMySubmitted(true);
+    }
+  };
+
+  const bothAnswered = mySubmitted && partnerSubmitted;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="스몰토크" onBack={onBack} />
+
+      <div className="px-5 py-6 flex-1 overflow-y-auto pb-20 space-y-5">
+        <div
+          className="rounded-2xl p-4"
+          style={{ background: "rgba(255,211,182,0.1)", border: "1px solid rgba(255,211,182,0.3)" }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">💕</span>
+            <p className="text-xs font-semibold" style={{ color: "#FFA882" }}>오늘의 질문</p>
+          </div>
+          <p className="text-sm font-semibold text-foreground">{QUESTION}</p>
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-foreground mb-3">내 답변</p>
+          {!mySubmitted ? (
+            <div className="space-y-3">
+              <textarea
+                value={myAnswer}
+                onChange={(e) => setMyAnswer(e.target.value)}
+                placeholder="답변을 작성해주세요..."
+                rows={5}
+                className="w-full px-4 py-3 rounded-2xl border border-border bg-card focus:outline-none focus:border-primary text-sm resize-none leading-relaxed"
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={!myAnswer.trim()}
+                className="w-full py-3 rounded-2xl font-semibold text-white disabled:opacity-50"
+                style={{ background: "#FFA882" }}
+              >
+                답변 제출하기
+              </button>
+            </div>
+          ) : (
+            <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#FFA882" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(255,168,130,0.1)", color: "#FFA882" }}>
+                  ✓ 제출 완료
+                </span>
+              </div>
+              <p className="text-sm text-foreground leading-relaxed">{myAnswer}</p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-foreground">
+              파트너의 답변 {isPregnant ? "(이준혁님)" : "(이수진님)"}
+            </p>
+            {partnerSubmitted ? (
+              <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(123,104,181,0.1)", color: "#7B68B5" }}>
+                ✓ 답변 완료
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">답변 대기 중</span>
+            )}
+          </div>
+
+          {bothAnswered ? (
+            <div className="bg-card rounded-2xl p-4 border border-border">
+              <p className="text-sm text-foreground leading-relaxed">{PARTNER_ANSWER}</p>
+            </div>
+          ) : (
+            <div className="bg-secondary/30 rounded-2xl p-8 text-center">
+              <div className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(255,168,130,0.1)" }}>
+                <span className="text-2xl">🔒</span>
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">
+                {mySubmitted ? "파트너가 답변을 작성 중입니다" : "내 답변을 먼저 제출해주세요"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                둘 다 답변을 제출하면 서로의 답변을 볼 수 있어요
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div
+          className="rounded-2xl p-4 text-center"
+          style={{ background: "rgba(255,211,182,0.05)", border: "1px solid rgba(255,211,182,0.15)" }}
+        >
+          <p className="text-sm font-medium text-foreground">💬 지난 스몰토크</p>
+          <p className="text-xs text-muted-foreground mt-1">이전 질문과 답변은 정신 케어 탭에서 확인할 수 있어요</p>
+        </div>
+      </div>
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── COMMUNITY VIEW ─────────────────────────────────────────────────────────
+function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  const baseWeek = user.pregnancyWeek || 28;
+
+  const getPeriod = (week: number) => {
+    if (week <= 13) return "초기";
+    if (week <= 27) return "중기";
+    return "후기";
+  };
+
+  const currentPeriod = getPeriod(baseWeek);
+  const [selPeriod, setSelPeriod] = useState<string>("전체");
+  const [liked, setLiked] = useState<Set<number>>(new Set());
+  const [posts, setPosts] = useState(POSTS_INIT.map((p) => ({ ...p, period: getPeriod(p.week) })));
+  const [showForm, setShowForm] = useState(false);
+  const [newPost, setNewPost] = useState("");
+
+  const PERIODS = ["전체", "초기", "중기", "후기"];
+  const filtered = selPeriod === "전체" ? posts : posts.filter((p) => p.period === selPeriod);
+
+  const toggleLike = (id: number) => {
+    const wasLiked = liked.has(id);
+    setLiked((prev) => { const next = new Set(prev); wasLiked ? next.delete(id) : next.add(id); return next; });
+    setPosts((prev) => prev.map((p) => p.id === id ? { ...p, likes: p.likes + (wasLiked ? -1 : 1) } : p));
+  };
+
+  const addPost = () => {
+    if (!newPost.trim()) return;
+    setPosts((prev) => [
+      { id: Date.now(), week: baseWeek, period: currentPeriod, avatar: "🌸", author: user.nickname || user.name, content: newPost, likes: 0, comments: 0, time: "방금 전" },
+      ...prev,
+    ]);
+    setNewPost("");
+    setShowForm(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <PageHeader title="커뮤니티" onBack={onBack} />
+      <div className="px-5 py-5 space-y-5 flex-1 overflow-y-auto pb-20">
+        <div
+          className="rounded-xl p-3 flex items-center gap-2 text-sm"
+          style={{ background: "rgba(181,234,215,0.06)", border: "1px solid rgba(181,234,215,0.15)" }}
+        >
+          <span>👥</span>
+          <p className="text-muted-foreground">
+            현재 <span className="font-semibold" style={{ color: "#78C9A0" }}>임신 {currentPeriod}</span> ({baseWeek}주차) 커뮤니티입니다
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-muted-foreground mb-3">시기별 보기</p>
+          <div className="grid grid-cols-2 gap-2">
+            {PERIODS.map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelPeriod(period)}
+                className="py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  background: selPeriod === period ? "#78C9A0" : "var(--secondary)",
+                  color: selPeriod === period ? "white" : "var(--muted-foreground)",
+                }}
+              >
+                {period === "전체" ? (
+                  "전체 보기"
+                ) : (
+                  <>
+                    임신 {period}
+                    <br />
+                    <span className="text-xs opacity-80">
+                      {period === "초기" ? "1-13주" : period === "중기" ? "14-27주" : "28-40주"}
+                    </span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="w-full py-3 rounded-2xl border-2 border-dashed text-sm font-medium flex items-center justify-center gap-2 transition-all"
+          style={{ borderColor: "rgba(120,201,160,0.3)", color: "#78C9A0" }}
+        >
+          <Plus size={16} />
+          임신 {selPeriod} 이야기 나누기
+        </button>
+
+        {showForm && (
+          <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
+            <textarea
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              placeholder="같은 주차 분들과 경험을 나눠보세요. 익명으로 게시됩니다 💙"
+              rows={4}
+              className="w-full text-sm px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary resize-none"
+            />
+            <div className="flex gap-2">
+              <button onClick={addPost} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#C94E70" }}>게시하기</button>
+              <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground">취소</button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {filtered.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <p className="text-3xl mb-3">💬</p>
+              <p className="text-sm">아직 게시물이 없어요</p>
+              <p className="text-xs mt-1">첫 번째로 이야기를 나눠보세요!</p>
+            </div>
+          ) : (
+            filtered.map((post) => (
+              <div key={post.id} className="bg-card rounded-2xl p-4 border border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">{post.avatar}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{post.author}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
+                        임신 {post.period}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{post.week}주차</span>
+                      <span className="text-xs text-muted-foreground">{post.time}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-foreground leading-relaxed mb-3">{post.content}</p>
+                <div className="flex items-center gap-4 pt-2 border-t border-border">
+                  <button
+                    onClick={() => toggleLike(post.id)}
+                    className="flex items-center gap-1.5 text-xs transition-colors"
+                    style={{ color: liked.has(post.id) ? "#C94E70" : "var(--muted-foreground)" }}
+                  >
+                    <ThumbsUp size={14} />
+                    <span>{post.likes}</span>
+                  </button>
+                  <button className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MessageCircle size={14} />
+                    <span>{post.comments}</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
+    </div>
+  );
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────────────────
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("home");
+  const [user, setUser] = useState<AppUser | null>(null);
+
+  const go = (s: Screen) => setScreen(s);
+  const back = () => setScreen(user ? "dashboard" : "home");
+
+  const login = (u: AppUser) => { setUser(u); setScreen("dashboard"); };
+  const logout = () => { setUser(null); setScreen("home"); };
+
+  const demoLogin = (role: Role) => {
+    const found = DEMO_USERS.find((u) => u.role === role)!;
+    login({ name: found.name, nickname: found.nickname, babyNickname: found.babyNickname, email: found.email, role: found.role, pregnancyWeek: found.pregnancyWeek, inviteCode: found.inviteCode });
+  };
+
+  return (
+    <div className="size-full flex items-center justify-center" style={{ background: "#EDE0E5" }}>
+      <div
+        className="w-full max-w-[430px] h-screen overflow-y-auto relative bg-background shadow-2xl"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {screen === "home" && <HomeView onLogin={() => go("login")} onRegister={() => go("register")} onDemoLogin={demoLogin} />}
+        {screen === "login" && <LoginView onBack={() => go("home")} onSuccess={login} onRegister={() => go("register")} />}
+        {screen === "register" && <RegisterView onBack={() => go("home")} onSuccess={login} />}
+        {screen === "dashboard" && user && <DashboardView user={user} onNavigate={go} onLogout={logout} />}
+        {screen === "discomfort" && <DiscomfortView onBack={back} onNavigate={go} />}
+        {screen === "mental" && <MentalCareView user={user} onBack={back} onNavigate={go} />}
+        {screen === "ai" && user && <AIRecommendView user={user} onBack={back} onNavigate={go} />}
+        {screen === "info" && <InfoView onBack={back} onNavigate={go} />}
+        {screen === "community" && user && <CommunityView user={user} onBack={back} onNavigate={go} />}
+        {screen === "smalltalk" && user && <SmalltalkView user={user} onBack={back} onNavigate={go} />}
+        {screen === "diary" && user && <DiaryView user={user} onNavigate={go} />}
+        {screen === "profile" && user && <ProfileView user={user} onNavigate={go} />}
+        {screen === "settings" && user && <SettingsView user={user} onNavigate={go} onLogout={logout} />}
+      </div>
+    </div>
+  );
+}
