@@ -5,3 +5,6 @@ Project/node_modules
 Project/AI_Chat/node_modules
 Project/AI_Chat/.npm-cache
 Project/AI_Chat/.env
+backend/__pycache__/
+__pycache__/
+*.pyc
