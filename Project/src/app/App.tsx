@@ -1672,10 +1672,13 @@ function AIRecommendView({ user, onBack, onNavigate }: { user: AppUser; onBack: 
 
 // ── INFO VIEW ──────────────────────────────────────────────────────────────
 function InfoView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s: Screen) => void }) {
+  type ChatSource = { title: string; organization: string; url: string };
+  type ChatCareLevel = "information" | "clarify" | "contact_now" | "emergency";
+  type ChatMessage = { role: "user" | "assistant"; text: string; sources?: ChatSource[]; careLevel?: ChatCareLevel; responseMode?: string };
   const [cat, setCat] = useState("전체");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [showChatbot, setShowChatbot] = useState(false);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", text: "안녕하세요! 임신 관련 의학 정보를 도와드리겠습니다. 궁금하신 점을 물어보세요." },
   ]);
   const [input, setInput] = useState("");
@@ -1683,34 +1686,59 @@ function InfoView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s:
   const CATS = ["전체", "영양", "운동", "정신건강", "태아발달", "수면"];
   const filtered = cat === "전체" ? INFO_ITEMS : INFO_ITEMS.filter((i) => i.category === cat);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!input.trim()) return;
 
     const userMsg = input.trim();
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setInput("");
 
-    setTimeout(() => {
-      let response = "";
-      if (userMsg.includes("엽산") || userMsg.includes("영양")) {
-        response = "엽산은 임신 초기 태아의 신경관 발달에 매우 중요합니다. 임신 전부터 임신 12주까지 하루 400~600mcg 섭취가 권장됩니다. 시금치, 브로콜리, 강화 시리얼 등에 풍부하게 들어있습니다.";
-      } else if (userMsg.includes("운동") || userMsg.includes("걷기")) {
-        response = "임신 중 적절한 운동은 체중 관리와 출산 준비에 도움이 됩니다. 걷기, 수영, 산전 요가가 안전합니다. 주 3회, 30분 이내로 진행하며, 과도한 운동은 피해주세요. 운동 전 의사와 상담을 권장합니다.";
-      } else if (userMsg.includes("입덧") || userMsg.includes("구토")) {
-        response = "입덧은 임신 초기에 흔한 증상으로, 대부분 12~16주 이후 호전됩니다. 소량씩 자주 먹고, 생강차나 레몬이 도움이 될 수 있습니다. 심한 경우 의사와 상담하여 약물 치료를 고려해보세요.";
-      } else if (userMsg.includes("수면") || userMsg.includes("잠")) {
-        response = "임신 중 좌측 수면 자세가 혈액 순환에 가장 좋습니다. 무릎 사이에 베개를 끼우면 더 편안합니다. 카페인을 피하고, 취침 전 따뜻한 물로 샤워하는 것도 도움이 됩니다.";
-      } else {
-        response = "궁금하신 내용에 대해 더 구체적으로 말씀해 주시면 도움을 드리겠습니다. 또는 아래 검증된 정보 항목들을 참고해주세요. 심각한 증상이 있다면 즉시 의사와 상담하시기 바랍니다.";
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMsg,
+          history: messages.map(({ role, text, responseMode }) => ({ role, text, responseMode })),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "상담 서버에서 응답을 받지 못했습니다.");
       }
-      setMessages((prev) => [...prev, { role: "assistant", text: response }]);
-    }, 800);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: data.answer,
+          sources: data.sources,
+          careLevel: data.careLevel,
+          responseMode: data.responseMode,
+        },
+      ]);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "상담 서버 연결에 실패했습니다.";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `현재 AI 상담을 연결할 수 없습니다. ${detail}`,
+        },
+      ]);
+    }
   };
 
   const BADGE_COLORS: Record<string, string> = {
     "의학 검증": "#2D7A9A",
     "정부 공인": "#2D6B45",
     "WHO 인증": "#6B5D2D",
+  };
+  const CARE_LABELS: Partial<Record<ChatCareLevel, { text: string; background: string; color: string }>> = {
+    clarify: { text: "증상을 조금 더 알려주세요", background: "#F5F1E9", color: "#6B5D2D" },
+    contact_now: { text: "지금 의료진 확인이 필요해요", background: "#FFF0E6", color: "#9A4D20" },
+    emergency: { text: "즉시 도움을 요청하세요", background: "#FDECEC", color: "#A12828" },
   };
 
   return (
@@ -1813,7 +1841,34 @@ function InfoView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (s:
                     border: msg.role === "assistant" ? "1px solid var(--border)" : "none",
                   }}
                 >
-                  <p className="text-sm leading-relaxed">{msg.text}</p>
+                  {msg.role === "assistant" && msg.careLevel && CARE_LABELS[msg.careLevel] && (
+                    <span
+                      className="inline-block text-xs font-semibold rounded-full px-2.5 py-1 mb-2"
+                      style={{
+                        background: CARE_LABELS[msg.careLevel]!.background,
+                        color: CARE_LABELS[msg.careLevel]!.color,
+                      }}
+                    >
+                      {CARE_LABELS[msg.careLevel]!.text}
+                    </span>
+                  )}
+                  <p className="text-sm leading-relaxed whitespace-pre-line">{msg.text}</p>
+                  {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-1">
+                      {msg.sources.map((source) => (
+                        <a
+                          key={source.url}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block text-xs font-medium underline break-words"
+                          style={{ color: "#2D7A9A" }}
+                        >
+                          출처 보기: {source.organization} - {source.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
