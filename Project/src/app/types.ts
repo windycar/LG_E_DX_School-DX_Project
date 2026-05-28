@@ -1,0 +1,31 @@
+export type Screen =
+  | "home" | "login" | "register" | "dashboard"
+  | "discomfort" | "mental" | "ai" | "info" | "community" | "smalltalk"
+  | "diary" | "profile" | "settings" | "appliance";
+
+export type Role = "pregnant" | "guardian";
+
+export interface AppUser {
+  name: string;
+  email: string;
+  role: Role;
+  pregnancyWeek: number;
+  inviteCode?: string;
+  partnerEmail?: string;
+  nickname?: string;
+  babyNickname?: string;
+  user_id?: number;
+  parent_user_id?: number | null;
+  connected_pregnant?: {
+    name: string;
+    baby_nickname: string | null;
+    pregnancy_start_date: string;
+  } | null;
+}
+
+export interface PartnerStatus {
+  symptoms: string[];
+  emotions: string[];
+  stress: number;
+  timestamp: string;
+}

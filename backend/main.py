@@ -9,8 +9,8 @@ app = FastAPI()
 from fastapi.middleware.cors import CORSMiddleware # 1. 필수 import
 import random
 import string
-
-
+from database import get_db
+from pydantic import BaseModel
 # 2. CORS 정책 설정 (이게 있어야 브라우저가 통신을 허용합니다)
 app.add_middleware(
     CORSMiddleware,
@@ -21,11 +21,61 @@ app.add_middleware(
 )
 # backend/main.py
 
+# 🚀 1. 게시글 목록 불러오기 (USERS 테이블과 JOIN하여 진짜 이름/역할 연동)
+@app.get("/api/community/posts")
+def get_community_posts(db: Session = Depends(database.get_db)):
+    # COMMUNITY_POSTS와 USERS 테이블을 작성자 ID(user_id) 기준으로 조인합니다.
+    results = db.query(models.CommunityPost, models.User)\
+                .join(models.User, models.CommunityPost.user_id == models.User.id)\
+                .order_by(models.CommunityPost.created_at.desc()).all()
+    
+    posts_list = []
+    for post, user in results:
+        posts_list.append({
+            "id": post.post_id,
+            "user_id": post.user_id,
+            "period": post.pregnancy_period,
+            "title": post.title,
+            "content": post.content,
+            "created_at": post.created_at,
+            # 🚀 데베 USERS 테이블에서 실시간으로 가져온 진짜 회원 정보 연동!
+            "role": "pregnant" if user.role == "PREGNANT" else "guardian", 
+            "author": user.name, # 유저 테이블의 진짜 이름
+            "avatar": "🤰" if user.role == "PREGNANT" else "👨",
+            "likes": 0,
+            "comments": 0
+        })
+    return {"status": "Success", "posts": posts_list}
 
 
-
-
-
+# 🚀 2. 새 게시글 작성하기 (schemas.PostCreate 규격 사용)
+@app.post("/api/community/posts")
+def create_community_post(post: schemas.PostCreate, db: Session = Depends(database.get_db)):
+    # schemas.py에 정의한 규격을 그대로 사용하여 안전하게 DB에 인서트합니다.
+    new_post = models.CommunityPost(
+        user_id=post.user_id,
+        pregnancy_period=post.pregnancy_period,
+        title=post.title,
+        content=post.content
+    )
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return {"status": "Success", "post": new_post}
+# main.py 의 게시글 작성(post) 코드 아래에 추가하십시오.
+# 삭제버튼을 허용하는 게시글 삭제 코드
+@app.delete("/api/community/posts/{post_id}")
+def delete_community_post(post_id: int, db: Session = Depends(database.get_db)):
+    # DB에서 해당 ID의 게시글을 찾습니다
+    post = db.query(models.CommunityPost).filter(models.CommunityPost.post_id == post_id).first()
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    
+    # 찾았으면 삭제합니다
+    db.delete(post)
+    db.commit()
+    return {"status": "Success", "message": "게시글이 삭제되었습니다."}
 
 
 

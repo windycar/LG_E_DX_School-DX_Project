@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, Date
 from database import Base
+from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy.sql import func
 
 # backend/models.py
 # backend/models.py
@@ -17,3 +19,16 @@ class User(Base):
     
     # 🚀 이 부분이 빠져있어서 에러가 났던 것입니다! 추가하십시오.
     parent_user_id = Column(Integer, nullable=True)
+
+
+# (다른 import가 있다면 그대로 두십시오)
+
+class CommunityPost(Base):
+    __tablename__ = "COMMUNITY_POSTS"
+
+    post_id = Column(BigInteger, primary_key=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False)
+    pregnancy_period = Column(String(50), nullable=True) # 초기, 중기, 후기
+    title = Column(String(200), nullable=True)           # 제목
+    content = Column(Text, nullable=True)                # 내용
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

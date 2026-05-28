@@ -14,3 +14,9 @@ class UserCreate(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class PostCreate(BaseModel):
+    user_id: int
+    pregnancy_period: str
+    title: str
+    content: str

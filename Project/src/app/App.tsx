@@ -11,38 +11,12 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-// ── Types ──────────────────────────────────────────────────────────────────
-type Screen =
-  | "home" | "login" | "register" | "dashboard"
-  | "discomfort" | "mental" | "ai" | "info" | "community" | "smalltalk"
-  | "diary" | "profile" | "settings" | "appliance";
-type Role = "pregnant" | "guardian";
-
-interface AppUser {
-  name: string;
-  email: string;
-  role: Role;
-  pregnancyWeek: number;
-  inviteCode?: string;
-  partnerEmail?: string;
-  nickname?: string;
-  babyNickname?: string;
-  user_id?: number;
-  parent_user_id?: number | null;
-  connected_pregnant?: {
-    name: string;
-    baby_nickname: string | null;
-    pregnancy_start_date: string;
-  } | null;
-}
-
-interface PartnerStatus {
-  symptoms: string[];
-  emotions: string[];
-  stress: number;
-  timestamp: string;
-}
-
+// 🚀 분할한 파일 불러오기!
+import { Screen, Role, AppUser, PartnerStatus } from "./types";
+import LoginView from "./LoginView";
+import DashboardView from "./DashboardView";
+// 🚀 새로 추가할 부분
+import CommunityView from "./CommunityView";
 // ── Mock data ──────────────────────────────────────────────────────────────
 const DEMO_USERS: Array<AppUser & { password: string }> = [
   { email: "mom@demo.kr", password: "1234", name: "이수진", role: "pregnant", pregnancyWeek: 28, nickname: "행복한예비맘", babyNickname: "콩이", inviteCode: "MOMDAL28" },
@@ -100,7 +74,8 @@ function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 
-function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (s: Screen) => void }) {
+// 🚀 DashboardView에서 쓸 수 있도록 export 추가
+export function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (s: Screen) => void }) {
   const tabs: Array<{ id: Screen; icon: typeof Home; label: string }> = [
     { id: "dashboard", icon: Home, label: "홈" },
     { id: "appliance", icon: Zap, label: "가전제어" },
@@ -608,108 +583,6 @@ function HomeView({
   );
 }
 
-// ── LOGIN VIEW ─────────────────────────────────────────────────────────────
-function LoginView({
-  onBack, onSuccess, onRegister,
-}: {
-  onBack: () => void;
-  onSuccess: (u: AppUser) => void;
-  onRegister: () => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("http://localhost:8000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.status === "Success") {
-        // 🚀 서버에서 받은 user 데이터 객체를 그대로 매핑
-        const userInfo = data.user;
-        
-        onSuccess({
-          name: userInfo.name,
-          nickname: userInfo.name, // 닉네임이 DB에 따로 없으면 이름으로 대체
-          babyNickname: userInfo.baby_nickname || "아기", 
-          email: email,
-          role: userInfo.role === "PREGNANT" ? "pregnant" : "guardian",
-          pregnancyWeek: 0, // 추후 계산 로직 추가 가능
-          user_id: userInfo.user_id,
-          parent_user_id: userInfo.parent_user_id,
-          connected_pregnant: userInfo.connected_pregnant
-        });
-      } else {
-        setError(data.detail || "이메일 또는 비밀번호가 올바르지 않습니다.");
-      }
-    } catch (err) {
-      setError("서버와 통신할 수 없습니다. 백엔드 서버를 확인해주세요.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
-      <div className="px-5 py-4">
-        <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
-          <ArrowLeft size={22} style={{ color: "#C94E70" }} />
-        </button>
-      </div>
-
-      <div className="flex-1 flex flex-col justify-center px-8 -mt-8">
-        <div className="text-center mb-10">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-md" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
-            <span className="text-3xl">🌸</span>
-          </div>
-          <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>다시 오셨군요 👋</h2>
-          <p className="text-muted-foreground text-sm mt-1">맘달 계정으로 로그인하세요</p>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground block mb-2">비밀번호</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" onKeyDown={(e) => e.key === "Enter" && handleLogin()} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
-          </div>
-
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
-
-          <button onClick={handleLogin} disabled={loading || !email || !password} className="w-full py-3.5 rounded-xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed mt-2" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
-            {loading ? "로그인 중..." : "로그인"}
-          </button>
-
-          <div className="pt-2 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center mb-3">데모 계정으로 빠른 로그인</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setEmail("mom@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors">🤰 임산부 계정</button>
-              <button onClick={() => { setEmail("dad@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground transition-colors hover:border-purple-500 hover:text-purple-500">👨 보호자 계정</button>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          아직 계정이 없으신가요?{" "}
-          <button onClick={onRegister} className="font-semibold" style={{ color: "#C94E70" }}>회원가입</button>
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ── REGISTER VIEW ──────────────────────────────────────────────────────────
 function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
   const [name, setName] = useState("");
@@ -739,27 +612,26 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
       const response = await fetch("http://localhost:8000/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-       // App.tsx -> handleRegister 내 body
-body: JSON.stringify({
-    email: email,
-    password: password,
-    name: name,
-    role: role === "pregnant" ? "PREGNANT" : "GUARDIAN",
-    start_date: startDate,
-    baby_nickname: babyNickname, // 🚀 이 키값이 models.py의 속성명과 같아야 함
-    input_connection_code: inviteCode
-}),
+        body: JSON.stringify({
+          email: email,
+          password: password,
+          name: name,
+          role: role === "pregnant" ? "PREGNANT" : "GUARDIAN",
+          start_date: startDate,
+          baby_nickname: babyNickname, 
+          input_connection_code: inviteCode
+        }),
       });
 
       const result = await response.json();
       
       if (result.status === "Success") {
-  const msg = result.connection_code 
-    ? `회원가입 완료! 인증코드: ${result.connection_code}` 
-    : "회원가입 완료!";
-  alert(msg);
-  onSuccess({ name, email, role, pregnancyWeek: 0 });
-} else {
+        const msg = result.connection_code 
+          ? `회원가입 완료! 인증코드: ${result.connection_code}` 
+          : "회원가입 완료!";
+        alert(msg);
+        onSuccess({ name, email, role, pregnancyWeek: 0 });
+      } else {
         setError(result.error || "가입 실패");
       }
     } catch (e) {
@@ -783,21 +655,21 @@ body: JSON.stringify({
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
-          {/* 역할 선택 */}
           <div className="grid grid-cols-2 gap-3">
-            {([["pregnant", "🤰", "임산부"], ["guardian", "👨", "보호자"]] as const).map(([r, emoji, label]) => (
-              <button key={r} onClick={() => setRole(r as any)} className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all" style={{ borderColor: role === r ? "#C94E70" : "var(--border)", background: role === r ? "rgba(201, 78, 112, 0.06)" : "transparent" }}>
-                <span className="text-2xl">{emoji}</span>
-                <span className="text-sm font-medium" style={{ color: role === r ? "#C94E70" : "var(--muted-foreground)" }}>{label}</span>
-              </button>
-            ))}
+            {(["pregnant", "guardian"] as const).map((r) => {
+              const [roleKey, emoji, label] = r === "pregnant" ? ["pregnant", "🤰", "임산부"] : ["guardian", "👨", "보호자"];
+              return (
+                <button key={roleKey} onClick={() => setRole(roleKey as any)} className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all" style={{ borderColor: role === roleKey ? "#C94E70" : "var(--border)", background: role === roleKey ? "rgba(201, 78, 112, 0.06)" : "transparent" }}>
+                  <span className="text-2xl">{emoji}</span>
+                  <span className="text-sm font-medium" style={{ color: role === roleKey ? "#C94E70" : "var(--muted-foreground)" }}>{label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* 입력창 리스트 */}
           <input placeholder="이름" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           <input placeholder="닉네임" value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           
-          {/* 🚀 임산부 전용 태명 UI는 그대로 유지 */}
           {role === "pregnant" && (
             <input placeholder="아기 태명" value={babyNickname} onChange={e => setBabyNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           )}
@@ -805,7 +677,6 @@ body: JSON.stringify({
           <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
 
-          {/* 조건부 필드 UI는 그대로 유지 */}
           {role === "pregnant" ? (
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm" />
           ) : (
@@ -819,255 +690,6 @@ body: JSON.stringify({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-// ── DASHBOARD VIEW ─────────────────────────────────────────────────────────
-function DashboardView({
-  user, onNavigate, onLogout, partnerStatus,
-}: {
-  user: AppUser;
-  onNavigate: (s: Screen) => void;
-  onLogout: () => void;
-  partnerStatus?: PartnerStatus | null;
-}) {
-  const isPregnant = user.role === "pregnant";
-  
-  // 🚀 백엔드에서 받아온 실제 연동 임산부 데이터 추출
-  const connected = (user as any).connected_pregnant;
-const getPregnancyWeek = (startDateStr: string | undefined) => {
-    if (!startDateStr) return 0;
-    const start = new Date(startDateStr);
-    const today = new Date();
-    // 며칠이 지났는지 계산 후 7로 나누어 주차(Week) 반환
-    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(0, Math.floor(diffDays / 7));
-  };
-
-  // 보호자일 경우, 연동된 임산부의 시작일로 주차 계산
-  const displayWeek = connected ? getPregnancyWeek(connected.pregnancy_start_date) : 0;
-  const getMissionFromStatus = (status: PartnerStatus | null) => {
-    if (!status) return null;
-
-    const { symptoms, emotions, stress } = status;
-
-    if (symptoms.length === 0 && emotions.length === 0 && stress <= 3) {
-      return {
-        type: "good" as const,
-        icon: "😊",
-        message: "아내가 오늘 기분이 좋아요!",
-        subtitle: "함께 행복한 시간을 보내세요 💕",
-        color: "#69C99A",
-      };
-    }
-
-    const missionMap: Record<string, { icon: string; message: string; subtitle: string }> = {
-      "두통": { icon: "💊", message: "아내가 두통이 있어요", subtitle: "조용한 환경을 만들어주고 빨래를 대신 해주세요" },
-      "입덧": { icon: "🍵", message: "아내가 입덧으로 힘들어해요", subtitle: "생강차를 준비해주고 환기를 시켜주세요" },
-      "붓기": { icon: "🦶", message: "아내가 붓기로 불편해해요", subtitle: "발 마사지를 해주고 다리를 높이 올려 쉬도록 해주세요" },
-      "피로감": { icon: "😴", message: "아내가 피곤해하고 있어요", subtitle: "집안일을 대신하고 충분히 쉴 수 있게 해주세요" },
-      "허리통증": { icon: "💆", message: "아내가 허리 통증이 있어요", subtitle: "부드럽게 마사지해주고 무거운 물건을 들지 않게 도와주세요" },
-      "수면장애": { icon: "🌙", message: "아내가 잠을 잘 못 자고 있어요", subtitle: "조명을 어둡게 하고 편안한 환경을 만들어주세요" },
-      "소화불량": { icon: "🍽️", message: "아내가 소화불량이에요", subtitle: "가벼운 식사를 준비하고 식후 산책을 함께 해주세요" },
-    };
-
-    for (const symptom of symptoms) {
-      if (missionMap[symptom]) {
-        return {
-          type: "mission" as const,
-          icon: missionMap[symptom].icon,
-          message: missionMap[symptom].message,
-          subtitle: missionMap[symptom].subtitle,
-          color: "#FFAB76",
-        };
-      }
-    }
-
-    if (emotions.includes("스트레스") || emotions.includes("불안") || emotions.includes("우울감")) {
-      return {
-        type: "mission" as const,
-        icon: "💙",
-        message: "아내가 감정적으로 힘든 시간이에요",
-        subtitle: "대화를 나누고 따뜻하게 안아주세요",
-        color: "#9B8EC4",
-      };
-    }
-
-    if (stress >= 7) {
-      return {
-        type: "mission" as const,
-        icon: "🧘",
-        message: "아내의 스트레스 지수가 높아요",
-        subtitle: "함께 산책하거나 좋아하는 음악을 들어주세요",
-        color: "#FFAB76",
-      };
-    }
-
-    return {
-      type: "info" as const,
-      icon: "💕",
-      message: "아내의 컨디션을 확인해보세요",
-      subtitle: "작은 관심이 큰 힘이 됩니다",
-      color: "#FFB3C6",
-    };
-  };
-
-  const mission = !isPregnant ? getMissionFromStatus(partnerStatus) : null;
-
-  const features: Array<{ id: Screen; icon: string; title: string; subtitle: string; grad: [string, string]; available: boolean }> = [
-    { id: "discomfort", icon: "🏠", title: "오늘의 상태 체크", subtitle: "불편 증상 & 가전 자동 제어", grad: ["#FFB3C6", "#FF8FAB"], available: isPregnant },
-    { id: "mental", icon: "💙", title: "정신 케어", subtitle: "감정 일기 & 주간 리포트", grad: ["#C3B1E1", "#9B8EC4"], available: isPregnant },
-    { id: "ai", icon: "🤖", title: "AI 맞춤 추천", subtitle: `${user.pregnancyWeek}주차 맞춤 가이드`, grad: ["#FFDAA5", "#FFB74D"], available: isPregnant },
-    { id: "info", icon: "📋", title: "신뢰 정보", subtitle: "검증된 의학 정보만", grad: ["#A8E6CF", "#69C99A"], available: true },
-    { id: "community", icon: "💬", title: "커뮤니티", subtitle: "같은 시기 예비맘들과 소통", grad: ["#B5EAD7", "#78C9A0"], available: true },
-    { id: "smalltalk", icon: "💕", title: "스몰토크", subtitle: "매일 질문으로 대화하기", grad: ["#FFD3B6", "#FFA882"], available: true },
-  ];
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <div
-        className="px-5 pt-12 pb-6"
-        style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-sm text-muted-foreground">안녕하세요 👋</p>
-            <h2
-              className="text-2xl font-bold"
-              style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
-            >
-              {user.name}님
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
-              style={{ background: "rgba(201, 78, 112, 0.1)" }}
-            >
-              {isPregnant ? "🤰" : "👨"}
-            </div>
-            <button
-              onClick={onLogout}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/60 transition-colors"
-            >
-              <LogOut size={16} className="text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-
-        {isPregnant ? (
-          <div
-            className="rounded-2xl px-5 py-4 flex items-center justify-between"
-            style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)", color: "white" }}
-          >
-            <div>
-              <p className="text-white/80 text-xs font-medium">{user.babyNickname ? `${user.babyNickname}와 함께` : "현재 임신"}</p>
-              <p className="text-3xl font-bold">{user.pregnancyWeek}주차</p>
-              <p className="text-white/80 text-xs mt-0.5">오늘도 잘 하고 있어요 ✨</p>
-            </div>
-            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
-              <span className="text-3xl">👶</span>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div
-              className="rounded-2xl px-5 py-4 mb-3"
-              style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}
-            >
-              <p className="text-white/80 text-xs font-medium">
-                보호자 모드 {connected?.baby_nickname ? `· ${connected.baby_nickname}` : ""}
-              </p>
-              <p className="text-xl font-bold">
-                {connected ? `${connected.name}님의 임신 ${displayWeek}주차` : "연결된 임산부가 없습니다"}
-              </p>
-              <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
-            </div>
-
-            {mission && (
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className="rounded-2xl px-5 py-4 shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${mission.color}15, ${mission.color}08)`,
-                  border: `2px solid ${mission.color}40`,
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0"
-                    style={{ background: `${mission.color}20` }}
-                  >
-                    {mission.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-foreground">{mission.message}</p>
-                      {mission.type === "mission" && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{ background: `${mission.color}`, color: "white" }}
-                        >
-                          오늘의 미션
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{mission.subtitle}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="px-5 py-5">
-        <p className="font-semibold text-foreground mb-4">무엇이 필요하세요?</p>
-        <div className="grid grid-cols-2 gap-3">
-          {features.map((feat, i) => (
-            <motion.button
-              key={feat.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07 }}
-              onClick={() => feat.available && onNavigate(feat.id)}
-              className="bg-card rounded-2xl p-4 text-left border border-border hover:shadow-md transition-all active:scale-95 relative overflow-hidden"
-            >
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 text-2xl"
-                style={{ background: `linear-gradient(135deg, ${feat.grad[0]}, ${feat.grad[1]})` }}
-              >
-                {feat.icon}
-              </div>
-              <p className="font-semibold text-foreground text-sm leading-tight">{feat.title}</p>
-              <p className="text-xs text-muted-foreground mt-1">{feat.subtitle}</p>
-              {!feat.available && (
-                <div className="absolute inset-0 bg-card/80 rounded-2xl flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground">임산부 전용</span>
-                </div>
-              )}
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      <div className="px-5 pb-8 flex-1">
-        <div
-          className="rounded-2xl p-4"
-          style={{ background: "linear-gradient(135deg, #FFF0F5, #F9E4EC)" }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Star size={14} style={{ color: "#C94E70" }} />
-            <p className="text-xs font-semibold" style={{ color: "#C94E70" }}>오늘의 팁</p>
-          </div>
-          <p className="text-sm text-foreground font-medium">28주차에는 좌측 수면 자세가 혈액순환에 좋아요</p>
-          <p className="text-xs text-muted-foreground mt-1">무릎 사이에 베개를 끼우면 더욱 편안합니다 💤</p>
-        </div>
-      </div>
-
-      <BottomNav current="dashboard" onNavigate={onNavigate} />
     </div>
   );
 }
@@ -2255,8 +1877,7 @@ function DiaryView({ user, onNavigate }: { user: AppUser; onNavigate: (s: Screen
     const lowerText = text.toLowerCase();
     const positiveWords = ["행복", "좋", "기쁨", "감동", "사랑", "건강", "편안", "즐거", "웃", "만족"];
     const negativeWords = ["힘들", "아프", "슬프", "우울", "불안", "스트레스", "걱정", "외로", "피곤", "지쳐"];
-    const neutralWords = ["보통", "그냥", "평범"];
-
+    
     let positiveCount = 0;
     let negativeCount = 0;
 
@@ -2697,7 +2318,7 @@ function ProfileView({ user, onNavigate }: { user: AppUser; onNavigate: (s: Scre
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-4 border border-border">
+            <div className="bg-white rounded-2xl p-4 border border-border mt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">보호자 초대 인증코드</p>
@@ -3307,157 +2928,7 @@ function SmalltalkView({ user, onBack, onNavigate }: { user: AppUser; onBack: ()
 }
 
 // ── COMMUNITY VIEW ─────────────────────────────────────────────────────────
-function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
-  const baseWeek = user.pregnancyWeek || 28;
 
-  const getPeriod = (week: number) => {
-    if (week <= 13) return "초기";
-    if (week <= 27) return "중기";
-    return "후기";
-  };
-
-  const currentPeriod = getPeriod(baseWeek);
-  const [selPeriod, setSelPeriod] = useState<string>("전체");
-  const [liked, setLiked] = useState<Set<number>>(new Set());
-  const [posts, setPosts] = useState(POSTS_INIT.map((p) => ({ ...p, period: getPeriod(p.week) })));
-  const [showForm, setShowForm] = useState(false);
-  const [newPost, setNewPost] = useState("");
-
-  const PERIODS = ["전체", "초기", "중기", "후기"];
-  const filtered = selPeriod === "전체" ? posts : posts.filter((p) => p.period === selPeriod);
-
-  const toggleLike = (id: number) => {
-    const wasLiked = liked.has(id);
-    setLiked((prev) => { const next = new Set(prev); wasLiked ? next.delete(id) : next.add(id); return next; });
-    setPosts((prev) => prev.map((p) => p.id === id ? { ...p, likes: p.likes + (wasLiked ? -1 : 1) } : p));
-  };
-
-  const addPost = () => {
-    if (!newPost.trim()) return;
-    setPosts((prev) => [
-      { id: Date.now(), week: baseWeek, period: currentPeriod, avatar: "🌸", author: user.nickname || user.name, content: newPost, likes: 0, comments: 0, time: "방금 전" },
-      ...prev,
-    ]);
-    setNewPost("");
-    setShowForm(false);
-  };
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <PageHeader title="커뮤니티" onBack={onBack} />
-      <div className="px-5 py-5 space-y-5 flex-1 overflow-y-auto pb-20">
-        <div
-          className="rounded-xl p-3 flex items-center gap-2 text-sm"
-          style={{ background: "rgba(181,234,215,0.06)", border: "1px solid rgba(181,234,215,0.15)" }}
-        >
-          <span>👥</span>
-          <p className="text-muted-foreground">
-            현재 <span className="font-semibold" style={{ color: "#78C9A0" }}>임신 {currentPeriod}</span> ({baseWeek}주차) 커뮤니티입니다
-          </p>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-3">시기별 보기</p>
-          <div className="grid grid-cols-2 gap-2">
-            {PERIODS.map((period) => (
-              <button
-                key={period}
-                onClick={() => setSelPeriod(period)}
-                className="py-2.5 rounded-xl text-sm font-medium transition-all"
-                style={{
-                  background: selPeriod === period ? "#78C9A0" : "var(--secondary)",
-                  color: selPeriod === period ? "white" : "var(--muted-foreground)",
-                }}
-              >
-                {period === "전체" ? (
-                  "전체 보기"
-                ) : (
-                  <>
-                    임신 {period}
-                    <br />
-                    <span className="text-xs opacity-80">
-                      {period === "초기" ? "1-13주" : period === "중기" ? "14-27주" : "28-40주"}
-                    </span>
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="w-full py-3 rounded-2xl border-2 border-dashed text-sm font-medium flex items-center justify-center gap-2 transition-all"
-          style={{ borderColor: "rgba(120,201,160,0.3)", color: "#78C9A0" }}
-        >
-          <Plus size={16} />
-          임신 {selPeriod} 이야기 나누기
-        </button>
-
-        {showForm && (
-          <div className="bg-card rounded-2xl p-4 border border-border space-y-3">
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="같은 주차 분들과 경험을 나눠보세요. 익명으로 게시됩니다 💙"
-              rows={4}
-              className="w-full text-sm px-3 py-2 rounded-xl border border-border focus:outline-none focus:border-primary resize-none"
-            />
-            <div className="flex gap-2">
-              <button onClick={addPost} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: "#C94E70" }}>게시하기</button>
-              <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground">취소</button>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-3">
-          {filtered.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <p className="text-3xl mb-3">💬</p>
-              <p className="text-sm">아직 게시물이 없어요</p>
-              <p className="text-xs mt-1">첫 번째로 이야기를 나눠보세요!</p>
-            </div>
-          ) : (
-            filtered.map((post) => (
-              <div key={post.id} className="bg-card rounded-2xl p-4 border border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xl">{post.avatar}</span>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{post.author}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
-                        임신 {post.period}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{post.week}주차</span>
-                      <span className="text-xs text-muted-foreground">{post.time}</span>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-sm text-foreground leading-relaxed mb-3">{post.content}</p>
-                <div className="flex items-center gap-4 pt-2 border-t border-border">
-                  <button
-                    onClick={() => toggleLike(post.id)}
-                    className="flex items-center gap-1.5 text-xs transition-colors"
-                    style={{ color: liked.has(post.id) ? "#C94E70" : "var(--muted-foreground)" }}
-                  >
-                    <ThumbsUp size={14} />
-                    <span>{post.likes}</span>
-                  </button>
-                  <button className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MessageCircle size={14} />
-                    <span>{post.comments}</span>
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
-    </div>
-  );
-}
 
 // ── MAIN APP ───────────────────────────────────────────────────────────────
 export default function App() {
