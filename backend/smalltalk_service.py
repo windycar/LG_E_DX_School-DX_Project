@@ -1,4 +1,4 @@
-# smalltalk_service.py (새 파일)
+
 from datetime import datetime
 from sqlalchemy.orm import Session
 import models

@@ -20,11 +20,40 @@ app.add_middleware(
     allow_methods=["*"], # 모든 통신 방식 허용
     allow_headers=["*"], # 모든 헤더 허용
 )
-# backend/main.py
-
+# 설정 만들기
 
 # main.py 아래쪽에 추가
 
+# 1. 프로필 수정 API
+@app.put("/api/user/profile/{user_id}")
+def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    
+    user.name = profile.name
+    user.baby_nickname = profile.baby_nickname
+    db.commit()
+    return {"status": "Success", "message": "프로필이 수정되었습니다."}
+
+# 2. 비밀번호 변경 API
+@app.put("/api/user/password/{user_id}")
+def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    
+    if user.password != passwords.current_password:
+        raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
+        
+    user.password = passwords.new_password
+    db.commit()
+    return {"status": "Success", "message": "비밀번호가 변경되었습니다."}
+
+
+
+
+# 스몰토크 가져오기
 @app.get("/api/smalltalk/{user_id}")
 def get_smalltalk(user_id: int, db: Session = Depends(database.get_db)):
     # 1. 내 정보 가져오기 (컬럼명 user_id, 객체 속성 id)
@@ -63,7 +92,7 @@ def get_smalltalk(user_id: int, db: Session = Depends(database.get_db)):
         "partner_answer": partner_answer_obj.answer_content if (my_answer_obj and partner_answer_obj) else None
     }
     
-
+# 스몰토크 답변 저장
 @app.post("/api/smalltalk/answer")
 def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(database.get_db)):
     user = db.query(models.User).filter(models.User.id == ans.user_id).first()
@@ -93,15 +122,7 @@ def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(
 
 
 
-
-
-
-
-
-
-
-
-# 🚀 1. 게시글 목록 불러오기 (USERS 테이블과 JOIN하여 진짜 이름/역할 연동)
+# 🚀 1. 커뮤니티 게시글 목록 불러오기 (USERS 테이블과 JOIN하여 진짜 이름/역할 연동)
 @app.get("/api/community/posts")
 def get_community_posts(db: Session = Depends(database.get_db)):
     # COMMUNITY_POSTS와 USERS 테이블을 작성자 ID(user_id) 기준으로 조인합니다.
@@ -182,32 +203,37 @@ def delete_community_post(post_id: int, db: Session = Depends(database.get_db)):
 
 
 # 로그인 기능 
-# backend/main.py
 
-
+# 🚀 1. 기존 로그인 API를 이걸로 덮어쓰십시오!
 @app.post("/api/auth/login")
 def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
+    # 1. 사용자 인증
     user = db.query(models.User).filter(models.User.email == request.email).first()
     if not user or user.password != request.password:
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
+    # 2. 보호자(GUARDIAN)일 경우, 연결된 임산부 정보(parent) 조회
     pregnant_info = None
     if user.role == "GUARDIAN" and user.parent_user_id:
-        # 여기서는 user.parent_user_id가 바로 임산부의 id임
         pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if pregnant_user:
             pregnant_info = {
                 "name": pregnant_user.name,
                 "baby_nickname": pregnant_user.baby_nickname,
-                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date)
+                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date),
+                "connection_code": pregnant_user.connection_code # 🚀 보호자에게 임산부의 연결 코드를 명확히 전달
             }
     
+    # 3. 프론트엔드로 전달할 최종 데이터 구성
     return {
         "status": "Success",
         "user": {
-            "user_id": user.id, # 🚀 코드에서는 무조건 .id로 접근!
+            "user_id": user.id,
+            "email": user.email,
             "name": user.name,
             "role": user.role,
+            "baby_nickname": user.baby_nickname,
+            "connection_code": user.connection_code, # 🚀 임산부 본인의 연결 코드 전달
             "parent_user_id": user.parent_user_id,
             "connected_pregnant": pregnant_info
         }
@@ -217,28 +243,29 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
     pregnant_info = None
-    # 🚀 수정: .id 가 아니라 .user_id
     if user.role == "GUARDIAN" and user.parent_user_id:
-        pregnant_user = db.query(models.User).filter(models.User.user_id == user.parent_user_id).first()
+        pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if pregnant_user:
             pregnant_info = {
                 "name": pregnant_user.name,
                 "baby_nickname": pregnant_user.baby_nickname,
-                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date)
+                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date),
+                "connection_code": pregnant_user.connection_code # 🚀 보호자를 위해 임산부의 연결 코드도 전달!
             }
     
     return {
         "status": "Success",
         "user": {
-            "user_id": user.user_id, # 🚀 수정: .id 가 아니라 .user_id
+            "user_id": user.id,
+            "email": user.email,
             "name": user.name,
             "role": user.role,
+            "baby_nickname": user.baby_nickname,
+            "connection_code": user.connection_code,
             "parent_user_id": user.parent_user_id,
             "connected_pregnant": pregnant_info
         }
-    }
-    
-    
+    }   
 # 회원가입 API
 @app.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
@@ -285,3 +312,22 @@ def get_week(user_id: int, db: Session = Depends(database.get_db)):
     return {"week": current_week}
 
 
+# 🚀 설정창 전용 데이터 불러오기 API
+@app.get("/api/user/info/{user_id}")
+def get_user_info(user_id: int, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    partner_code = None
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if parent:
+            partner_code = parent.connection_code
+            
+    return {
+        "status": "Success",
+        "baby_nickname": user.baby_nickname,
+        "connection_code": user.connection_code,
+        "partner_code": partner_code
+    }
