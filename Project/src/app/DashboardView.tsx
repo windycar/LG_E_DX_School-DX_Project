@@ -1,8 +1,17 @@
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { LogOut, Star } from "lucide-react";
 import { AppUser, PartnerStatus, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App"; 
+
+const calculateWeek = (dateString: string | undefined | null) => {
+  if (!dateString || dateString === "None" || dateString === "") return 0;
+  const start = new Date(dateString);
+  const today = new Date();
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, Math.floor(diffDays / 7));
+};
 
 export default function DashboardView({
   user, onNavigate, onLogout, partnerStatus,
@@ -12,22 +21,47 @@ export default function DashboardView({
   onLogout: () => void;
   partnerStatus?: PartnerStatus | null;
 }) {
-  const isPregnant = user.role === "pregnant";
-  const connected = (user as any).connected_pregnant;
+  const isPregnant = String(user.role).toUpperCase() === "PREGNANT";
+  const userId = (user as any).id || user.user_id;
+  
+  // 🚀 [핵심 배정] 회원가입 직후 고유 ID가 없을 때를 대비해 이메일을 조회 키로 활용합니다!
+  const identifier = userId || user.email;
 
-  const getPregnancyWeek = (startDateStr: string | undefined) => {
-    if (!startDateStr) return 0;
-    const start = new Date(startDateStr);
-    const today = new Date();
-    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(0, Math.floor(diffDays / 7));
-  };
+  const [dbInfo, setDbInfo] = useState({
+    name: user.name || "",
+    baby_nickname: (user as any).baby_nickname || "",
+    pregnancy_start_date: "",
+    connected_name: ""
+  });
 
-  const displayWeek = connected ? getPregnancyWeek(connected.pregnancy_start_date) : 0;
+  useEffect(() => {
+    if (!identifier) return;
+    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "Success") {
+          // 🚀 [마법의 주입] 이메일로 유저 정보를 찾았다면, 발급된 진짜 DB 고유 ID를 전역 객체에 심어줍니다.
+          // 이렇게 하면 회원가입 직후 로그아웃을 안 해도 커뮤니티 글쓰기 등이 완벽하게 연동됩니다!
+          if (data.user_id) {
+            (user as any).user_id = data.user_id;
+            (user as any).id = data.user_id;
+          }
+
+          setDbInfo({
+            name: data.name || user.name,
+            baby_nickname: data.baby_nickname || "",
+            pregnancy_start_date: data.pregnancy_start_date || "",
+            connected_name: data.connected_name || ""
+          });
+        }
+      })
+      .catch(e => console.error("메인 화면 데이터 갱신 실패:", e));
+  }, [identifier]);
+
+  const currentWeek = calculateWeek(dbInfo.pregnancy_start_date);
 
   const getMissionFromStatus = (status: PartnerStatus | null) => {
     if (!status) return null;
-
     const { symptoms, emotions, stress } = status;
 
     if (symptoms.length === 0 && emotions.length === 0 && stress <= 3) {
@@ -66,7 +100,7 @@ export default function DashboardView({
   const features: Array<{ id: Screen; icon: string; title: string; subtitle: string; grad: [string, string]; available: boolean }> = [
     { id: "discomfort", icon: "🏠", title: "오늘의 상태 체크", subtitle: "불편 증상 & 가전 자동 제어", grad: ["#FFB3C6", "#FF8FAB"], available: isPregnant },
     { id: "mental", icon: "💙", title: "정신 케어", subtitle: "감정 일기 & 주간 리포트", grad: ["#C3B1E1", "#9B8EC4"], available: isPregnant },
-    { id: "ai", icon: "🤖", title: "AI 맞춤 추천", subtitle: `${user.pregnancyWeek}주차 맞춤 가이드`, grad: ["#FFDAA5", "#FFB74D"], available: isPregnant },
+    { id: "ai", icon: "🤖", title: "AI 맞춤 추천", subtitle: `${currentWeek}주차 맞춤 가이드`, grad: ["#FFDAA5", "#FFB74D"], available: isPregnant },
     { id: "info", icon: "📋", title: "신뢰 정보", subtitle: "검증된 의학 정보만", grad: ["#A8E6CF", "#69C99A"], available: true },
     { id: "community", icon: "💬", title: "커뮤니티", subtitle: "같은 시기 예비맘들과 소통", grad: ["#B5EAD7", "#78C9A0"], available: true },
     { id: "smalltalk", icon: "💕", title: "스몰토크", subtitle: "매일 질문으로 대화하기", grad: ["#FFD3B6", "#FFA882"], available: true },
@@ -79,7 +113,7 @@ export default function DashboardView({
           <div>
             <p className="text-sm text-muted-foreground">안녕하세요 👋</p>
             <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>
-              {user.name}님
+              {dbInfo.name}님
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -95,8 +129,8 @@ export default function DashboardView({
         {isPregnant ? (
           <div className="rounded-2xl px-5 py-4 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)", color: "white" }}>
             <div>
-              <p className="text-white/80 text-xs font-medium">{user.babyNickname ? `${user.babyNickname}와 함께` : "현재 임신"}</p>
-              <p className="text-3xl font-bold">{user.pregnancyWeek}주차</p>
+              <p className="text-white/80 text-xs font-medium">{dbInfo.baby_nickname ? `${dbInfo.baby_nickname}와 함께` : "현재 임신"}</p>
+              <p className="text-3xl font-bold">{currentWeek}주차</p>
               <p className="text-white/80 text-xs mt-0.5">오늘도 잘 하고 있어요 ✨</p>
             </div>
             <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
@@ -107,10 +141,10 @@ export default function DashboardView({
           <>
             <div className="rounded-2xl px-5 py-4 mb-3" style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)", color: "white" }}>
               <p className="text-white/80 text-xs font-medium">
-                보호자 모드 {connected?.baby_nickname ? `· ${connected.baby_nickname}` : ""}
+                보호자 모드 {dbInfo.baby_nickname ? `· ${dbInfo.baby_nickname}` : ""}
               </p>
               <p className="text-xl font-bold">
-                {connected ? `${connected.name}님의 임신 ${displayWeek}주차` : "연결된 임산부가 없습니다"}
+                {dbInfo.connected_name ? `${dbInfo.connected_name}님의 임신 ${currentWeek}주차` : "연결된 임산부가 없습니다"}
               </p>
               <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
             </div>
@@ -165,7 +199,7 @@ export default function DashboardView({
             <Star size={14} style={{ color: "#C94E70" }} />
             <p className="text-xs font-semibold" style={{ color: "#C94E70" }}>오늘의 팁</p>
           </div>
-          <p className="text-sm text-foreground font-medium">28주차에는 좌측 수면 자세가 혈액순환에 좋아요</p>
+          <p className="text-sm text-foreground font-medium">{currentWeek}주차에는 좌측 수면 자세가 혈액순환에 좋아요</p>
           <p className="text-xs text-muted-foreground mt-1">무릎 사이에 베개를 끼우면 더욱 편안합니다 💤</p>
         </div>
       </div>

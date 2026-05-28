@@ -29,12 +29,18 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const connected = (user as any).connected_pregnant;
   const currentUserId = (user as any).id || user.user_id; 
   
- const getPregnancyWeek = () => {
+  const getPregnancyWeek = () => {
     const roleStr = String(user.role).toUpperCase();
     
     if (roleStr === "PREGNANT") {
+      // 🚀 백엔드에서 받아온 시작일로 진짜 '주차'를 계산합니다!
+      const startDate = (user as any).pregnancy_start_date;
+      if (startDate && startDate !== "None") {
+        return calculateWeek(startDate);
+      }
       return (user as any).pregnancyWeek || 0;
     }
+    
     if (roleStr === "GUARDIAN" && connected?.pregnancy_start_date) {
       return calculateWeek(connected.pregnancy_start_date);
     }
@@ -67,7 +73,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     try {
       const res = await fetch("http://localhost:8000/api/community/posts");
       const data = await res.json();
-      // 🚀 하얀 화면 방지 로직 1 (무조건 배열로 들어오게 강제)
       if (data.status === "Success" && Array.isArray(data.posts)) setPosts(data.posts);
       else setPosts([]);
     } catch (e) {
@@ -101,7 +106,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     try {
       const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`);
       const data = await res.json();
-      // 🚀 하얀 화면 방지 로직 2
       if (data.status === "Success" && Array.isArray(data.comments)) setPostComments(data.comments);
       else setPostComments([]);
     } catch (e) { 
@@ -144,7 +148,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     { id: "후기", label: "임신 후기", desc: "28-40주" },
   ];
 
-  // 🚀 하얀 화면 방지 로직 3 (posts가 undefined일 때 터지는 것 방지)
   const safePosts = Array.isArray(posts) ? posts : [];
   const filtered = selPeriod === "전체" ? safePosts : safePosts.filter((p) => p && (p.period === selPeriod || p.pregnancy_period === selPeriod));
 
@@ -153,12 +156,15 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       alert("제목과 내용을 모두 입력해주세요!");
       return;
     }
+    
+    // 🚀 핵심 수정 부분: 사용자가 어느 탭을 보고 있든 무조건 현재 상태(currentPeriod)로 태그를 달아줍니다!
     const payload = {
       user_id: currentUserId || 1, 
-      pregnancy_period: selPeriod === "전체" ? currentPeriod : selPeriod,
+      pregnancy_period: currentPeriod, 
       title: newTitle,
       content: newPost,
     };
+    
     try {
       const res = await fetch("http://localhost:8000/api/community/posts", {
         method: "POST",
@@ -169,10 +175,15 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
         alert("글 작성 실패! 백엔드 설정을 다시 확인하세요.");
         return;
       }
+      
       fetchPosts();
       setShowForm(false);
       setNewTitle("");
       setNewPost("");
+      
+      // 글을 다 쓴 후, 본인이 쓴 글을 바로 확인할 수 있도록 내 시기 탭으로 자동 이동시켜 줍니다! (센스 한 스푼 추가)
+      setSelPeriod(currentPeriod); 
+      
     } catch (e) { alert("서버 연결 실패"); }
   };
 
@@ -211,8 +222,9 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
           </div>
         </div>
 
+        {/* 🚀 버튼 텍스트도 명확하게 수정했습니다 */}
         <button onClick={() => setShowForm(!showForm)} className="w-full py-4 rounded-2xl border-[1.5px] border-dashed font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[#78C9A0]/5" style={{ borderColor: "#78C9A0", color: "#78C9A0" }}>
-          <Plus size={18} strokeWidth={2.5} /> {selPeriod === "전체" ? "임신 전체" : `임신 ${selPeriod}`} 이야기 나누기
+          <Plus size={18} strokeWidth={2.5} /> 내 임신 시기({currentPeriod}) 이야기 나누기
         </button>
 
         {showForm && (

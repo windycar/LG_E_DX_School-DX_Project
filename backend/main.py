@@ -267,6 +267,39 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
     if not user or user.password != request.password:
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
+    # 2. 보호자(GUARDIAN)일 경우 연결된 임산부 정보(parent) 조회
+    pregnant_info = None
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if parent:
+            pregnant_info = {
+                "name": parent.name,
+                "baby_nickname": parent.baby_nickname,
+                "pregnancy_start_date": str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None,
+                "connection_code": parent.connection_code
+            }
+    
+    # 3. 프론트엔드로 전달할 최종 데이터 구성
+    return {
+        "status": "Success",
+        "user": {
+            "user_id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "baby_nickname": user.baby_nickname,
+            # 🚀 바로 이 부분! 임산부의 임신 시작일을 프론트로 보냅니다.
+            "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
+            "connection_code": user.connection_code,
+            "parent_user_id": user.parent_user_id,
+            "connected_pregnant": pregnant_info
+        }
+    }
+    # 1. 사용자 인증
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or user.password != request.password:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
+    
     # 2. 보호자(GUARDIAN)일 경우, 연결된 임산부 정보(parent) 조회
     pregnant_info = None
     if user.role == "GUARDIAN" and user.parent_user_id:
@@ -367,22 +400,64 @@ def get_week(user_id: int, db: Session = Depends(database.get_db)):
     return {"week": current_week}
 
 
-# 🚀 설정창 전용 데이터 불러오기 API
-@app.get("/api/user/info/{user_id}")
-def get_user_info(user_id: int, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+
+# 🚀 설정창 & 메인화면 전용 데이터 불러오기 API (주차 계산용 데이터 추가됨!)
+@app.get("/api/user/info/{identifier}")
+def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
+    # identifier가 숫자(ID)인지 문자열(이메일)인지 판별하여 검색
+    if identifier.isdigit():
+        user = db.query(models.User).filter(models.User.id == int(identifier)).first()
+    else:
+        user = db.query(models.User).filter(models.User.email == identifier).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     partner_code = None
+    pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
+    connected_name = None
+
     if user.role == "GUARDIAN" and user.parent_user_id:
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
             partner_code = parent.connection_code
-            
+            pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
+            connected_name = parent.name
+
     return {
         "status": "Success",
+        "user_id": user.id, # 🚀 회원가입 직후 동기화를 위해 고유 ID도 함께 반환합니다.
+        "name": user.name,
         "baby_nickname": user.baby_nickname,
         "connection_code": user.connection_code,
-        "partner_code": partner_code
+        "partner_code": partner_code,
+        "pregnancy_start_date": pregnant_start_date,
+        "connected_name": connected_name
+    }
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    partner_code = None
+    # 🚀 임산부 본인의 시작일
+    pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
+    connected_name = None
+
+    # 🚀 보호자일 경우, 아내의 시작일과 이름을 가져옴
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if parent:
+            partner_code = parent.connection_code
+            pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
+            connected_name = parent.name
+
+    return {
+        "status": "Success",
+        "name": user.name,
+        "baby_nickname": user.baby_nickname,
+        "connection_code": user.connection_code,
+        "partner_code": partner_code,
+        "pregnancy_start_date": pregnant_start_date, # 🚀 추가됨!
+        "connected_name": connected_name             # 🚀 추가됨!
     }
