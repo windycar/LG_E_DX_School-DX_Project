@@ -12,6 +12,9 @@ import string
 from database import get_db 
 from pydantic import BaseModel
 import smalltalk_service
+
+
+
 # 2. CORS 정책 설정 (이게 있어야 브라우저가 통신을 허용합니다)
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +53,58 @@ def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session
     db.commit()
     return {"status": "Success", "message": "비밀번호가 변경되었습니다."}
 
+
+# 🚀 1. 특정 게시글의 댓글 불러오기 API (작성자 ID 추가)
+class CommentCreate(BaseModel):
+    user_id: int
+    content: str
+
+# 🚀 1. 댓글 불러오기 API
+@app.get("/api/posts/{post_id}/comments")
+def get_comments(post_id: int, db: Session = Depends(database.get_db)):
+    comments = db.query(models.Comment).filter(models.Comment.post_id == post_id).order_by(models.Comment.created_at.asc()).all()
+    
+    result = []
+    for c in comments:
+        user = db.query(models.User).filter(models.User.id == c.user_id).first()
+        result.append({
+            "id": c.comment_id, # 🚀 프론트엔드로 보낼 땐 c.comment_id 값을 꺼내서 보냅니다!
+            "user_id": c.user_id,
+            "content": c.content,
+            "created_at": c.created_at,
+            "author_name": user.name if user else "알 수 없는 유저", 
+            "author_role": user.role if user else "",
+            "pregnancy_start_date": str(user.pregnancy_start_date) if user and user.pregnancy_start_date else None
+        })
+    return {"status": "Success", "comments": result}
+
+# 🚀 2. 댓글 등록 API
+@app.post("/api/posts/{post_id}/comments")
+def create_comment(post_id: int, comment: CommentCreate, db: Session = Depends(database.get_db)):
+    new_comment = models.Comment(
+        post_id=post_id,
+        user_id=comment.user_id,
+        content=comment.content,
+        created_at=datetime.now()
+    )
+    db.add(new_comment)
+    db.commit()
+    return {"status": "Success", "message": "댓글이 등록되었습니다."}
+
+# 🚀 3. 댓글 삭제 API
+@app.delete("/api/comments/{comment_id}")
+def delete_comment(comment_id: int, user_id: int, db: Session = Depends(database.get_db)):
+    # 🚀 삭제할 때도 comment_id로 찾습니다!
+    comment = db.query(models.Comment).filter(models.Comment.comment_id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    
+    if comment.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인의 댓글만 삭제할 수 있습니다.")
+        
+    db.delete(comment)
+    db.commit()
+    return {"status": "Success", "message": "댓글이 삭제되었습니다."}
 
 
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-// 🚀 삭제 기능에 쓸 쓰레기통 아이콘(Trash2)을 추가했습니다.
-import { ArrowLeft, MessageCircle, ThumbsUp, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, MessageCircle, Plus, Trash2, Send } from "lucide-react";
 import { AppUser, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App";
@@ -18,24 +17,31 @@ const timeAgo = (dateString: string) => {
   return `${Math.floor(diffHrs / 24)}일 전`;
 };
 
+const calculateWeek = (dateString: string) => {
+  if (!dateString) return "?";
+  const start = new Date(dateString);
+  const today = new Date();
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, Math.floor(diffDays / 7));
+};
+
 export default function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
   const connected = (user as any).connected_pregnant;
+  const currentUserId = (user as any).id || user.user_id; 
   
-  const getPregnancyWeek = () => {
-    if (user.role === "pregnant") {
-      return user.pregnancyWeek || 0;
+ const getPregnancyWeek = () => {
+    const roleStr = String(user.role).toUpperCase();
+    
+    if (roleStr === "PREGNANT") {
+      return (user as any).pregnancyWeek || 0;
     }
-    if (user.role === "guardian" && connected?.pregnancy_start_date) {
-      const start = new Date(connected.pregnancy_start_date);
-      const today = new Date();
-      const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      return Math.max(0, Math.floor(diffDays / 7));
+    if (roleStr === "GUARDIAN" && connected?.pregnancy_start_date) {
+      return calculateWeek(connected.pregnancy_start_date);
     }
     return 0;
   };
   
   const currentWeek = getPregnancyWeek();
-
   const getPeriod = (week: number) => {
     if (week <= 13) return "초기";
     if (week <= 27) return "중기";
@@ -43,7 +49,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   };
   
   const currentPeriod = getPeriod(currentWeek);
-
   const [selPeriod, setSelPeriod] = useState<string>(currentPeriod);
   
   const [posts, setPosts] = useState<any[]>([]);
@@ -52,42 +57,84 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const [newPost, setNewPost] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchPosts();
-  }, []);
+  const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+  const [postComments, setPostComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState("");
+
+  useEffect(() => { fetchPosts(); }, []);
 
   const fetchPosts = async () => {
     try {
       const res = await fetch("http://localhost:8000/api/community/posts");
       const data = await res.json();
-      if (data.status === "Success") {
-        setPosts(data.posts);
-      }
+      // 🚀 하얀 화면 방지 로직 1 (무조건 배열로 들어오게 강제)
+      if (data.status === "Success" && Array.isArray(data.posts)) setPosts(data.posts);
+      else setPosts([]);
     } catch (e) {
       console.error("게시글 불러오기 실패:", e);
+      setPosts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 🚀 게시글 삭제 함수 추가
   const deletePost = async (postId: number) => {
     if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
-
     try {
-      const res = await fetch(`http://localhost:8000/api/community/posts/${postId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`http://localhost:8000/api/community/posts/${postId}`, { method: "DELETE" });
+      if (res.ok) fetchPosts();
+      else alert("게시글 삭제에 실패했습니다.");
+    } catch (e) { alert("서버와 통신 오류가 발생했습니다."); }
+  };
 
-      if (res.ok) {
-        // 성공적으로 삭제되었으면 목록 새로고침
-        fetchPosts();
-      } else {
-        alert("게시글 삭제에 실패했습니다.");
-      }
-    } catch (e) {
-      alert("서버와 통신 오류가 발생했습니다.");
+  const toggleComments = async (postId: number) => {
+    if (expandedPostId === postId) {
+      setExpandedPostId(null);
+      return;
     }
+    setExpandedPostId(postId);
+    setPostComments([]); 
+    await fetchComments(postId);
+  };
+
+  const fetchComments = async (postId: number) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`);
+      const data = await res.json();
+      // 🚀 하얀 화면 방지 로직 2
+      if (data.status === "Success" && Array.isArray(data.comments)) setPostComments(data.comments);
+      else setPostComments([]);
+    } catch (e) { 
+      console.error("댓글 불러오기 실패", e);
+      setPostComments([]);
+    }
+  };
+
+  const submitComment = async (postId: number) => {
+    if (!newComment.trim()) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUserId, content: newComment }),
+      });
+      if (res.ok) {
+        setNewComment(""); 
+        fetchComments(postId); 
+      } else alert("댓글 등록 실패");
+    } catch (e) { alert("서버 오류"); }
+  };
+
+  const deleteComment = async (commentId: number, postId: number) => {
+    if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/comments/${commentId}?user_id=${currentUserId}`, { method: "DELETE" });
+      if (res.ok) fetchComments(postId);
+      else {
+        const err = await res.json();
+        alert(err.detail || "삭제 실패");
+      }
+    } catch (e) { alert("서버 오류"); }
   };
 
   const PERIODS = [
@@ -97,46 +144,36 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     { id: "후기", label: "임신 후기", desc: "28-40주" },
   ];
 
-  const filtered = selPeriod === "전체" ? posts : posts.filter((p) => p.period === selPeriod || p.pregnancy_period === selPeriod);
+  // 🚀 하얀 화면 방지 로직 3 (posts가 undefined일 때 터지는 것 방지)
+  const safePosts = Array.isArray(posts) ? posts : [];
+  const filtered = selPeriod === "전체" ? safePosts : safePosts.filter((p) => p && (p.period === selPeriod || p.pregnancy_period === selPeriod));
 
   const addPost = async () => {
     if (!newTitle.trim() || !newPost.trim()) {
       alert("제목과 내용을 모두 입력해주세요!");
       return;
     }
-
-    const targetPeriod = selPeriod === "전체" ? currentPeriod : selPeriod;
-
     const payload = {
-      user_id: user.user_id || 1, 
-      pregnancy_period: targetPeriod, 
+      user_id: currentUserId || 1, 
+      pregnancy_period: selPeriod === "전체" ? currentPeriod : selPeriod,
       title: newTitle,
       content: newPost,
     };
-
     try {
       const res = await fetch("http://localhost:8000/api/community/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
-        const errorData = await res.json();
-        alert(`에러 발생! 내용: ${JSON.stringify(errorData)}`);
+        alert("글 작성 실패! 백엔드 설정을 다시 확인하세요.");
         return;
       }
-
-      const data = await res.json();
-      if (data.status === "Success") {
-        fetchPosts(); 
-        setNewTitle("");
-        setNewPost("");
-        setShowForm(false);
-      }
-    } catch (e) {
-      alert("글 작성에 실패했습니다. 서버를 확인해주세요.");
-    }
+      fetchPosts();
+      setShowForm(false);
+      setNewTitle("");
+      setNewPost("");
+    } catch (e) { alert("서버 연결 실패"); }
   };
 
   return (
@@ -149,14 +186,9 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       </div>
 
       <div className="px-5 py-5 space-y-5 flex-1 overflow-y-auto pb-20">
-        <div
-          className="rounded-2xl p-4 flex items-center gap-3 text-sm shadow-sm"
-          style={{ background: "#FDFDFD", border: "1px solid rgba(120,201,160,0.15)" }}
-        >
+        <div className="rounded-2xl p-4 flex items-center gap-3 text-sm shadow-sm" style={{ background: "#FDFDFD", border: "1px solid rgba(120,201,160,0.15)" }}>
           <span className="text-lg">👥</span>
-          <p className="text-muted-foreground">
-            현재 <span className="font-bold" style={{ color: "#69C99A" }}>임신 {currentPeriod}</span> ({currentWeek}주차)입니다
-          </p>
+          <p className="text-muted-foreground">현재 <span className="font-bold" style={{ color: "#69C99A" }}>임신 {currentPeriod}</span> ({currentWeek}주차)입니다</p>
         </div>
 
         <div>
@@ -169,49 +201,24 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
                   key={period.id}
                   onClick={() => setSelPeriod(period.id)}
                   className="py-3 rounded-2xl flex flex-col items-center justify-center transition-all shadow-sm"
-                  style={{
-                    background: isSelected ? "#78C9A0" : "#FCF0F4",
-                    color: isSelected ? "white" : "#A68A94",
-                    border: isSelected ? "none" : "1px solid rgba(201,78,112,0.05)",
-                  }}
+                  style={{ background: isSelected ? "#78C9A0" : "#FCF0F4", color: isSelected ? "white" : "#A68A94", border: isSelected ? "none" : "1px solid rgba(201,78,112,0.05)" }}
                 >
                   <span className="font-bold text-[15px]">{period.label}</span>
-                  {period.desc && (
-                    <span className="text-[11px] mt-0.5" style={{ color: isSelected ? "rgba(255,255,255,0.8)" : "#BFA6AE" }}>
-                      {period.desc}
-                    </span>
-                  )}
+                  {period.desc && <span className="text-[11px] mt-0.5" style={{ color: isSelected ? "rgba(255,255,255,0.8)" : "#BFA6AE" }}>{period.desc}</span>}
                 </button>
               );
             })}
           </div>
         </div>
 
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="w-full py-4 rounded-2xl border-[1.5px] border-dashed font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[#78C9A0]/5"
-          style={{ borderColor: "#78C9A0", color: "#78C9A0" }}
-        >
-          <Plus size={18} strokeWidth={2.5} />
-          {selPeriod === "전체" ? "임신 전체" : `임신 ${selPeriod}`} 이야기 나누기
+        <button onClick={() => setShowForm(!showForm)} className="w-full py-4 rounded-2xl border-[1.5px] border-dashed font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[#78C9A0]/5" style={{ borderColor: "#78C9A0", color: "#78C9A0" }}>
+          <Plus size={18} strokeWidth={2.5} /> {selPeriod === "전체" ? "임신 전체" : `임신 ${selPeriod}`} 이야기 나누기
         </button>
 
         {showForm && (
           <div className="bg-white rounded-2xl p-4 border border-border space-y-3 shadow-sm">
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="글 제목을 입력하세요"
-              className="w-full text-sm px-4 py-3 rounded-xl border border-border bg-[#FCF0F4]/30 focus:outline-none focus:border-[#78C9A0]"
-            />
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="비슷한 시기의 분들과 경험을 나눠보세요 💙"
-              rows={4}
-              className="w-full text-sm px-4 py-3 rounded-xl border border-border bg-[#FCF0F4]/30 focus:outline-none focus:border-[#78C9A0] resize-none"
-            />
+            <input type="text" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="글 제목을 입력하세요" className="w-full text-sm px-4 py-3 rounded-xl border border-border bg-[#FCF0F4]/30 focus:outline-none focus:border-[#78C9A0]" />
+            <textarea value={newPost} onChange={(e) => setNewPost(e.target.value)} placeholder="비슷한 시기의 분들과 경험을 나눠보세요 💙" rows={4} className="w-full text-sm px-4 py-3 rounded-xl border border-border bg-[#FCF0F4]/30 focus:outline-none focus:border-[#78C9A0] resize-none" />
             <div className="flex gap-2">
               <button onClick={addPost} className="flex-1 py-3 rounded-xl text-sm font-bold text-white shadow-sm" style={{ background: "#78C9A0" }}>게시하기</button>
               <button onClick={() => setShowForm(false)} className="flex-1 py-3 rounded-xl text-sm font-bold border border-border text-muted-foreground bg-white">취소</button>
@@ -228,49 +235,104 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
               <p className="text-sm font-medium">아직 게시물이 없어요</p>
             </div>
           ) : (
-            filtered.map((post) => (
-              <div key={post.id || post.post_id} className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-                
-                {/* 프로필 정보 및 삭제 버튼 영역 */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-[#FCF0F4]">
-                      {post.avatar || "👤"}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: post.role === "pregnant" ? "rgba(201,78,112,0.1)" : "rgba(123,104,181,0.1)", color: post.role === "pregnant" ? "#C94E70" : "#7B68B5" }}>
-                          {post.role === "pregnant" ? "임산부" : "보호자"}
-                        </span>
-                        <p className="text-sm font-bold text-foreground">{post.author || "익명"}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
-                          임신 {post.period || post.pregnancy_period}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {post.created_at ? timeAgo(post.created_at) : (post.time || "방금 전")}
-                        </span>
+            filtered.map((post) => {
+              const postId = post.id || post.post_id;
+              const isExpanded = expandedPostId === postId;
+
+              return (
+                <div key={postId} className="bg-white rounded-2xl p-5 border border-border shadow-sm transition-all">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-[#FCF0F4]">👤</div>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: post.role === "pregnant" || post.role === "PREGNANT" ? "rgba(201,78,112,0.1)" : "rgba(123,104,181,0.1)", color: post.role === "pregnant" || post.role === "PREGNANT" ? "#C94E70" : "#7B68B5" }}>
+                            {post.role === "pregnant" || post.role === "PREGNANT" ? "임산부" : "보호자"}
+                          </span>
+                          <p className="text-sm font-bold text-foreground">{post.author || "익명"}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>임신 {post.period || post.pregnancy_period}</span>
+                          <span className="text-[11px] text-muted-foreground">{post.created_at ? timeAgo(post.created_at) : (post.time || "방금 전")}</span>
+                        </div>
                       </div>
                     </div>
+                    {currentUserId === post.user_id && (
+                      <button onClick={() => deletePost(postId)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors">
+                        <Trash2 size={14} /> 삭제
+                      </button>
+                    )}
+                  </div>
+                  {post.title && <p className="text-[15px] font-bold text-[#333] mb-1">{post.title}</p>}
+                  <p className="text-[14px] text-[#555] leading-relaxed mb-4">{post.content}</p>
+
+                  <div className="pt-3 border-t border-border/50">
+                    <button 
+                      onClick={() => toggleComments(postId)} 
+                      className="flex items-center gap-1.5 text-xs font-medium transition-colors"
+                      style={{ color: isExpanded ? "#C94E70" : "#888" }}
+                    >
+                      <MessageCircle size={16} /> {isExpanded ? "댓글 닫기" : "댓글 보기 및 쓰기"}
+                    </button>
                   </div>
 
-                  {/* 🚀 본인이 작성한 게시글일 때만 삭제 버튼 표시! */}
-                  {user.user_id === post.user_id && (
-                    <button 
-                      onClick={() => deletePost(post.id || post.post_id)}
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                      삭제
-                    </button>
+                  {isExpanded && (
+                    <div className="mt-3 bg-[#FDFDFD] rounded-xl border border-border overflow-hidden">
+                      <div className="p-4 space-y-4 max-h-[300px] overflow-y-auto bg-[#FCF0F4]/10">
+                        {(!postComments || postComments.length === 0) ? (
+                          <p className="text-center text-xs text-muted-foreground py-2">첫 번째 댓글을 남겨보세요!</p>
+                        ) : (
+                          postComments.map((c) => {
+                            const isCmtPregnant = c.author_role === "pregnant" || c.author_role === "PREGNANT";
+                            const cmtWeek = isCmtPregnant && c.pregnancy_start_date && c.pregnancy_start_date !== "None" ? calculateWeek(c.pregnancy_start_date) : null;
+                            
+                            return (
+                              <div key={c.id} className="flex justify-between items-start gap-3 border-b border-border/30 pb-3 last:border-0 last:pb-0">
+                                <div>
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: isCmtPregnant ? "rgba(201,78,112,0.1)" : "rgba(123,104,181,0.1)", color: isCmtPregnant ? "#C94E70" : "#7B68B5" }}>
+                                      {isCmtPregnant ? `임산부 • ${cmtWeek !== null ? cmtWeek : "?"}주차` : "보호자"}
+                                    </span>
+                                    <span className="text-xs font-bold text-foreground">{c.author_name}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
+                                  </div>
+                                  <p className="text-[13px] text-[#444] leading-snug">{c.content}</p>
+                                </div>
+                                
+                                {currentUserId === c.user_id && (
+                                  <button onClick={() => deleteComment(c.id, postId)} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors">
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      <div className="p-2.5 bg-white border-t border-border flex gap-2 items-center">
+                        <input 
+                          type="text" 
+                          value={newComment} 
+                          onChange={(e) => setNewComment(e.target.value)} 
+                          onKeyDown={(e) => e.key === "Enter" && submitComment(postId)}
+                          placeholder="따뜻한 댓글을 남겨주세요..." 
+                          className="flex-1 text-xs px-3 py-2.5 rounded-lg border border-border bg-[#FCF0F4]/30 focus:outline-none focus:border-[#78C9A0]" 
+                        />
+                        <button 
+                          onClick={() => submitComment(postId)} 
+                          className="p-2.5 rounded-lg text-white transition-colors" 
+                          style={{ background: newComment.trim() ? "#78C9A0" : "#D1D5DB" }}
+                          disabled={!newComment.trim()}
+                        >
+                          <Send size={16} />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {post.title && <p className="text-[15px] font-bold text-[#333] mb-1">{post.title}</p>}
-                <p className="text-[14px] text-[#555] leading-relaxed mb-4">{post.content}</p>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
