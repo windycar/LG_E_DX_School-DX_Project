@@ -1,53 +1,35 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+// 맘달 앱 공통 색상 및 테마
+export const COLORS = {
+  primary: '#C94E70',
+  primaryLight: '#E8789A',
+  primaryLighter: '#F4A4C0',
+  guardian: '#7B68B5',
+  guardianLight: '#9B8EC4',
+  guardianLighter: '#C3B1E1',
+  accent: '#FFAB76',
+  accentLight: '#FFB74D',
+  success: '#69C99A',
+  successDark: '#2D5A4A',
+  warning: '#FF9A56',
+  info: '#2D7A9A',
+  infoLight: '#4A9AB8',
 
-import { Platform } from 'react-native';
+  background: '#FFFFFF',
+  card: '#FFFFFF',
+  secondary: '#F5F0F2',
+  border: '#EDE0E5',
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+  foreground: '#2D1B33',
+  mutedForeground: '#967A86',
 
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  gradientStart: '#FFE8EE',
+  gradientMid: '#FFF5F7',
+  gradientEnd: '#F5F0FF',
+
+  white: '#FFFFFF',
+  black: '#000000',
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const FONTS = {
+  serif: 'serif',
+};
