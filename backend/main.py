@@ -369,7 +369,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         pregnant_user = db.query(models.User).filter(models.User.connection_code == user.input_connection_code).first()
         if not pregnant_user:
             raise HTTPException(status_code=400, detail="유효하지 않은 인증코드입니다.")
-        parent_user_id = pregnant_user.user_id # 🚀 수정: .id 대신 .user_id
+        parent_user_id = pregnant_user.id # 🚀 수정: .id 대신 .user_id
 
     new_user = models.User(
         email=user.email,
