@@ -17,8 +17,8 @@ const timeAgo = (dateString: string) => {
   return `${Math.floor(diffHrs / 24)}일 전`;
 };
 
-const calculateWeek = (dateString: string) => {
-  if (!dateString) return "?";
+const calculateWeek = (dateString: string | undefined | null) => {
+  if (!dateString || dateString === "None" || dateString === "") return 0;
   const start = new Date(dateString);
   const today = new Date();
   const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -26,36 +26,48 @@ const calculateWeek = (dateString: string) => {
 };
 
 export default function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
-  const connected = (user as any).connected_pregnant;
-  const currentUserId = (user as any).id || user.user_id; 
+  const isPregnant = String(user.role).toUpperCase() === "PREGNANT";
+  const userId = (user as any).id || user.user_id; 
   
-  const getPregnancyWeek = () => {
-    const roleStr = String(user.role).toUpperCase();
-    
-    if (roleStr === "PREGNANT") {
-      // 🚀 백엔드에서 받아온 시작일로 진짜 '주차'를 계산합니다!
-      const startDate = (user as any).pregnancy_start_date;
-      if (startDate && startDate !== "None") {
-        return calculateWeek(startDate);
-      }
-      return (user as any).pregnancyWeek || 0;
-    }
-    
-    if (roleStr === "GUARDIAN" && connected?.pregnancy_start_date) {
-      return calculateWeek(connected.pregnancy_start_date);
-    }
-    return 0;
-  };
+  // 🚀 1. 이메일 백업: 회원가입 직후 ID가 없을 때를 대비
+  const identifier = userId || user.email;
+
+  const [dbInfo, setDbInfo] = useState({
+    pregnancy_start_date: "",
+  });
+
+  // 🚀 2. 커뮤니티 화면도 독립 선언! 켜지자마자 내 진짜 시작일을 DB에서 가져옵니다.
+  useEffect(() => {
+    if (!identifier) return;
+    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "Success") {
+          // 전역 user 객체에 최신 ID 주입
+          if (data.user_id) {
+            (user as any).user_id = data.user_id;
+            (user as any).id = data.user_id;
+          }
+          setDbInfo({
+            pregnancy_start_date: data.pregnancy_start_date || "",
+          });
+        }
+      })
+      .catch(e => console.error("커뮤니티 유저 정보 갱신 실패:", e));
+  }, [identifier]);
+
+  // 최신 DB 데이터로 진짜 주차와 시기를 계산
+  const currentWeek = calculateWeek(dbInfo.pregnancy_start_date);
   
-  const currentWeek = getPregnancyWeek();
   const getPeriod = (week: number) => {
     if (week <= 13) return "초기";
     if (week <= 27) return "중기";
     return "후기";
   };
-  
   const currentPeriod = getPeriod(currentWeek);
-  const [selPeriod, setSelPeriod] = useState<string>(currentPeriod);
+  
+  // 🚀 3. 디폴트 탭을 "전체"로 강제 고정!
+  const [selPeriod, setSelPeriod] = useState<string>("전체");
   
   const [posts, setPosts] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -117,6 +129,8 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const submitComment = async (postId: number) => {
     if (!newComment.trim()) return;
     try {
+      // 🚀 현재 안전하게 주입된 user_id를 사용
+      const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,6 +146,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const deleteComment = async (commentId: number, postId: number) => {
     if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
     try {
+      const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(`http://localhost:8000/api/comments/${commentId}?user_id=${currentUserId}`, { method: "DELETE" });
       if (res.ok) fetchComments(postId);
       else {
@@ -157,9 +172,11 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       return;
     }
     
-    // 🚀 핵심 수정 부분: 사용자가 어느 탭을 보고 있든 무조건 현재 상태(currentPeriod)로 태그를 달아줍니다!
+    const currentUserId = (user as any).id || (user as any).user_id || 1;
+    
+    // 🚀 전송 시에는 무조건 '현재 시기(currentPeriod)'로 태그를 달아줍니다
     const payload = {
-      user_id: currentUserId || 1, 
+      user_id: currentUserId, 
       pregnancy_period: currentPeriod, 
       title: newTitle,
       content: newPost,
@@ -181,7 +198,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       setNewTitle("");
       setNewPost("");
       
-      // 글을 다 쓴 후, 본인이 쓴 글을 바로 확인할 수 있도록 내 시기 탭으로 자동 이동시켜 줍니다! (센스 한 스푼 추가)
+      // 글을 쓰고 나면 본인 글을 확인할 수 있게 내 시기 탭으로 이동!
       setSelPeriod(currentPeriod); 
       
     } catch (e) { alert("서버 연결 실패"); }
@@ -222,7 +239,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
           </div>
         </div>
 
-        {/* 🚀 버튼 텍스트도 명확하게 수정했습니다 */}
+        {/* 🚀 전체 보기에 있어도, 글쓰기 버튼은 항상 내 시기로 뜹니다 */}
         <button onClick={() => setShowForm(!showForm)} className="w-full py-4 rounded-2xl border-[1.5px] border-dashed font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[#78C9A0]/5" style={{ borderColor: "#78C9A0", color: "#78C9A0" }}>
           <Plus size={18} strokeWidth={2.5} /> 내 임신 시기({currentPeriod}) 이야기 나누기
         </button>
@@ -250,6 +267,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
             filtered.map((post) => {
               const postId = post.id || post.post_id;
               const isExpanded = expandedPostId === postId;
+              const currentUserId = (user as any).id || (user as any).user_id || 1;
 
               return (
                 <div key={postId} className="bg-white rounded-2xl p-5 border border-border shadow-sm transition-all">
