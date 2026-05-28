@@ -4,6 +4,8 @@ from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, Fore
 from sqlalchemy.sql import func
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
 import datetime
+from sqlalchemy import Column, String, Integer, DateTime, Date, Text
+
 # backend/models.py
 # backend/models.py
 class User(Base):
@@ -51,9 +53,6 @@ class SmallTalkAnswer(Base):
     match_status = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-
-# ... (기존 User 모델 등 유지) ...
-
 # 🚀 댓글 테이블 추가
 class Comment(Base):
     __tablename__ = "COMMUNITY_COMMENTS"
@@ -64,3 +63,15 @@ class Comment(Base):
     content = Column(String(500))
     # 👇 여기가 핵심입니다! 파이썬 에러가 나지 않는 완벽한 방법
     created_at = Column(DateTime, default=func.now())
+
+
+class SharedCalendarEvent(Base):
+    __tablename__ = "SHARED_CALENDAR_EVENTS"
+
+    event_id = Column(Integer, primary_key=True, index=True)
+    connection_code = Column(String(100), index=True) # 부부 매칭 코드 (이게 같으면 일정을 공유함!)
+    event_type = Column(String(50))  # 일정 유형 (병원, 여행, 사진 등)
+    title = Column(String(200))      # 일정 제목
+    content = Column(Text)           # 일정 상세 내용
+    event_date = Column(Date)        # 일정 날짜
+    created_at = Column(DateTime, default=func.now())  

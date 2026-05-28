@@ -25,7 +25,88 @@ app.add_middleware(
 )
 # 설정 만들기
 
-# main.py 아래쪽에 추가
+from pydantic import BaseModel
+from datetime import date
+
+# 일정 등록용 데이터 검증 스키마
+class EventCreate(BaseModel):
+    connection_code: str
+    event_type: str
+    title: str
+    content: str
+    event_date: date
+class EventUpdate(BaseModel):
+    event_type: str
+    title: str
+    content: str
+    event_date: date
+# 🚀 1. 캘린더 일정 불러오기 API (부부의 connection_code로 검색)
+@app.get("/api/calendar/events/{connection_code}")
+def get_calendar_events(connection_code: str, db: Session = Depends(database.get_db)):
+    # connection_code가 없는 경우(연동 안됨) 빈 배열 반환
+    if not connection_code or connection_code == "None":
+        return {"status": "Success", "events": []}
+        
+    events = db.query(models.SharedCalendarEvent).filter(
+        models.SharedCalendarEvent.connection_code == connection_code
+    ).all()
+    
+    result = []
+    for e in events:
+        result.append({
+            "event_id": e.event_id,
+            "event_type": e.event_type,
+            "title": e.title,
+            "content": e.content,
+            "event_date": str(e.event_date)
+        })
+    return {"status": "Success", "events": result}
+
+# 🚀 2. 새 일정 등록 API
+@app.post("/api/calendar/events")
+def create_calendar_event(event: EventCreate, db: Session = Depends(database.get_db)):
+    if not event.connection_code or event.connection_code == "None":
+        raise HTTPException(status_code=400, detail="부부 연동 코드가 필요합니다.")
+        
+    new_event = models.SharedCalendarEvent(
+        connection_code=event.connection_code,
+        event_type=event.event_type,
+        title=event.title,
+        content=event.content,
+        event_date=event.event_date
+    )
+    db.add(new_event)
+    db.commit()
+    return {"status": "Success", "message": "일정이 등록되었습니다."}
+
+# 🚀 4. 일정 삭제 API
+@app.delete("/api/calendar/events/{event_id}")
+def delete_calendar_event(event_id: int, db: Session = Depends(database.get_db)):
+    event = db.query(models.SharedCalendarEvent).filter(models.SharedCalendarEvent.event_id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다.")
+    
+    db.delete(event)
+    db.commit()
+    return {"status": "Success", "message": "일정이 삭제되었습니다."}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 1. 프로필 수정 API
 @app.put("/api/user/profile/{user_id}")
@@ -391,7 +472,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         if parent:
             partner_code = parent.connection_code
             pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
-            connected_name = parent.name
+            connected_name = parent.name    
 
     return {
         "status": "Success",
