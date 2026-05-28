@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const app = express();
-const port = Number(process.env.PORT || 8000);
+const port = Number(process.env.PORT || 8001);
 const host = process.env.HOST || "127.0.0.1";
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173")
