@@ -19,6 +19,7 @@ const allowedOrigins = new Set(
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
+const allowedDevOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1):517\d$/;
 const knowledgePath = path.resolve(__dirname, "trusted-knowledge.json");
 const aiGenerationEnabled =
   process.env.ENABLE_AI_GENERATION === "true" && Boolean(process.env.OPENAI_API_KEY);
@@ -168,9 +169,21 @@ const contractionConcernTerms = [
   "뭉쳐",
   "자궁 수축",
 ];
-const ambiguousMovementTerms = ["움직임이 느껴", "배에서 움직", "움직이는 느낌", "배가 움직"];
-const fetalMovementTerms = ["태동", "아기가 움직", "아기 움직", "꼬물"];
-const greetingTerms = ["안녕", "안녕하세요", "하이", "hello", "hi", "반가워"];
+const ambiguousMovementTerms = ["움직임이 느껴", "배에서 움직", "배에서 먼가 움직", "움직이는 느낌", "움직이는 느끼", "배가 움직"];
+const fetalMovementTerms = [
+  "태동",
+  "아기가 움직",
+  "아기 움직",
+  "아이가 움직",
+  "아이 움직",
+  "애기가 움직",
+  "배 속에서 움직",
+  "배속에서 움직",
+  "꼬물",
+  "꼼지락",
+  "발로 차",
+];
+const greetingTerms = ["안녕", "안녕하세요", "ㅎㅇ", "하이", "헬로", "hello", "hi", "반가워"];
 const thanksTerms = ["고마워", "고맙", "감사"];
 const helpTerms = ["뭘 물어", "무엇을 물어", "어떤 질문", "도와줄", "사용법", "뭐 할 수"];
 
@@ -180,7 +193,7 @@ let chatModel;
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
+      if (!origin || allowedOrigins.has(origin) || allowedDevOriginPattern.test(origin)) {
         callback(null, true);
         return;
       }
@@ -212,6 +225,30 @@ function toSource(entry) {
   };
 }
 
+const plainLanguageGlossary = [
+  ["상한섭취량", "하루에 넘기지 않는 양"],
+  ["권장량", "하루에 보통 필요한 양"],
+  ["태동", "아기 움직임"],
+  ["양수 누출", "물이 새는 느낌"],
+  ["전자간증", "임신 중 혈압이 많이 올라 위험해질 수 있는 상태"],
+  ["리스테리아", "식중독균의 한 종류"],
+  ["Tdap", "백일해 예방 주사"],
+  ["RSV", "호흡기 바이러스"],
+  ["mcg", "아주 작은 양을 나타내는 단위"],
+  ["IU", "비타민 양을 나타내는 단위"],
+];
+
+function addPlainLanguageGlossary(answer) {
+  const explanations = plainLanguageGlossary
+    .filter(([term]) => answer.includes(term))
+    .slice(0, 3)
+    .map(([term, meaning]) => `${term}: ${meaning}`);
+
+  if (explanations.length === 0) return answer;
+
+  return `${answer}\n\n말 풀이: ${explanations.join(" / ")}`;
+}
+
 function officialExtractAnswer(entries) {
   const extracts = entries
     .map((entry) => {
@@ -219,7 +256,9 @@ function officialExtractAnswer(entries) {
     })
     .join("\n\n");
 
-  return `${extracts}\n\n증상이 있거나 걱정되는 변화가 있다면 담당 산부인과에 상담하세요.`;
+  return addPlainLanguageGlossary(
+    `쉽게 말하면,\n${extracts}\n\n사람마다 임신 주수와 몸 상태가 다를 수 있습니다. 숫자나 복용량이 헷갈리면 산전 진료 때 성분표를 보여주고 확인하세요.`,
+  );
 }
 
 function normalizeText(text) {
@@ -433,16 +472,40 @@ async function getKnowledgeStore() {
 
 function localVerifiedSearch(message, knowledge) {
   const normalized = message.replace(/\s+/g, "").toLowerCase();
-  return knowledge
-    .map((entry) => ({
-      entry,
-      score: entry.topic
+  const weakKeywords = new Set(["임신", "임산부", "증상", "초기", "중", "몇주"]);
+  const shortStrongKeywords = new Set(["술", "냉", "회", "쥐"]);
+  const scored = knowledge
+    .map((entry) => {
+      const matchedKeywords = entry.topic
         .split(/\s+/)
-        .reduce((sum, keyword) => sum + (normalized.includes(keyword.toLowerCase()) ? 1 : 0), 0),
-    }))
-    .filter(({ score }) => score > 0)
+        .filter((keyword) => {
+          const normalizedKeyword = keyword.toLowerCase();
+          return (
+            (normalizedKeyword.length >= 2 || shortStrongKeywords.has(normalizedKeyword)) &&
+            normalized.includes(normalizedKeyword)
+          );
+        });
+      const strongMatches = matchedKeywords.filter((keyword) => !weakKeywords.has(keyword));
+      const score = strongMatches.reduce(
+        (sum, keyword) => sum + (shortStrongKeywords.has(keyword) ? 2 : Math.max(1, keyword.length)),
+        0,
+      );
+
+      return {
+        entry,
+        score,
+        strongMatchCount: strongMatches.length,
+      };
+    })
+    .filter(({ score, strongMatchCount }) => score >= 2 && strongMatchCount > 0)
     .sort((left, right) => right.score - left.score)
-    .slice(0, 2)
+    .slice(0, 2);
+
+  if (scored.length > 1 && scored[1].score < scored[0].score * 0.7) {
+    return [scored[0].entry];
+  }
+
+  return scored
     .map(({ entry }) => entry);
 }
 
@@ -486,7 +549,16 @@ async function generateAiReply(message, history) {
       content: entry.text.slice(0, 1000),
     }));
   const systemPrompt = `당신은 임산부와 보호자를 위한 건강정보 상담 챗봇입니다.
-한국어로 따뜻하고 이해하기 쉽게 답하세요. 전문용어는 피하고, 필요한 경우 쉬운 말로 풀어 쓰세요.
+읽는 사람은 의학 지식이 없는 임산부 또는 보호자입니다. 초등 고학년~중학생도 이해할 수 있는 쉬운 한국어로 답하세요.
+
+답변 방식:
+- 첫 문장은 결론부터 말하세요. 예: "하루 총량을 200 mg 아래로 보는 것이 좋아요."
+- 그 다음 2~4문장으로 이유와 조심할 점을 짧게 설명하세요.
+- 질문이 모호하면 답을 단정하지 말고 확인 질문을 먼저 하세요.
+- 전문용어는 가능한 쓰지 마세요.
+- 꼭 필요한 전문용어는 바로 쉬운 말로 풀어 쓰세요. 예: "태동(아기 움직임)", "양수 누출(물이 새는 느낌)", "상한섭취량(하루에 넘기지 않는 양)".
+- "근거에 따르면", "합병증", "전자간증", "감별", "상한섭취량"처럼 딱딱한 표현을 답변 앞쪽에 두지 마세요.
+- 사용자를 겁주지 마세요. 위험 신호가 명확할 때만 분명하게 병원 연락을 안내하세요.
 
 안전 규칙:
 - 사용자가 모호하게 말하면 즉시 위험하다고 단정하지 말고 먼저 필요한 확인 질문을 1~3개 하세요.

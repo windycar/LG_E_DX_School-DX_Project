@@ -1,61 +1,69 @@
 # AI_Chat
 
-`신뢰 정보 > 의학 정보 AI 상담` 화면이 호출하는 LangChain 기반 독립 백엔드입니다.
+임산부용 `신뢰 정보 > 의학 정보 AI 상담` 화면에서 사용하는 LangChain 기반 챗봇 백엔드입니다.
 
 ## Structure
 
-- `index.js`: Express API, LangChain.js 공식자료 검색, OpenAI 생성 답변, 안전 선분기
-- `trusted-knowledge.json`: 공식 원문 발췌, 출처 URL, 갱신일, 검증일
-- `SOURCE_VALIDATION.md`: 사용 출처 검증 결과와 운영 전 필수 점검
-- `.env.example`: OpenAI 모델 및 서버 포트 환경변수 예시
+- `index.js`: Express API, 안전 분기, 공식 자료 검색, OpenAI 답변 생성
+- `trusted-knowledge.json`: 공식 자료 기반 지식 문서와 출처 URL
+- `SOURCE_VALIDATION.md`: 출처 검증 기준과 운영 전 확인 항목
+- `.env.example`: OpenAI API 키와 모델 설정 예시
+- `scenario-test.js`: 응급/주의/일반 질문 응답 시나리오 테스트
 
-## Run
+## Run From Project Root
+
+이제 `Project` 폴더에서 한 번만 실행하면 Vite 프론트와 AI_Chat 백엔드가 같이 실행됩니다.
 
 ```powershell
-Copy-Item .env.example .env
-# AI_Chat/.env 파일에서 본인의 키를 설정합니다. 이 파일은 GitHub에 올리지 않습니다.
-# OPENAI_API_KEY=your_openai_api_key_here
+cd Project
 npm.cmd install
 npm.cmd run dev
 ```
 
-프론트엔드는 `Project` 폴더에서 실행하며, 챗봇 화면이 이 서버의
-`http://127.0.0.1:8000/api/chat`을 호출합니다.
+첫 실행에서 `AI_Chat/node_modules`가 없으면 루트 dev 스크립트가 `AI_Chat` 안에서 `npm install`을 자동으로 실행합니다.
 
-기본 설정은 서버를 `127.0.0.1`에만 열고, `localhost:5173` 또는
-`127.0.0.1:5173`에서 실행된 프론트 요청만 허용합니다. 실제 배포에서는
-`HOST`와 `ALLOWED_ORIGINS`를 배포 환경에 맞게 설정해야 합니다.
+## Enable OpenAI Answers
+
+```powershell
+cd Project\AI_Chat
+Copy-Item .env.example .env
+```
+
+그 다음 `Project\AI_Chat\.env`에 본인 키를 넣습니다. `.env`는 `.gitignore`에 포함되어 GitHub에 올라가지 않습니다.
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+ENABLE_AI_GENERATION=true
+```
+
+API 키가 없거나 `ENABLE_AI_GENERATION=false`이면 챗봇은 안전 분기와 `trusted-knowledge.json`의 공식 자료 기반 기본 답변만 사용합니다. API 키를 넣으면 검색된 공식 자료를 근거로 OpenAI 모델이 더 자연스러운 답변을 생성합니다.
 
 ## API
 
-- `GET /api/health`: 서버 상태와 의미 기반 검색 설정 여부 확인
+- `GET /api/health`: 서버 상태, 모델 설정, 검색 설정 확인
 - `POST /api/chat`: `{ "message": "...", "history": [] }` 형식의 상담 요청 처리
 
-## Supported interactions
+## Supported Topics
 
-- 일상 응대: `안녕`, `어떤 질문을 할 수 있어?`, `고마워`
-- 확인 질문: `움직임이 느껴져요`, `배에 진통있어`, `배가 아파요`처럼 증상의 종류나 정도가 불명확한 입력
-- 지금 의료진 확인 안내: `피가 나요`, `물이 새요`, `태동이 줄었어요`, `배가 규칙적으로 뭉쳐요`, `배가 너무 아파요`
-- 즉시 도움 안내: `숨쉬기 힘들고 가슴이 아파요`, `죽고 싶어요`처럼 긴급 도움이 필요한 입력
-- 태동 안내: `태동이 느껴져요`처럼 아기 움직임이 명확한 문의에는 위험 경고부터 표시하지 않습니다.
-- 안전 경계 응답: `감기약 먹어도 돼?`처럼 복용 판단을 요구하는 질문
-- 공식 정보 검색: `임신당뇨 검사는 언제 하나요?`, `엽산은 왜 필요한가요?`
+- 인사와 사용 안내
+- 복통, 진통, 출혈, 양수 의심, 태동 감소 같은 안전 분기
+- 모호한 증상에 대한 확인 질문
+- 임신성 당뇨 검사, 입덧, 조산, 산후 우울 등 기존 공식 자료 질문
+- 엽산, 철분, 칼슘, 비타민 D, 비타민 C, 요오드, 비타민 B6/B12 등 영양 질문
+- 생선과 수은, 카페인, 술, 피해야 할 음식, 리스테리아 등 생활/식품 안전 질문
+- 임신 중 권장 백신, 변비, 다리 쥐, 어지러움, 골반통, 허리통증 등 흔한 불편감 질문
 
 ## Test
 
 ```powershell
+cd Project\AI_Chat
 npm.cmd test
 ```
 
-## Safety policy
+## Safety Policy
 
-- `OPENAI_API_KEY`와 `ENABLE_AI_GENERATION=true`가 설정되면 AI가 대화 이력과 검색된 공식 자료를 바탕으로 쉬운 답변을 생성합니다.
-- 모델은 검색된 공식 근거에 없는 진단, 처방, 약 복용 결정을 만들지 않도록 시스템 지침으로 제한됩니다.
-- 명확한 위험 신호, 약 복용 판단 요청, 증상 확인 질문이 우선 필요한 입력은 AI 생성 전에 안전 분기로 처리합니다.
-- 채팅 화면에는 이해하기 쉬운 안내문을 우선 표시하고, 확인용 공식 출처는 별도 링크로 제공합니다.
-- API 키가 없거나 `ENABLE_AI_GENERATION=false`이면 안전 분기 및 등록 자료 기반 기본 응답만 동작합니다.
-- AI 생성 또는 의미 기반 검색을 활성화하면 사용자가 입력한 건강 질문과 대화 내용이 OpenAI API로 전송될 수 있으므로, 실제 서비스 전 개인정보 처리방침과 사용자 동의를 검토해야 합니다.
-- 의미 기반 검색 결과는 `MIN_SIMILARITY_SCORE` 기준 이상일 때만 출처로 표시하여 관련 없는 의료 문서가 노출되는 것을 줄입니다.
-- 출혈, 양수 누출, 심하거나 계속되는 복통, 태동 감소·멈춤, 전자간증 의심 증상, 자해 표현은 검색보다 먼저 탐지하여 즉시 진료 안내와 공식 근거를 반환합니다.
-- 질문에 직접 대응하는 검증 문서가 없으면 AI가 의학 사실을 만들어 답하지 않고, 확인 질문 또는 의료진 상담 안내를 하도록 제한합니다.
-- 공공누리 제4유형 자료는 상업적 이용과 변경에 제한이 있으므로 외부 공개·상용 배포 전 이용 범위를 반드시 재확인해야 합니다.
+- 이 챗봇은 진단, 처방, 복용 결정, 응급 여부 확정을 하지 않습니다.
+- 출혈, 양수 의심, 규칙적이고 심해지는 통증, 태동 감소, 심한 두통/시야 이상/숨참/가슴통증 같은 위험 신호는 모델 답변보다 안전 분기가 먼저 작동합니다.
+- 질문이 모호하면 바로 위험하다고 단정하지 않고, 통증 여부, 반복 간격, 출혈/양수 여부, 태동 변화 같은 핵심 정보를 먼저 묻습니다.
+- OpenAI 답변은 검색된 공식 자료 범위 안에서만 생성하도록 제한합니다.
+- 실제 서비스 배포 전에는 의료진 또는 의료 콘텐츠 책임자의 문구 검토가 필요합니다.

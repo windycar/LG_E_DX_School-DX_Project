@@ -1,58 +1,48 @@
 # Source Validation
 
-검증 기준일: 2026-05-27
+검증 기준일: 2026-05-28
 
-이 서비스는 임산부 대상 기능이므로, 명확한 경고 신호는 모델보다 먼저 안전 문구로 분기합니다.
-일반 대화와 모호한 질문은 OpenAI 모델이 대화 이력과 검색된 공식 자료를 참고해
-쉬운 안내문을 생성하며, 화면에는 근거 기관명과 원문 링크를 함께 표시합니다.
+이 챗봇은 임산부 상담 보조 기능입니다. 응급 신호, 진단, 처방, 복용 결정은 AI가 확정하지 않으며, 공식 자료 기반의 일반 안내와 의료진 상담 유도를 우선합니다.
 
 ## Verified Sources
 
-| Topic | Organization | Official update date | Status |
-| --- | --- | --- | --- |
-| 식이영양(임산부) | 질병관리청 국가건강정보포털 | 2026-05-04 | 원문 확인 |
-| 운동 | 질병관리청 국가건강정보포털 | 2026-05-15 | 일반 운동정보로만 사용 |
-| 임신고혈압과 전자간증(임신중독증) | 질병관리청 국가건강정보포털 | 2026-05-06 | 원문 확인 |
-| 임신당뇨병 | 질병관리청 국가건강정보포털 | 2026-04-27 | 원문 확인 |
-| 조산 | 질병관리청 국가건강정보포털 | 2026-04-17 | 원문 확인 |
-| 산후 우울증 | 보건복지부 국립정신건강센터 국가정신건강정보포털 | 페이지 및 운영기관 확인, 갱신일 미표시 | 제한 사용 |
-| 산모 관련 응급 경고 징후 | 미국 질병통제예방센터(CDC) Hear Her 캠페인 한국어 안내서 | 페이지 확인, 갱신일 미표시 | 복통·태동 경고 분기에만 사용 |
+| Topic | Organization | Status |
+| --- | --- | --- |
+| 임신성 당뇨, 입덧, 고혈압/전자간증, 조산 | 질병관리청 국가건강정보포털 | 공식 건강정보 원문 확인 |
+| 산후 우울증 | 보건복지부 국립정신건강센터 국가정신건강정보포털 | 공식 정신건강정보 원문 확인 |
+| 산모 관련 응급 경고 징후 | CDC Hear Her campaign | 산모 응급 경고 신호 분기용으로 사용 |
+| 임신 중 핵심 영양소와 산전영양제 | NIH Office of Dietary Supplements | 영양소 일반 정보와 상한량 확인 |
+| 비타민 C, 철분, 칼슘, 비타민 D, 요오드, 비타민 B6, 비타민 B12 | NIH Office of Dietary Supplements | 임신 중 권장량/상한량/주의사항 확인 |
+| 생선, 오메가3, 수은 | FDA/EPA | 임신 중 생선 섭취 권고 확인 |
+| 카페인 | ACOG | 임신 중 하루 200 mg 이하 안내 확인 |
+| 술 | CDC | 임신 중 안전한 음주량 없음 안내 확인 |
+| 피해야 할 음식, 흔한 임신 불편감, 골반통/허리통증 | NHS | 쉬운 표현의 임신 생활 안내 확인 |
+| 리스테리아 식품안전 | FDA | 임신 중 고위험 식품 안전 안내 확인 |
+| 임신 중 백신 | CDC | 임신 중 권장 백신 안내 확인 |
 
 ## Authority Assessment
 
-- 질병관리청 국가건강정보포털은 대한민국 공식 전자정부 누리집으로 표시되어 있으며, 해당 임신 관련 문서는 공식 건강정보 원문입니다.
-- 국가정신건강정보포털은 보건복지부 국립정신건강센터가 제공하며, 전문가 검증을 거친 정신건강 공공포털임을 안내합니다.
-- CDC `Hear Her` 한국어 안내서는 지속되는 심한 복통, 태동 감소·멈춤, 호흡 곤란, 흉통, 실신, 발열, 심한 구토 및 심한 부종 등을 즉시 진료가 필요한 산모 응급 경고 징후로 안내합니다.
-- 위 출처는 신뢰 가능한 1차 공공 출처지만, 개별 임산부의 진단·처방·응급 판단을 대신하지 않습니다.
-- `운동` 문서는 일반 운동 정보이므로 임산부 개인에게 특정 운동을 권장하는 자료로 확대 해석하지 않습니다.
+- 질병관리청 국가건강정보포털은 대한민국 공공 건강정보 원문으로, 국내 사용자의 기본 임신 관련 안내에 우선 사용합니다.
+- NIH Office of Dietary Supplements는 미국 국립보건원 산하 영양보충제 정보 기관으로, 영양소 권장량과 상한량 근거에 사용합니다.
+- ACOG는 미국 산부인과 전문 학회 자료로, 카페인처럼 산부인과 권고가 중요한 주제에 보조 근거로 사용합니다.
+- CDC, FDA, FDA/EPA 자료는 감염, 백신, 식품 안전, 수은 노출처럼 공공보건 기준이 중요한 주제에 사용합니다.
+- NHS 자료는 임산부가 이해하기 쉬운 표현을 만들 때 보조 근거로 사용하되, 국내 진료 기준을 대체하지 않습니다.
 
 ## Use Restrictions
 
-질병관리청 국가건강정보포털은 공공누리 제4유형 자료에 대해
-`출처표시`, `비상업적 이용`, `변경금지` 조건을 안내합니다.
-따라서 본 구현은 원문 전체를 복제하지 않고, 검색된 사실을 생성 답변의 근거로 제공하며 원문 링크를 함께 표시합니다.
-외부 배포 또는 상업 이용 전에는 각 콘텐츠의 공공누리 부착 여부와 이용허락 범위를
-문서별로 다시 확인해야 합니다.
+- 공식 원문 전체를 복제하지 않고, 확인된 사실을 쉬운 문장으로 요약합니다.
+- 약물 복용, 영양제 고용량 복용, 진단명 판단, 치료 결정은 의료진 상담으로 안내합니다.
+- 공공누리 또는 각 기관의 이용 조건은 실제 공개/상업 배포 전 다시 확인해야 합니다.
+- OpenAI API 사용 시 건강 질문이 외부 API로 전송될 수 있으므로 실제 서비스에서는 개인정보 고지와 사용자 동의가 필요합니다.
 
 ## Release Gate
 
-- 산부인과 전문의 또는 의료 콘텐츠 책임자의 문구 검토 완료
-- 원문 링크 유효성 및 갱신일 정기 확인 절차 마련
-- 위험 문구 분기 시나리오 테스트 완료
-- 의약품 복용, 진단, 치료 지시를 생성하지 않는지 점검
-- 상업 배포 시 저작물 이용허락 확인 완료
-- 외부 임베딩 검색을 활성화할 경우 민감 건강질문 전송에 대한 개인정보 검토 및 사용자 동의 완료
-- OpenAI 생성 답변을 활성화할 경우 건강질문과 대화 이력 전송에 대한 개인정보 고지 및 사용자 동의 완료
-- 생성 답변이 공식 근거가 없는 진단·처방·복약 결정을 하지 않는지 평가 시나리오 마련
-- 로컬 개발 시 API 서버를 `127.0.0.1`에만 바인딩하고 허용된 프론트 주소만 CORS로 접근시키는지 확인
-- 의미 기반 검색 결과가 관련도 기준 미만일 때 의료 근거로 노출되지 않는지 확인
-
-## Triage Presentation Policy
-
-- 증상의 종류나 심각도가 불명확하면 위험하다고 단정하지 않고, 통증 여부, 반복 간격, 출혈·물 샘 여부, 태동 감소 여부를 먼저 질문합니다.
-- 질병관리청 조산 안내의 규칙적이고 지속적인 배뭉침, 강해지는 진통, 출혈, 양수 누출 기준이나 CDC의 태동 감소 등 명확한 경고 표현이 확인되면 `지금 의료진 확인이 필요해요` 단계로 안내합니다.
-- 호흡 곤란, 흉통, 실신, 자해·타해 표현처럼 즉각적인 도움 요청이 필요한 입력에만 `즉시 도움을 요청하세요` 단계를 표시합니다.
-- 이 단계는 진단이나 응급도 확정이 아니라, 사용자가 다음 행동을 선택하도록 돕는 안전 안내입니다.
+- 의료진 또는 의료 콘텐츠 책임자의 문구 검토
+- 출처 링크 유효성 정기 점검
+- 응급/주의/일반 분기 시나리오 테스트
+- 약 복용, 진단, 치료 지시를 생성하지 않는지 평가
+- 실제 배포 전 개인정보 처리방침과 이용자 동의 문구 확인
+- OpenAI API 키가 GitHub에 포함되지 않는지 확인
 
 ## Official Links
 
@@ -63,4 +53,29 @@
 - https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=6583
 - https://www.mentalhealth.go.kr/portal/disease/diseaseDetail.do?dissId=66
 - https://www.cdc.gov/hearher/docs/pdf/other-languages/conversation-guides/Hear-Her-Womens-Conv-Guide-Final-9-1-21_Korean.pdf
-- https://health.kdca.go.kr/healthinfo/biz/health/portalUseGuidance/hlthinsReqst/hlthinsReqstMth.do?index=3
+- https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminC-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Calcium-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminD-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminB6-HealthProfessional/
+- https://ods.od.nih.gov/factsheets/VitaminB12-HealthProfessional/
+- https://www.fda.gov/food/consumers/questions-answers-fdaepa-advice-about-eating-fish-those-who-might-become-or-are-pregnant-or
+- https://www.acog.org/womens-health/experts-and-stories/ask-acog/how-much-coffee-can-i-drink-while-pregnant
+- https://www.cdc.gov/alcohol-pregnancy/about/index.html
+- https://www.nhs.uk/pregnancy/keeping-well/foods-to-avoid/
+- https://www.fda.gov/food/health-educators/listeria-food-safety-moms-be
+- https://www.cdc.gov/vaccines-pregnancy/recommended-vaccines/index.html
+- https://www.nhs.uk/pregnancy/common-symptoms/common-health-problems/
+- https://www.nhs.uk/pregnancy/common-symptoms/pelvic-pain/
+- https://www.nhs.uk/pregnancy/common-symptoms/headaches/
+- https://www.nhs.uk/pregnancy/common-symptoms/swollen-ankles-feet-and-fingers/
+- https://www.nhs.uk/pregnancy/common-symptoms/piles/
+- https://www.nhs.uk/pregnancy/common-symptoms/indigestion-and-heartburn/
+- https://www.nhs.uk/pregnancy/common-symptoms/vomiting-and-morning-sickness/
+- https://www.nhs.uk/pregnancy/common-symptoms/vaginal-discharge/
+- https://www.nhs.uk/pregnancy/trying-for-a-baby/signs-and-symptoms-of-pregnancy/
+- https://www.cdc.gov/pregnancy/during/index.html
+- https://www.cdc.gov/physical-activity-basics/guidelines/healthy-pregnant-or-postpartum-women.html
+- https://www.acog.org/womens-health/faqs/skin-conditions-during-pregnancy

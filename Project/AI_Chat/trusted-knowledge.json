@@ -68,5 +68,305 @@
     "verifiedAt": "2026-05-27",
     "evidence": "CDC는 임신 중 지속되는 심한 복통, 태동 감소 또는 중단, 호흡 곤란, 흉통이나 빠른 심장 박동, 실신, 38도 이상의 발열, 심한 구토, 얼굴·손의 심한 부종, 다리의 부종·발적·통증 등을 즉시 진료를 받아야 하는 산모 관련 응급 경고 징후로 안내합니다.",
     "plainAnswer": "아기 움직임이 평소보다 확실히 줄거나 느껴지지 않는다면 바로 담당 산부인과에 연락하세요."
+  },
+  {
+    "title": "임신 중 핵심 영양소와 산전영양제",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "산전영양제 임산부 영양제 종합비타민 칼슘 콜린 엽산 요오드 철분 마그네슘 오메가3 비타민A 비타민B6 비타민B12 비타민C 비타민D 아연 권장량 상한량",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 필요한 주요 영양소로 칼슘, 콜린, 엽산, 요오드, 철분, 마그네슘, 오메가3 지방산, 비타민 A, B6, B12, C, D, 아연 등을 안내하며, 산전영양제 성분과 용량은 제품마다 다르므로 확인이 필요하다고 설명합니다.",
+    "plainAnswer": "임신 중에는 여러 영양소 필요량이 달라집니다. 산전영양제를 고를 때는 엽산, 철분, 요오드, 비타민 D 같은 핵심 성분이 들어 있는지 확인하고, 이미 먹는 약이나 영양제가 있으면 산부인과나 약사에게 함께 확인하세요."
+  },
+  {
+    "title": "비타민 C와 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "비타민C 비타민 씨 아스코르빈산 권장량 상한량 감기 오렌지 과일 철분 흡수 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 비타민 C 권장량을 14~18세 80 mg, 19~50세 85 mg으로 제시하며, 임신 중 상한섭취량은 14~18세 1,800 mg, 19~50세 2,000 mg입니다. 비타민 C를 너무 많이 먹으면 설사, 메스꺼움, 복통이 생길 수 있습니다.",
+    "plainAnswer": "성인 임산부는 하루 비타민 C 권장량이 85 mg입니다. 일반 과일과 채소로 섭취하는 것은 보통 문제가 적지만, 고함량 영양제를 여러 개 같이 먹으면 과해질 수 있습니다. 성인 기준 하루 2,000 mg을 넘기지 않도록 성분표를 확인하세요."
+  },
+  {
+    "title": "철분과 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "철분 빈혈 철분제 헤모글로빈 페리틴 어지러움 피곤함 변비 철분 권장량 상한량 비타민C 칼슘",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 철분 권장량을 27 mg, 상한섭취량을 45 mg으로 안내합니다. 철분은 산모와 태아 건강에 중요하지만, 충분한 사람에게 무조건 고용량 철분을 더하는 것은 이득과 위해가 모두 고려되어야 합니다. 비타민 C는 비헴철 흡수를 돕고 칼슘은 철 흡수를 방해할 수 있습니다.",
+    "plainAnswer": "임신 중 철분은 중요하지만 철분제를 얼마나 먹을지는 빈혈 검사, 기존 산전영양제 성분, 변비 같은 부작용을 같이 봐야 합니다. 철분제는 비타민 C와 같이 먹으면 흡수에 도움이 될 수 있고, 칼슘제와는 시간을 띄우는 것이 좋습니다."
+  },
+  {
+    "title": "칼슘과 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "칼슘 뼈 치아 골다공증 우유 치즈 요거트 칼슘제 권장량 상한량 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 칼슘 권장량을 14~18세 1,300 mg, 19~50세 1,000 mg으로 안내합니다. 칼슘은 뼈와 치아 형성에 중요하며, 비타민 D는 칼슘 흡수를 돕습니다. 상한섭취량은 14~18세 3,000 mg, 19~50세 2,500 mg입니다.",
+    "plainAnswer": "성인 임산부는 하루 칼슘 권장량이 1,000 mg입니다. 우유, 요거트, 치즈, 칼슘 강화 식품을 포함해 계산하고, 칼슘제를 추가할 때는 철분제와 시간을 띄워 먹는 것이 좋습니다."
+  },
+  {
+    "title": "비타민 D와 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "비타민D 비타민 디 햇빛 뼈 칼슘 600IU 15mcg 상한량 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 비타민 D 권장량을 15 mcg, 즉 600 IU로 안내하고, 상한섭취량은 100 mcg, 즉 4,000 IU로 제시합니다. 비타민 D는 태아 발달과 뼈 성장에 필요하며 칼슘 흡수를 돕습니다.",
+    "plainAnswer": "임신 중 비타민 D는 뼈 건강과 칼슘 흡수에 중요합니다. 성분표에서 mcg와 IU 단위를 확인하세요. 이미 산전영양제에 들어 있을 수 있으므로 추가 복용 전 총량을 확인하는 것이 좋습니다."
+  },
+  {
+    "title": "요오드와 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "요오드 아이오딘 갑상선 해조류 김 미역 다시마 산전영양제 권장량 상한량 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 요오드 권장량을 220 mcg로 안내하며, WHO 등은 임신 중 250 mcg/day 수준을 권고합니다. 요오드는 갑상선 기능과 태아 신경 발달에 중요하고, 상한섭취량은 14~18세 900 mcg, 19~50세 1,100 mcg입니다.",
+    "plainAnswer": "요오드는 갑상선과 아기 신경 발달에 중요합니다. 다만 해조류나 고함량 요오드 영양제를 많이 먹으면 과할 수 있으니, 갑상선 질환이 있거나 미역·다시마 제품을 자주 먹는다면 산부인과에 확인하세요."
+  },
+  {
+    "title": "비타민 B6와 입덧",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "입덧 구역 구토 메스꺼움 비타민B6 피리독신 생강 도크실라민 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 비타민 B6가 임신 중 신경계 발달과 기능에 중요하고, ACOG가 임신 중 구역과 구토 완화를 위해 비타민 B6 단독 또는 독실아민 병용을 1차 선택지로 고려할 수 있다고 안내합니다. 임신 중 비타민 B6 상한섭취량은 100 mg/day입니다.",
+    "plainAnswer": "입덧에는 비타민 B6가 도움이 될 수 있다는 공식 근거가 있습니다. 하지만 용량과 병용 약은 개인 상황에 따라 달라질 수 있으므로, 심하게 토하거나 물도 못 마시면 산부인과에 바로 상담하세요."
+  },
+  {
+    "title": "비타민 B12와 채식 임신",
+    "organization": "미국 국립보건원 식이보충제국(NIH ODS)",
+    "url": "https://ods.od.nih.gov/factsheets/Pregnancy-HealthProfessional/",
+    "topic": "비타민B12 비건 채식 채식주의자 빈혈 신경 발달 산전영양제 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NIH ODS는 임신 중 비타민 B12 권장량을 2.6 mcg로 안내합니다. 비타민 B12는 주로 동물성 식품에 들어 있어, 채식 또는 비건 식단을 따르는 임산부는 부족 위험이 높을 수 있고 보충 필요 여부를 의료진과 상의해야 합니다.",
+    "plainAnswer": "비건이나 엄격한 채식 식단이라면 비타민 B12가 부족해질 수 있습니다. 산전영양제 성분표를 확인하고, 필요하면 담당 의료진과 보충 여부를 상의하세요."
+  },
+  {
+    "title": "생선, 오메가3와 수은",
+    "organization": "미국 식품의약국(FDA)·환경보호청(EPA)",
+    "url": "https://www.fda.gov/food/consumers/questions-answers-fdaepa-advice-about-eating-fish-those-who-might-become-or-are-pregnant-or",
+    "topic": "생선 회 초밥 참치 수은 오메가3 DHA EPA 연어 고등어 참치캔 상어 황새치 킹고등어 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "FDA/EPA는 임신 중이거나 임신 가능성이 있는 사람에게 수은이 낮은 생선을 일주일에 2~3회 선택하도록 안내합니다. 수은이 높은 생선은 피하고, 임신 중에는 생선·고기·계란 등을 안전한 내부 온도로 익혀 먹도록 권고합니다.",
+    "plainAnswer": "생선은 단백질과 오메가3를 줄 수 있지만 수은이 낮은 종류를 고르는 것이 중요합니다. 임신 중에는 회나 날생선보다 익힌 생선을 선택하고, 상어·황새치처럼 수은이 높은 생선은 피하세요."
+  },
+  {
+    "title": "카페인과 임신",
+    "organization": "미국산부인과학회(ACOG)",
+    "url": "https://www.acog.org/womens-health/experts-and-stories/ask-acog/how-much-coffee-can-i-drink-while-pregnant",
+    "topic": "카페인 커피 아메리카노 라떼 녹차 홍차 초콜릿 에너지드링크 콜라 200mg 임산부",
+    "sourceUpdatedAt": "2020-10",
+    "verifiedAt": "2026-05-28",
+    "evidence": "ACOG는 임신 중 하루 200 mg 미만의 중등도 카페인 섭취가 유산이나 조산의 주요 원인으로 보이지 않는다고 안내합니다. 카페인은 커피뿐 아니라 차, 초콜릿, 에너지 음료, 탄산음료에도 들어 있습니다.",
+    "plainAnswer": "임신 중 카페인은 하루 총량을 200 mg 미만으로 제한하는 것이 좋습니다. 커피뿐 아니라 녹차, 홍차, 초콜릿, 에너지드링크, 일부 감기약에도 카페인이 있을 수 있으니 합산해서 보세요."
+  },
+  {
+    "title": "술과 임신",
+    "organization": "미국 질병통제예방센터(CDC)",
+    "url": "https://www.cdc.gov/alcohol-pregnancy/about/index.html",
+    "topic": "술 알코올 맥주 와인 소주 음주 임신 초기 모르고 마심 태아알코올증후군 임산부",
+    "sourceUpdatedAt": "2026-04-02",
+    "verifiedAt": "2026-05-28",
+    "evidence": "CDC는 임신 중 알려진 안전한 음주량이나 안전한 시기가 없다고 안내합니다. 임신 사실을 알게 된 뒤 술을 끊는 것은 언제라도 아기 건강에 도움이 되며, 임신 중 음주가 있었다면 의료진과 상의하도록 안내합니다.",
+    "plainAnswer": "임신 중에는 술을 마시지 않는 것이 가장 안전합니다. 임신인 줄 모르고 마셨다면 지금부터 중단하고 산전 진료 때 의료진에게 솔직히 말해 상담받으세요."
+  },
+  {
+    "title": "임신 중 피해야 할 음식",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/keeping-well/foods-to-avoid/",
+    "topic": "피해야 할 음식 치즈 브리 카망베르 블루치즈 살균 안된 우유 날계란 날고기 간 파테 훈제연어 회 날생선 날조개 리스테리아 식중독",
+    "sourceUpdatedAt": "2023-05-19",
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 일부 음식은 주의하거나 피해야 한다고 안내합니다. 리스테리아는 유산, 사산 또는 신생아 중증 질환으로 이어질 수 있으며, 일부 치즈와 훈제·절임 생선은 충분히 뜨겁게 조리하면 위험을 낮출 수 있습니다. 날조개류는 유해균·바이러스·독소 위험이 있습니다.",
+    "plainAnswer": "임신 중에는 살균되지 않은 유제품, 일부 부드러운 치즈, 날고기·날조개류, 충분히 익히지 않은 음식, 간·파테류를 조심해야 합니다. 애매하면 충분히 익혀 먹고, 먹고 난 뒤 열이나 설사 등 몸이 안 좋으면 의료진에게 연락하세요."
+  },
+  {
+    "title": "리스테리아와 식품안전",
+    "organization": "미국 식품의약국(FDA)",
+    "url": "https://www.fda.gov/food/health-educators/listeria-food-safety-moms-be",
+    "topic": "리스테리아 식중독 델리미트 햄 소시지 핫도그 훈제생선 비살균 우유 치즈 냉장식품 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "FDA는 임산부가 리스테리아에 더 취약하고, 리스테리아 감염이 유산, 사산, 조산, 신생아 중증 질환으로 이어질 수 있다고 설명합니다. 리스테리아는 냉장 온도에서도 자랄 수 있으며, 델리미트·핫도그·훈제생선·비살균 유제품 등에서 주의가 필요합니다.",
+    "plainAnswer": "임신 중에는 냉장식품이라도 안전하다고만 볼 수 없습니다. 델리미트나 핫도그는 김이 날 정도로 데워 먹고, 비살균 유제품이나 차가운 훈제생선은 피하거나 충분히 익혀 먹는 것이 좋습니다."
+  },
+  {
+    "title": "임신 중 백신",
+    "organization": "미국 질병통제예방센터(CDC)",
+    "url": "https://www.cdc.gov/vaccines-pregnancy/recommended-vaccines/index.html",
+    "topic": "백신 예방접종 독감 인플루엔자 Tdap 백일해 RSV 코로나 코로나19 임산부 몇주",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "CDC는 임신 중 백일해(Tdap), 독감, COVID-19, RSV 예방과 관련한 권고를 안내합니다. Tdap은 매 임신 27~36주에 권고되며, RSV 백신은 임신 32~36주와 계절 조건에 따라 고려할 수 있고, 개인 상황은 의료진과 상의하도록 안내합니다.",
+    "plainAnswer": "임신 중 백신은 종류와 임신 주수에 따라 권고 시기가 다릅니다. Tdap은 보통 27~36주에 맞는 것으로 안내되며, 독감·RSV·COVID-19 백신은 계절과 개인 위험도에 따라 담당 의료진과 상의하세요."
+  },
+  {
+    "title": "변비, 쥐, 어지러움, 소변 증상",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/common-health-problems/",
+    "topic": "변비 배변 화장실 못감 똥 안나옴 쥐 다리쥐 종아리쥐 다리 저림 어지러움 어지러워 어지럽다 어질어질 현기증 핑돈다 기절 쓰러질것같 소변 자주 봄 배뇨통 소변 피 오줌 아파 요로감염",
+    "sourceUpdatedAt": "2024-04-22",
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 변비, 다리 쥐, 어지러움, 소변 증상이 흔히 생길 수 있다고 안내합니다. 변비에는 섬유질 식품, 규칙적인 운동, 물 섭취가 도움이 될 수 있습니다. 어지러움이 있으면 천천히 일어나고, 누워 있을 때 어지럽다면 옆으로 돌아눕도록 안내합니다. 소변 볼 때 통증이 있거나 소변에 피가 보이면 요로감염일 수 있어 24시간 안에 의료진에게 연락하도록 안내합니다.",
+    "plainAnswer": "어지러움, 변비, 다리 쥐는 임신 중 생길 수 있는 흔한 불편감입니다. 어지러우면 갑자기 일어나지 말고 잠시 앉거나 옆으로 누워 쉬세요. 다만 쓰러질 것 같거나 실제로 쓰러졌거나, 숨이 차거나 가슴이 아프면 바로 도움을 받아야 합니다. 소변 볼 때 아프거나 피가 보이면 산부인과에 연락하세요."
+  },
+  {
+    "title": "골반통과 허리통증",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/pelvic-pain/",
+    "topic": "골반통 허리통증 치골통 엉덩이 통증 다리 통증 걸을 때 아픔 계단 침대 뒤척임 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 관련 골반통이 아기에게 해롭지는 않지만 통증이 심하고 움직이기 어렵게 만들 수 있다고 설명합니다. 통증은 치골, 허리, 회음부, 허벅지로 퍼질 수 있고 걷기, 계단 오르기, 한쪽 다리로 서기, 침대에서 돌아눕기 때 심해질 수 있습니다.",
+    "plainAnswer": "골반이나 허리 통증은 임신 중 흔할 수 있지만, 걷기 힘들 정도로 아프거나 생활이 어렵다면 참지 말고 산부인과나 물리치료 관련 상담을 받으세요."
+  },
+  {
+    "title": "눕는 자세와 어지러움",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/common-health-problems/",
+    "topic": "수면자세 왼쪽으로 눕기 똑바로 눕기 28주 어지러움 기절 누우면 어지러움 임산부",
+    "sourceUpdatedAt": "2024-04-22",
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 어지러움이 호르몬 변화와 관련될 수 있고, 누워 있을 때 어지럽다면 옆으로 돌아눕도록 안내합니다. 임신 28주 이후에는 등을 대고 잠드는 것을 피하는 것이 좋다고 안내합니다.",
+    "plainAnswer": "임신 후반에는 똑바로 누웠을 때 어지럽거나 불편할 수 있습니다. 옆으로 눕는 자세가 더 편할 수 있고, 28주 이후에는 등을 대고 자는 습관을 피하는 것이 좋습니다."
+  },
+  {
+    "title": "흔한 임신 불편감과 상담 기준",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/common-health-problems/",
+    "topic": "흔한 증상 피곤함 피곤해 졸림 잠이 많아 덥다 더워 땀 피부변화 유륜 어두워짐 튼살 정맥류 부종 붓기 손부음 발부음 다리부음 걱정되는 증상 임산부",
+    "sourceUpdatedAt": "2024-04-22",
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 몸의 변화가 불편감이나 걱정을 만들 수 있지만 대부분 바로 놀랄 필요는 없다고 설명하면서도, 걱정되는 것은 산전관리팀에 말하라고 안내합니다. 더위, 땀, 피부색 변화, 정맥류 등도 임신 중 나타날 수 있습니다.",
+    "plainAnswer": "임신 중 몸 변화가 많아 불편할 수 있습니다. 흔한 변화라도 본인이 걱정되거나 새롭게 심해지는 증상이라면 산전 진료 때 꼭 말하는 것이 좋습니다."
+  },
+  {
+    "title": "속쓰림과 소화불량",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/indigestion-and-heartburn/",
+    "topic": "속쓰림 속 쓰림 속이 쓰려 속쓰려 위산 역류 신물 올라옴 트림 소화불량 더부룩 명치 답답 가슴 쓰림 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 속쓰림과 소화불량이 호르몬 변화와 커진 자궁 때문에 생길 수 있다고 안내합니다. 적은 양을 자주 먹고, 기름지거나 매운 음식 등 증상을 악화시키는 음식을 피하며, 식사 직후 바로 눕지 않는 것이 도움이 될 수 있다고 안내합니다.",
+    "plainAnswer": "속이 쓰리거나 신물이 올라오는 느낌은 임신 중 흔할 수 있습니다. 한 번에 많이 먹기보다 조금씩 나눠 먹고, 먹고 바로 눕지 않는 것이 도움이 될 수 있습니다. 그래도 심하거나 계속되면 산부인과에 말해 안전한 약을 확인하세요."
+  },
+  {
+    "title": "입덧과 심한 구토",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/vomiting-and-morning-sickness/",
+    "topic": "입덧 메스꺼움 울렁거림 토할것같 토해 구토 계속 토 물도 못마셔 음식 못먹어 아침 입덧 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 메스꺼움과 구토가 흔하지만, 심해서 음식이나 물을 거의 못 먹거나 소변이 줄면 치료가 필요할 수 있다고 안내합니다. 소량씩 자주 먹고 충분히 쉬는 것이 도움이 될 수 있으며, 심한 경우 의료진 상담이 필요합니다.",
+    "plainAnswer": "입덧은 임신 중 흔하지만, 물도 못 마시거나 계속 토하면 그냥 참으면 안 됩니다. 조금씩 자주 먹고 쉬는 것이 도움이 될 수 있지만, 소변이 줄거나 몸이 축 처지면 산부인과에 바로 상담하세요."
+  },
+  {
+    "title": "두통과 눈앞이 흐림",
+    "organization": "질병관리청 국가건강정보포털",
+    "url": "https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=3329",
+    "topic": "두통 머리아파 머리 아파 눈앞 흐림 시야 흐림 번쩍임 어지러움 혈압 윗배통증 상복부통증 임신중독증 전자간증 임산부",
+    "sourceUpdatedAt": "2026-05-06",
+    "verifiedAt": "2026-05-28",
+    "evidence": "질병관리청은 임신고혈압과 전자간증이 중증으로 진행되면 두통, 시력장애, 상복부 통증, 소변량 감소 등의 증상이 나타날 수 있다고 안내합니다. 정기 산전진찰에서 혈압과 단백뇨 확인이 중요합니다.",
+    "plainAnswer": "가벼운 두통도 있을 수 있지만, 머리가 심하게 아프거나 눈앞이 흐려지거나 윗배가 아프면 산부인과에서 바로 확인받아야 합니다. 특히 혈압 문제와 관련될 수 있어 참지 않는 것이 좋습니다."
+  },
+  {
+    "title": "질 분비물과 가려움",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/vaginal-discharge/",
+    "topic": "냉 분비물 질분비물 냄새 가려움 따가움 간지러움 노란분비물 초록분비물 피섞임 질염 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 질 분비물이 늘 수 있지만, 냄새가 나거나 가렵거나 따갑거나 색이 변하면 감염 가능성이 있어 의료진에게 상담하도록 안내합니다. 피가 섞인 분비물은 확인이 필요합니다.",
+    "plainAnswer": "임신 중 냉이 늘 수는 있습니다. 하지만 냄새가 심하거나 가렵고 따갑거나, 노랗거나 초록색이거나, 피가 섞이면 산부인과에 확인하세요."
+  },
+  {
+    "title": "두통",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/headaches/",
+    "topic": "두통 머리 아파 머리아파 편두통 머리가 지끈 머리가 깨질것같 임신초기 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 두통이 생길 수 있으며, 충분한 휴식과 수분 섭취가 도움이 될 수 있다고 안내합니다. 심한 두통이나 시야 변화, 몸의 붓기 등 다른 증상이 함께 있으면 의료진 확인이 필요합니다.",
+    "plainAnswer": "임신 중 두통이 생길 수 있습니다. 물을 마시고 쉬어도 계속 심하거나, 눈앞이 흐리거나 손발이 갑자기 많이 붓는다면 산부인과에 바로 확인하세요."
+  },
+  {
+    "title": "부종",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/swollen-ankles-feet-and-fingers/",
+    "topic": "부종 붓기 손부음 발부음 발목부음 다리부음 손이 부어 발이 부어 반지 안빠짐 얼굴 부음 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 손, 발, 발목이 붓는 일이 흔할 수 있다고 안내합니다. 다만 갑자기 심하게 붓거나 얼굴, 손, 눈 주변이 붓고 두통이나 시야 변화가 함께 있으면 전자간증 가능성이 있어 즉시 확인이 필요합니다.",
+    "plainAnswer": "손발이 조금 붓는 것은 임신 중 흔할 수 있습니다. 하지만 갑자기 많이 붓거나 얼굴까지 붓고, 머리가 심하게 아프거나 눈앞이 흐리면 바로 산부인과에 연락하세요."
+  },
+  {
+    "title": "치질",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/common-symptoms/piles/",
+    "topic": "치질 항문 아파 항문 피 변 볼때 피 똥쌀때 피 항문 튀어나옴 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 중 치질이 생길 수 있고, 변비를 줄이는 것이 도움이 될 수 있다고 안내합니다. 통증이나 출혈이 있으면 의료진에게 상담하도록 안내합니다.",
+    "plainAnswer": "임신 중 변비 때문에 치질이 생길 수 있습니다. 물과 섬유질을 챙기고, 변 볼 때 피가 나거나 항문 통증이 계속되면 산부인과에 말해 안전한 치료 방법을 확인하세요."
+  },
+  {
+    "title": "운동과 활동",
+    "organization": "미국 질병통제예방센터(CDC)",
+    "url": "https://www.cdc.gov/physical-activity-basics/guidelines/healthy-pregnant-or-postpartum-women.html",
+    "topic": "운동 걷기 산책 요가 필라테스 헬스 수영 근력운동 활동량 150분 임산부",
+    "sourceUpdatedAt": "2025-12-04",
+    "verifiedAt": "2026-05-28",
+    "evidence": "CDC는 건강한 임산부와 산후 여성이 중간 강도의 유산소 활동을 주 150분 정도 하는 것이 안전하고 도움이 될 수 있다고 안내합니다. 개인 질환이나 위험 요인이 있으면 의료진과 상의해야 합니다.",
+    "plainAnswer": "특별한 금지 사유가 없다면 걷기 같은 가벼운 운동은 도움이 될 수 있습니다. 다만 출혈, 어지러움, 숨참, 가슴통증, 규칙적인 배뭉침이 있으면 운동하지 말고 산부인과에 확인하세요."
+  },
+  {
+    "title": "흡연, 전자담배, 대마",
+    "organization": "미국 질병통제예방센터(CDC)",
+    "url": "https://www.cdc.gov/pregnancy/during/index.html",
+    "topic": "흡연 담배 전자담배 액상담배 베이프 대마 마리화나 간접흡연 임산부",
+    "sourceUpdatedAt": "2025-05-08",
+    "verifiedAt": "2026-05-28",
+    "evidence": "CDC는 임신 중 흡연, 음주, 특정 약물 사용이 조산, 선천 이상, 영아 사망 등 문제와 관련될 수 있다고 안내합니다. 임신 중 대마 사용의 잠재적 건강 영향도 별도 주제로 안내합니다.",
+    "plainAnswer": "임신 중에는 담배, 전자담배, 대마를 피하는 것이 안전합니다. 끊기 어렵다면 혼자 해결하려 하지 말고 산부인과에 말해 도움을 받으세요."
+  },
+  {
+    "title": "임신 초기 증상과 임신 테스트",
+    "organization": "영국 국민보건서비스(NHS)",
+    "url": "https://www.nhs.uk/pregnancy/trying-for-a-baby/signs-and-symptoms-of-pregnancy/",
+    "topic": "임신초기 임신 초기 증상 생리 안함 생리 늦음 임테기 임신테스트 임신 테스트 임신테스트기 테스트 방법 확인 가슴 아픔 피곤함 입덧 냄새 민감 소변 자주",
+    "sourceUpdatedAt": "2022-12-29",
+    "verifiedAt": "2026-05-28",
+    "evidence": "NHS는 임신 초기 증상으로 생리 지연, 메스꺼움과 구토, 피곤함, 가슴 통증, 소변을 자주 보는 느낌, 냄새와 입맛 변화 등이 나타날 수 있다고 안내합니다. 임신 테스트 양성은 지침대로 사용했다면 대체로 정확하지만, 음성인데 임신이 의심되면 시간을 두고 다시 검사할 수 있습니다.",
+    "plainAnswer": "생리가 늦고 가슴이 아프거나 피곤하고 속이 울렁거릴 수 있습니다. 임신 테스트기가 양성이면 산부인과 진료를 잡고, 음성인데 계속 의심되면 며칠 뒤 다시 검사해 보세요."
+  },
+  {
+    "title": "피부 변화와 튼살",
+    "organization": "미국산부인과학회(ACOG)",
+    "url": "https://www.acog.org/womens-health/faqs/skin-conditions-during-pregnancy",
+    "topic": "피부 변화 튼살 여드름 기미 색소침착 배꼽선 유두색 진해짐 정맥류 가려움 임산부",
+    "sourceUpdatedAt": null,
+    "verifiedAt": "2026-05-28",
+    "evidence": "ACOG는 임신 중 어두운 반점, 기미, 배 중앙의 어두운 선, 튼살, 여드름, 정맥류, 머리카락과 손발톱 변화 등이 흔히 나타날 수 있다고 안내합니다.",
+    "plainAnswer": "임신 중 기미, 튼살, 여드름, 피부색 변화가 생길 수 있습니다. 대부분 흔한 변화지만, 가려움이 심하거나 발진이 넓게 퍼지면 진료 때 꼭 말하세요."
+  },
+  {
+    "title": "감염과 성병 상담",
+    "organization": "미국 질병통제예방센터(CDC)",
+    "url": "https://www.cdc.gov/pregnancy/during/index.html",
+    "topic": "성병 성관계 감염 질염 헤르페스 매독 HIV 간염 톡소플라스마 고양이 배설물 기생충 임산부",
+    "sourceUpdatedAt": "2025-05-08",
+    "verifiedAt": "2026-05-28",
+    "evidence": "CDC는 임신 중 감염, 성병, 톡소플라스마 예방 등 주제가 산모와 아기 건강에 중요할 수 있다고 안내합니다. 감염이 의심되면 검사와 치료가 필요할 수 있습니다.",
+    "plainAnswer": "가려움, 냄새 나는 분비물, 물집, 통증, 성병 노출 걱정이 있으면 숨기지 말고 산부인과에 말하세요. 임신 중에도 안전하게 검사와 치료가 필요한 경우가 있습니다."
   }
 ]
