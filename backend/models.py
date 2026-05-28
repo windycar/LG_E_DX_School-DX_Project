@@ -32,3 +32,20 @@ class CommunityPost(Base):
     title = Column(String(200), nullable=True)           # 제목
     content = Column(Text, nullable=True)                # 내용
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+# models.py 맨 아래에 추가
+
+class SmallTalkTopic(Base):
+    __tablename__ = "SMALL_TALK_TOPICS"
+    topic_id = Column(BigInteger, primary_key=True, index=True)
+    question_text = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class SmallTalkAnswer(Base):
+    __tablename__ = "SMALL_TALK_ANSWERS"
+    answer_id = Column(BigInteger, primary_key=True, index=True)
+    topic_id = Column(BigInteger, ForeignKey("SMALL_TALK_TOPICS.topic_id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False)
+    connection_code = Column(String(100), nullable=True)
+    answer_content = Column(Text, nullable=False)
+    match_status = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

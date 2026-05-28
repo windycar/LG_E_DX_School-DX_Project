@@ -15,7 +15,7 @@ import {
 import { Screen, Role, AppUser, PartnerStatus } from "./types";
 import LoginView from "./LoginView";
 import DashboardView from "./DashboardView";
-// 🚀 새로 추가할 부분
+import SmallTalkView from "./SmallTalkView";
 import CommunityView from "./CommunityView";
 // ── Mock data ──────────────────────────────────────────────────────────────
 const DEMO_USERS: Array<AppUser & { password: string }> = [
@@ -2812,120 +2812,7 @@ function SettingsView({ user, onNavigate, onLogout }: { user: AppUser; onNavigat
 }
 
 // ── SMALLTALK VIEW ─────────────────────────────────────────────────────────
-function SmalltalkView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
-  const isPregnant = user.role === "pregnant";
-  const [myAnswer, setMyAnswer] = useState("");
-  const [mySubmitted, setMySubmitted] = useState(false);
-  const [partnerSubmitted, setPartnerSubmitted] = useState(true); // 데모용
 
-  const QUESTION = "오늘 가장 행복했던 순간은 언제인가요?";
-  const babyName = user.babyNickname || "아기";
-  const PARTNER_ANSWER = isPregnant
-    ? `수진이가 웃으면서 태동 이야기를 해줄 때 정말 행복했어요. 함께 손을 배에 대고 ${babyName}를 느낄 수 있어서 좋았습니다 😊`
-    : `${babyName}의 태동을 느꼈을 때가 가장 행복했어요. 작은 생명이 자라고 있다는 걸 실감할 수 있어서 너무 신기하고 감사했습니다 💕`;
-
-  const handleSubmit = () => {
-    if (myAnswer.trim()) {
-      setMySubmitted(true);
-    }
-  };
-
-  const bothAnswered = mySubmitted && partnerSubmitted;
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <PageHeader title="스몰토크" onBack={onBack} />
-
-      <div className="px-5 py-6 flex-1 overflow-y-auto pb-20 space-y-5">
-        <div
-          className="rounded-2xl p-4"
-          style={{ background: "rgba(255,211,182,0.1)", border: "1px solid rgba(255,211,182,0.3)" }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl">💕</span>
-            <p className="text-xs font-semibold" style={{ color: "#FFA882" }}>오늘의 질문</p>
-          </div>
-          <p className="text-sm font-semibold text-foreground">{QUESTION}</p>
-        </div>
-
-        <div>
-          <p className="text-sm font-semibold text-foreground mb-3">내 답변</p>
-          {!mySubmitted ? (
-            <div className="space-y-3">
-              <textarea
-                value={myAnswer}
-                onChange={(e) => setMyAnswer(e.target.value)}
-                placeholder="답변을 작성해주세요..."
-                rows={5}
-                className="w-full px-4 py-3 rounded-2xl border border-border bg-card focus:outline-none focus:border-primary text-sm resize-none leading-relaxed"
-              />
-              <button
-                onClick={handleSubmit}
-                disabled={!myAnswer.trim()}
-                className="w-full py-3 rounded-2xl font-semibold text-white disabled:opacity-50"
-                style={{ background: "#FFA882" }}
-              >
-                답변 제출하기
-              </button>
-            </div>
-          ) : (
-            <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#FFA882" }}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(255,168,130,0.1)", color: "#FFA882" }}>
-                  ✓ 제출 완료
-                </span>
-              </div>
-              <p className="text-sm text-foreground leading-relaxed">{myAnswer}</p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-foreground">
-              파트너의 답변 {isPregnant ? "(이준혁님)" : "(이수진님)"}
-            </p>
-            {partnerSubmitted ? (
-              <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(123,104,181,0.1)", color: "#7B68B5" }}>
-                ✓ 답변 완료
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">답변 대기 중</span>
-            )}
-          </div>
-
-          {bothAnswered ? (
-            <div className="bg-card rounded-2xl p-4 border border-border">
-              <p className="text-sm text-foreground leading-relaxed">{PARTNER_ANSWER}</p>
-            </div>
-          ) : (
-            <div className="bg-secondary/30 rounded-2xl p-8 text-center">
-              <div className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(255,168,130,0.1)" }}>
-                <span className="text-2xl">🔒</span>
-              </div>
-              <p className="text-sm font-medium text-foreground mb-1">
-                {mySubmitted ? "파트너가 답변을 작성 중입니다" : "내 답변을 먼저 제출해주세요"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                둘 다 답변을 제출하면 서로의 답변을 볼 수 있어요
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div
-          className="rounded-2xl p-4 text-center"
-          style={{ background: "rgba(255,211,182,0.05)", border: "1px solid rgba(255,211,182,0.15)" }}
-        >
-          <p className="text-sm font-medium text-foreground">💬 지난 스몰토크</p>
-          <p className="text-xs text-muted-foreground mt-1">이전 질문과 답변은 정신 케어 탭에서 확인할 수 있어요</p>
-        </div>
-      </div>
-
-      {onNavigate && <BottomNav current="dashboard" onNavigate={onNavigate} />}
-    </div>
-  );
-}
 
 // ── COMMUNITY VIEW ─────────────────────────────────────────────────────────
 
@@ -2962,7 +2849,7 @@ export default function App() {
         {screen === "ai" && user && <AIRecommendView user={user} onBack={back} onNavigate={go} />}
         {screen === "info" && <InfoView onBack={back} onNavigate={go} />}
         {screen === "community" && user && <CommunityView user={user} onBack={back} onNavigate={go} />}
-        {screen === "smalltalk" && user && <SmalltalkView user={user} onBack={back} onNavigate={go} />}
+        {screen === "smalltalk" && user && <SmallTalkView user={user} onBack={back} onNavigate={go} />}
         {screen === "diary" && user && <DiaryView user={user} onNavigate={go} />}
         {screen === "profile" && user && <ProfileView user={user} onNavigate={go} />}
         {screen === "settings" && user && <SettingsView user={user} onNavigate={go} onLogout={logout} />}

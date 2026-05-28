@@ -20,3 +20,9 @@ class PostCreate(BaseModel):
     pregnancy_period: str
     title: str
     content: str
+# schemas.py 맨 아래에 추가
+
+class SmallTalkSubmit(BaseModel):
+    user_id: int
+    topic_id: int
+    answer_content: str
