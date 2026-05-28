@@ -295,65 +295,6 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             "connected_pregnant": pregnant_info
         }
     }
-    # 1. 사용자 인증
-    user = db.query(models.User).filter(models.User.email == request.email).first()
-    if not user or user.password != request.password:
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
-    
-    # 2. 보호자(GUARDIAN)일 경우, 연결된 임산부 정보(parent) 조회
-    pregnant_info = None
-    if user.role == "GUARDIAN" and user.parent_user_id:
-        pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
-        if pregnant_user:
-            pregnant_info = {
-                "name": pregnant_user.name,
-                "baby_nickname": pregnant_user.baby_nickname,
-                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date),
-                "connection_code": pregnant_user.connection_code # 🚀 보호자에게 임산부의 연결 코드를 명확히 전달
-            }
-    
-    # 3. 프론트엔드로 전달할 최종 데이터 구성
-    return {
-        "status": "Success",
-        "user": {
-            "user_id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "role": user.role,
-            "baby_nickname": user.baby_nickname,
-            "connection_code": user.connection_code, # 🚀 임산부 본인의 연결 코드 전달
-            "parent_user_id": user.parent_user_id,
-            "connected_pregnant": pregnant_info
-        }
-    }
-    user = db.query(models.User).filter(models.User.email == request.email).first()
-    if not user or user.password != request.password:
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
-    
-    pregnant_info = None
-    if user.role == "GUARDIAN" and user.parent_user_id:
-        pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
-        if pregnant_user:
-            pregnant_info = {
-                "name": pregnant_user.name,
-                "baby_nickname": pregnant_user.baby_nickname,
-                "pregnancy_start_date": str(pregnant_user.pregnancy_start_date),
-                "connection_code": pregnant_user.connection_code # 🚀 보호자를 위해 임산부의 연결 코드도 전달!
-            }
-    
-    return {
-        "status": "Success",
-        "user": {
-            "user_id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "role": user.role,
-            "baby_nickname": user.baby_nickname,
-            "connection_code": user.connection_code,
-            "parent_user_id": user.parent_user_id,
-            "connected_pregnant": pregnant_info
-        }
-    }   
 # 회원가입 API
 @app.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
@@ -369,7 +310,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         pregnant_user = db.query(models.User).filter(models.User.connection_code == user.input_connection_code).first()
         if not pregnant_user:
             raise HTTPException(status_code=400, detail="유효하지 않은 인증코드입니다.")
-        parent_user_id = pregnant_user.user_id # 🚀 수정: .id 대신 .user_id
+        parent_user_id = pregnant_user.id # 🚀 수정: .id 대신 .user_id
 
     new_user = models.User(
         email=user.email,
