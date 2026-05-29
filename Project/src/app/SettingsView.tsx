@@ -8,13 +8,15 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showGuardianManage, setShowGuardianManage] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawConfirm, setWithdrawConfirm] = useState("");
 
   // 🚀 대문자 문제 및 타입스크립트 에러 완벽 해결
   const isPregnant = String(user.role).toUpperCase() === "PREGNANT";
   const userId = (user as any).id || user.user_id;
 
   // 백엔드에서 직접 가져온 데이터를 담을 그릇
-  const [dbInfo, setDbInfo] = useState({ baby_nickname: "", connection_code: "", partner_code: "" });
+  const [dbInfo, setDbInfo] = useState({ baby_nickname: "", connection_code: "", partner_code: "", connected_name: "", connected_email: "" });
 
   const [editName, setEditName] = useState(user.name || "");
   const [editBabyNickname, setEditBabyNickname] = useState("");
@@ -97,6 +99,40 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
     } catch (e) { alert("서버 오류가 발생했습니다."); }
   };
 
+  // 🚀 회원탈퇴 함수
+  const handleWithdraw = async () => {
+    const confirmText = isPregnant ? "탈퇴" : "탈퇴";
+    if (withdrawConfirm !== confirmText) {
+      alert(`'${confirmText}'을 입력해주세요.`);
+      return;
+    }
+
+    if (!window.confirm("정말로 회원탈퇴 하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/auth/withdraw/${userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        alert(isPregnant 
+          ? "회원탈퇴가 완료되었습니다. 관련된 모든 데이터가 삭제되었습니다."
+          : "회원탈퇴가 완료되었습니다."
+        );
+        setShowWithdraw(false);
+        onLogout();
+      } else {
+        const data = await res.json();
+        alert(data.detail || "회원탈퇴 중 오류가 발생했습니다.");
+      }
+    } catch (e) {
+      alert("서버 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="px-5 pt-12 pb-6" style={{ background: "linear-gradient(160deg, #FFE8EE 0%, #FFF5F7 100%)" }}>
@@ -169,6 +205,14 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
         </div>
 
         <button onClick={onLogout} className="w-full py-3 rounded-2xl font-semibold border-2 transition-all active:scale-95" style={{ borderColor: "#C94E70", color: "#C94E70" }}>로그아웃</button>
+        
+        <button 
+          onClick={() => setShowWithdraw(true)} 
+          className="w-full py-3 rounded-2xl font-semibold border-2 transition-all active:scale-95 mt-2" 
+          style={{ borderColor: "#DC2626", color: "#DC2626" }}
+        >
+          회원탈퇴
+        </button>
       </div>
 
       {/* 모달창 영역 */}
@@ -250,26 +294,113 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 pb-20">
             {isPregnant ? (
-              <div>
-                <p className="text-sm font-semibold text-foreground mb-3">보호자 초대 인증코드</p>
-                <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#C94E70" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-muted-foreground">회원가입 시 입력할 코드</p>
-                    <button onClick={() => { navigator.clipboard.writeText(connectionCode); alert("복사되었습니다!"); }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}><Copy size={12} /> 복사</button>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">연결된 보호자</p>
+                  {dbInfo.connected_name ? (
+                    <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#C94E70" }}>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">보호자 이름</p>
+                          <p className="text-sm font-semibold text-foreground">{dbInfo.connected_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">이메일</p>
+                          <p className="text-sm text-foreground text-ellipsis overflow-hidden">{dbInfo.connected_email}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-secondary/40 rounded-2xl p-4 border border-border text-center">
+                      <p className="text-sm text-muted-foreground">연결된 보호자가 없습니다</p>
+                      <p className="text-xs text-muted-foreground mt-2">아래 코드를 보호자에게 공유하세요</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <p className="text-sm font-semibold text-foreground mb-3">보호자 초대 인증코드</p>
+                  <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#C94E70" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">회원가입 시 입력할 코드</p>
+                      <button onClick={() => { navigator.clipboard.writeText(dbInfo.connection_code); alert("복사되었습니다!"); }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}><Copy size={12} /> 복사</button>
+                    </div>
+                    <p className="text-2xl font-bold text-center py-3" style={{ color: "#C94E70", letterSpacing: "4px" }}>{dbInfo.connection_code}</p>
+                    <p className="text-xs text-center text-muted-foreground">이 코드를 보호자에게 전달하여 안내하세요</p>
                   </div>
-                  <p className="text-2xl font-bold text-center py-3" style={{ color: "#C94E70", letterSpacing: "4px" }}>{connectionCode}</p>
-                  <p className="text-xs text-center text-muted-foreground">이 코드를 보호자에게 전달하여 안내하세요</p>
                 </div>
               </div>
             ) : (
               <div>
-                <p className="text-sm font-semibold text-foreground mb-3">사용한 인증코드</p>
-                <div className="bg-secondary/40 rounded-2xl p-4 border border-border">
-                  <p className="text-center text-xl font-bold" style={{ color: "#7B68B5", letterSpacing: "3px" }}>{connectionCode}</p>
-                  <p className="text-xs text-center text-muted-foreground mt-2">회원가입 시 입력한 인증코드입니다</p>
-                </div>
+                <p className="text-sm font-semibold text-foreground mb-3">연결된 임산부</p>
+                {dbInfo.connected_name ? (
+                  <div className="bg-card rounded-2xl p-4 border-2" style={{ borderColor: "#7B68B5" }}>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">임산부 이름</p>
+                        <p className="text-sm font-semibold text-foreground">{dbInfo.connected_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">이메일</p>
+                        <p className="text-sm text-foreground text-ellipsis overflow-hidden">{dbInfo.connected_email}</p>
+                      </div>
+                      {dbInfo.baby_nickname && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">아기 태명</p>
+                          <p className="text-sm text-foreground">{dbInfo.baby_nickname}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-secondary/40 rounded-2xl p-4 border border-border text-center">
+                    <p className="text-sm text-muted-foreground">연결된 임산부가 없습니다</p>
+                  </div>
+                )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 회원탈퇴 모달 */}
+      {showWithdraw && (
+        <div className="fixed inset-0 bg-background z-50 flex flex-col max-w-[430px] mx-auto">
+          <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm border-b border-border">
+            <button onClick={() => { setShowWithdraw(false); setWithdrawConfirm(""); }} className="p-2 rounded-xl hover:bg-secondary transition-colors"><ArrowLeft size={20} className="text-foreground" /></button>
+            <h1 className="font-semibold text-foreground">회원탈퇴</h1>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-20">
+            <div className="bg-red-50 dark:bg-red-950/30 p-4 rounded-xl border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-700 dark:text-red-300 font-semibold mb-2">⚠️ 주의</p>
+              <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">
+                {isPregnant 
+                  ? "임산부 계정을 탈퇴하면 본인의 모든 데이터와 연결된 보호자 계정이 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+                  : "보호자 계정을 탈퇴하면 본인의 데이터만 삭제됩니다. 연결된 임산부 계정은 유지됩니다."
+                }
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                계속 진행하려면 '<span className="text-red-600">탈퇴</span>'를 입력해주세요
+              </label>
+              <input 
+                type="text" 
+                value={withdrawConfirm} 
+                onChange={(e) => setWithdrawConfirm(e.target.value)} 
+                placeholder="탈퇴" 
+                className="w-full px-4 py-3 rounded-xl border border-red-200 dark:border-red-800 bg-card focus:outline-none focus:border-red-500 text-sm" 
+              />
+            </div>
+
+            <button 
+              onClick={handleWithdraw} 
+              disabled={withdrawConfirm !== "탈퇴"}
+              className="w-full py-3 rounded-2xl font-semibold text-white mt-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors" 
+            >
+              계정 탈퇴하기
+            </button>
           </div>
         </div>
       )}

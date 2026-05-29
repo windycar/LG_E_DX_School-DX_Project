@@ -24,6 +24,7 @@ import ProfileView from './ProfileView.tsx';
 
 import ApplianceControlView from "./ApplianceControlView";
 import DiscomfortView from "./DiscomfortView";
+import MentalCareView from "./MentalCareView.tsx"
 // ── Mock data ──────────────────────────────────────────────────────────────
 const DEMO_USERS: Array<AppUser & { password: string }> = [
   { email: "mom@demo.kr", password: "1234", name: "이수진", role: "pregnant", pregnancyWeek: 28, nickname: "행복한예비맘", babyNickname: "콩이", inviteCode: "MOMDAL28" },
@@ -860,7 +861,7 @@ export default function App() {
         {screen === "register" && <RegisterView onBack={() => go("home")} onSuccess={login} />}
         {screen === "dashboard" && user && <DashboardView user={user} onNavigate={go} onLogout={logout} partnerStatus={partnerStatus} />}
         {screen === "discomfort" && <DiscomfortView user={user} onBack={back} onNavigate={go} onStatusUpdate={setPartnerStatus} />}
-        {screen === "mental" && <MentalCareView user={user} onBack={back} onNavigate={go} />}
+        {screen === "mental" && user && <MentalCareView user={user} onBack={back} onNavigate={go} />}
         {screen === "ai" && user && <AIRecommendView user={user} onBack={back} onNavigate={go} />}
         {screen === "info" && <InfoView onBack={back} onNavigate={go} />}
         {screen === "community" && user && <CommunityView user={user} onBack={back} onNavigate={go} />}

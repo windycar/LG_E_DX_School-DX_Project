@@ -25,6 +25,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   
   // 🚀 이제 가짜 데이터가 아니라 빈 배열([])로 시작합니다!
   const [entries, setEntries] = useState<any[]>([]);
+  const [smalltalkEntries, setSmallTalkEntries] = useState<any[]>([]);
 
   // 1. 유저 정보 & 연동 코드 가져오기
   useEffect(() => {
@@ -53,15 +54,25 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
 
   // 🚀 3. DB에서 내 다이어리 일지 쫙 긁어오기 함수!
   const fetchEntries = () => {
-    if (!userId) return;
+    if (!userId) {
+      console.warn("⚠️ userId가 없음");
+      return;
+    }
+    console.log(`📥 다이어리 & 스몰토크 조회 시작: userId=${userId}`);
     fetch(`http://localhost:8000/api/diary/logs/${userId}`)
       .then(res => res.json())
       .then(data => {
-        if (data.status === "Success" && Array.isArray(data.entries)) {
-          setEntries(data.entries); // DB 데이터를 화면에 꽂아 넣습니다!
+        console.log("📊 API 응답:", data);
+        if (data.status === "Success") {
+          console.log(`✅ ${data.diary_entries?.length || 0}개 다이어리, ${data.smalltalk_entries?.length || 0}개 스몰토크`);
+          console.log("💬 스몰토크:", data.smalltalk_entries);
+          setEntries(data.diary_entries || []); 
+          setSmallTalkEntries(data.smalltalk_entries || []);
+        } else {
+          console.warn("⚠️ API 응답 구조 오류:", data);
         }
       })
-      .catch(e => console.error("일기 목록 로드 실패:", e));
+      .catch(e => console.error("❌ 조회 실패:", e));
   };
 
   useEffect(() => { fetchEvents(); }, [connectionCode]);
@@ -153,6 +164,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
 
   const filteredEntries = selectedDate ? entries.filter((e) => e.date === selectedDate) : entries;
   const filteredEvents = selectedDate ? events.filter((e) => e.event_date === selectedDate) : events;
+  const filteredSmallTalk = selectedDate ? smalltalkEntries.filter((e) => e.date === selectedDate) : smalltalkEntries;
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
@@ -356,7 +368,8 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           </div>
         )}
 
-        <div className="space-y-3 pb-20">
+        {/* 📝 다이어리 섹션 */}
+        <div className="space-y-3 pb-5">
           {filteredEntries.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <p className="text-3xl mb-3">📖</p>
@@ -364,22 +377,94 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
             </div>
           ) : (
             filteredEntries.map((entry) => (
-              <div key={`entry-${entry.id}`} className="bg-white rounded-2xl p-4 border border-border shadow-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl">{entry.mood}</span>
-                  <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+              <div key={`entry-${entry.id}`} className="space-y-3">
+                {/* 일반 다이어리 카드 */}
+                <div className="bg-white rounded-2xl p-4 border border-border shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">{entry.mood}</span>
+                    <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+                  </div>
+                  
+                  {/* 📸 사진 뿌려주기! */}
+                  {entry.images && entry.images.length > 0 && (
+                    <img src={entry.images[0]} alt="diary" className="w-full rounded-xl object-cover aspect-video mb-3 border border-border/50 bg-secondary/30" />
+                  )}
+                  
+                  <p className="text-sm text-[#444] leading-relaxed whitespace-pre-wrap">{entry.content}</p>
                 </div>
-                
-                {/* 📸 사진 뿌려주기! */}
-                {entry.images && entry.images.length > 0 && (
-                  <img src={entry.images[0]} alt="diary" className="w-full rounded-xl object-cover aspect-video mb-3 border border-border/50 bg-secondary/30" />
+
+                {/* 🚀 다이어리 날짜의 스몰토크도 함께 표시 */}
+                {entry.smalltalk && (
+                  <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-200 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-lg">💕</span>
+                      <p className="text-xs font-bold text-pink-600">그날의 스몰토크</p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {/* 질문 */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1.5">❓ 질문</p>
+                        <p className="text-sm font-medium text-foreground leading-relaxed">{entry.smalltalk.topic}</p>
+                      </div>
+
+                      {/* 내 답변 */}
+                      <div className="bg-white/70 rounded-xl p-3 border border-pink-100">
+                        <p className="text-xs font-semibold text-pink-600 mb-1">💬 내 답변</p>
+                        <p className="text-sm text-foreground leading-relaxed">{entry.smalltalk.my_answer}</p>
+                      </div>
+
+                      {/* 파트너 답변 */}
+                      <div className="bg-white/70 rounded-xl p-3 border border-purple-100">
+                        <p className="text-xs font-semibold text-purple-600 mb-1">💬 파트너의 답변</p>
+                        <p className="text-sm text-foreground leading-relaxed">{entry.smalltalk.partner_answer}</p>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                
-                <p className="text-sm text-[#444] leading-relaxed whitespace-pre-wrap">{entry.content}</p>
               </div>
             ))
           )}
         </div>
+
+        {/* 🚀 스몰토크 섹션 (다이어리와 독립적) */}
+        {filteredSmallTalk.length > 0 && (
+          <div className="border-t border-border/50 pt-5 mt-5">
+            <p className="text-sm font-bold mb-3" style={{ color: "#C94E70" }}>
+              💕 우리의 스몰토크
+            </p>
+            <div className="space-y-3 pb-20">
+              {filteredSmallTalk.map((st) => (
+                <div key={`smalltalk-${st.id}`} className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-200 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">💕</span>
+                    <p className="text-xs font-bold text-pink-600">{new Date(st.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {/* 질문 */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-1.5">❓ 질문</p>
+                      <p className="text-sm font-medium text-foreground leading-relaxed">{st.topic}</p>
+                    </div>
+
+                    {/* 내 답변 */}
+                    <div className="bg-white/70 rounded-xl p-3 border border-pink-100">
+                      <p className="text-xs font-semibold text-pink-600 mb-1">💬 내 답변</p>
+                      <p className="text-sm text-foreground leading-relaxed">{st.my_answer}</p>
+                    </div>
+
+                    {/* 파트너 답변 */}
+                    <div className="bg-white/70 rounded-xl p-3 border border-purple-100">
+                      <p className="text-xs font-semibold text-purple-600 mb-1">💬 파트너의 답변</p>
+                      <p className="text-sm text-foreground leading-relaxed">{st.partner_answer}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       
       <BottomNav current="diary" onNavigate={onNavigate} />

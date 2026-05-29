@@ -2,7 +2,7 @@
 import { ArrowLeft, CheckCircle, Search, X } from "lucide-react";
 import { AppUser, PartnerStatus, Screen } from "./types";
 import { BottomNav } from "./App";
-
+//오늘의 상태 체크 
 const API_BASE_URL = "http://localhost:8000";
 
 type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier";

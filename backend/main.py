@@ -132,6 +132,14 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         parent_user_id=parent_user_id
     )
     db.add(new_user)
+    db.flush()  # 새 사용자의 ID 생성
+    
+    # 🚀 양방향 연결: 보호자가 임산부를 선택했으면, 임산부도 보호자를 저장
+    if user.role == "GUARDIAN" and parent_user_id:
+        pregnant_user = db.query(models.User).filter(models.User.id == parent_user_id).first()
+        if pregnant_user:
+            pregnant_user.parent_user_id = new_user.id
+    
     db.commit()
     return {"status": "Success", "connection_code": connection_code}
 
@@ -142,7 +150,10 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
     pregnant_info = None
+    guardian_info = None
+    
     if user.role == "GUARDIAN" and user.parent_user_id:
+        # 보호자: 연결된 임산부 정보
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
             pregnant_info = {
@@ -150,6 +161,14 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
                 "baby_nickname": parent.baby_nickname,
                 "pregnancy_start_date": str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None,
                 "connection_code": parent.connection_code
+            }
+    elif user.role == "PREGNANT" and user.parent_user_id:
+        # 임산부: 연결된 보호자 정보
+        guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if guardian:
+            guardian_info = {
+                "name": guardian.name,
+                "email": guardian.email
             }
     
     return {
@@ -163,7 +182,8 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
             "connection_code": user.connection_code,
             "parent_user_id": user.parent_user_id,
-            "connected_pregnant": pregnant_info
+            "connected_pregnant": pregnant_info,
+            "connected_guardian": guardian_info
         }
     }
 
@@ -180,13 +200,22 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
     partner_code = None
     pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
     connected_name = None
+    connected_email = None
 
     if user.role == "GUARDIAN" and user.parent_user_id:
+        # 보호자 계정: 연결된 임산부 정보
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
             partner_code = parent.connection_code
             pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
             connected_name = parent.name
+            connected_email = parent.email
+    elif user.role == "PREGNANT" and user.parent_user_id:
+        # 임산부 계정: 연결된 보호자 정보
+        guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if guardian:
+            connected_name = guardian.name
+            connected_email = guardian.email
 
     return {
         "status": "Success",
@@ -196,7 +225,8 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         "connection_code": user.connection_code,
         "partner_code": partner_code,
         "pregnancy_start_date": pregnant_start_date,
-        "connected_name": connected_name
+        "connected_name": connected_name,
+        "connected_email": connected_email
     }
 
 @app.put("/api/user/profile/{user_id}")
@@ -219,6 +249,76 @@ def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session
     user.password = passwords.new_password
     db.commit()
     return {"status": "Success", "message": "비밀번호가 변경되었습니다."}
+
+@app.delete("/api/auth/withdraw/{user_id}")
+def withdraw_user(user_id: int, db: Session = Depends(database.get_db)):
+    """회원탈퇴 API
+    - PREGNANT: 본인 + 관련 보호자 모두 삭제
+    - GUARDIAN: 본인만 삭제"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    
+    try:
+        if user.role == "PREGNANT":
+            # 임산부 탈퇴: 본인 + 관련 보호자 모두 삭제
+            
+            # 1. 보호자가 있으면 보호자도 삭제
+            if user.parent_user_id:
+                guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+                if guardian:
+                    # 보호자의 모든 데이터 삭제
+                    db.query(models.CommunityPost).filter(models.CommunityPost.user_id == guardian.id).delete()
+                    db.query(models.CommunityComment).filter(models.CommunityComment.user_id == guardian.id).delete()
+                    db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == guardian.id).delete()
+                    db.delete(guardian)
+            
+            # 2. 임산부의 모든 데이터 삭제
+            # 다이어리 및 AI 분석 결과
+            diary_logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).all()
+            for log in diary_logs:
+                db.query(models.AiAnalysisResult).filter(models.AiAnalysisResult.diary_id == log.diary_id).delete()
+            db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).delete()
+            
+            # 커뮤니티 게시글 및 댓글
+            db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
+            db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).delete()
+            
+            # 스몰토크 답변
+            db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).delete()
+            
+            # 공유 캘린더 이벤트 (connection_code 기준)
+            if user.connection_code:
+                db.query(models.SharedCalendarEvent).filter(
+                    models.SharedCalendarEvent.connection_code == user.connection_code
+                ).delete()
+            
+            # 가전 설정
+            db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).delete()
+            
+            # 사용자 계정 삭제
+            db.delete(user)
+            
+        elif user.role == "GUARDIAN":
+            # 보호자 탈퇴: 보호자만 삭제
+            
+            # 보호자의 모든 데이터 삭제
+            db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).delete()
+            db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
+            db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).delete()
+            
+            # 가전 설정
+            db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).delete()
+            
+            # 보호자 계정 삭제
+            db.delete(user)
+        
+        db.commit()
+        return {"status": "Success", "message": "회원탈퇴가 완료되었습니다."}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"탈퇴 중 오류 발생: {str(e)}")
 
 
 # =====================================================================
@@ -352,21 +452,103 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
     try:
         logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
         keyword_to_emoji = {"행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐", "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"}
-        result = []
+        diary_result = []
+        
+        # 유저의 파트너 정보 가져오기
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        partner_id = user.parent_user_id if user else None
+        
         for log in logs:
             date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
             img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
             display_mood = keyword_to_emoji.get(log.selected_emotion, "😐")
-            result.append({
+            
+            entry = {
                 "id": log.diary_id,
                 "date": date_str,
                 "mood": display_mood,
                 "content": log.diary_content,
                 "images": img_list,
-                "type": "daily" 
-            })
-        return {"status": "Success", "entries": result}
+                "type": "daily"
+            }
+            
+            # 🚀 같은 날짜의 스몰토크도 포함
+            if partner_id:
+                try:
+                    from datetime import datetime as dt
+                    date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
+                    
+                    # 해당 날짜에 사용자가 답변한 스몰토크
+                    my_smalltalk = db.query(models.SmallTalkAnswer).filter(
+                        models.SmallTalkAnswer.user_id == user_id,
+                        func.date(models.SmallTalkAnswer.created_at) == date_obj
+                    ).first()
+                    
+                    if my_smalltalk:
+                        # 파트너도 같은 주제에 답변했는지 확인
+                        partner_smalltalk = db.query(models.SmallTalkAnswer).filter(
+                            models.SmallTalkAnswer.user_id == partner_id,
+                            models.SmallTalkAnswer.topic_id == my_smalltalk.topic_id
+                        ).first()
+                        
+                        if partner_smalltalk:
+                            topic = db.query(models.SmallTalkTopic).filter(
+                                models.SmallTalkTopic.topic_id == my_smalltalk.topic_id
+                            ).first()
+                            
+                            if topic:
+                                entry["smalltalk"] = {
+                                    "topic": topic.question_text,
+                                    "my_answer": my_smalltalk.answer_content,
+                                    "partner_answer": partner_smalltalk.answer_content
+                                }
+                except Exception as e:
+                    pass
+            
+            diary_result.append(entry)
+        
+        # 🚀 스몰토크 전체 목록 (다이어리 여부 무관)
+        smalltalk_result = []
+        
+        if partner_id:
+            try:
+                # 사용자가 답변한 모든 스몰토크
+                my_answers = db.query(models.SmallTalkAnswer).filter(
+                    models.SmallTalkAnswer.user_id == user_id
+                ).order_by(models.SmallTalkAnswer.created_at.desc()).all()
+                
+                for my_ans in my_answers:
+                    # 파트너가 같은 주제에 답변했는지 확인
+                    partner_ans = db.query(models.SmallTalkAnswer).filter(
+                        models.SmallTalkAnswer.user_id == partner_id,
+                        models.SmallTalkAnswer.topic_id == my_ans.topic_id
+                    ).first()
+                    
+                    if partner_ans:
+                        topic = db.query(models.SmallTalkTopic).filter(
+                            models.SmallTalkTopic.topic_id == my_ans.topic_id
+                        ).first()
+                        
+                        if topic:
+                            date_str = str(my_ans.created_at).split(" ")[0] if my_ans.created_at else "2026-05-26"
+                            smalltalk_result.append({
+                                "id": my_ans.answer_id,
+                                "date": date_str,
+                                "topic": topic.question_text,
+                                "my_answer": my_ans.answer_content,
+                                "partner_answer": partner_ans.answer_content
+                            })
+            except Exception as e:
+                pass
+        
+        return {
+            "status": "Success",
+            "diary_entries": diary_result,
+            "smalltalk_entries": smalltalk_result
+        }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"status": "Error", "message": str(e)}
 
 
