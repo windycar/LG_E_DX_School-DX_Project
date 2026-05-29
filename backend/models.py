@@ -75,7 +75,6 @@ class SmallTalkAnswer(Base):
     match_status = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-<<<<<<< HEAD
 # 8. 부부 공유 캘린더 일정 테이블
 class SharedCalendarEvent(Base):
     __tablename__ = "SHARED_CALENDAR_EVENTS"
@@ -86,20 +85,10 @@ class SharedCalendarEvent(Base):
     content = Column(Text)           
     event_date = Column(Date)        
     created_at = Column(DateTime, default=func.now())
-=======
 
 # ... (기존 User 모델 등 유지) ...
 
 # 🚀 댓글 테이블 추가
-class Comment(Base):
-    __tablename__ = "COMMUNITY_COMMENTS"
-
-    comment_id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(Integer, index=True)
-    user_id = Column(Integer, index=True)
-    content = Column(String(500))
-    # 👇 여기가 핵심입니다! 파이썬 에러가 나지 않는 완벽한 방법
-    created_at = Column(DateTime, default=func.now())
 
 
 class ApplianceSetting(Base):
@@ -111,4 +100,3 @@ class ApplianceSetting(Base):
     appliance_name = Column(String(50), nullable=False)
     control_command = Column(Text, nullable=False)
     execution_status = Column(String(20), nullable=False, default="OFF")
->>>>>>> origin/pkb_workspace.ver2

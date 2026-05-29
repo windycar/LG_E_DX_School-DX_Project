@@ -35,7 +35,7 @@ class ProfileUpdate(BaseModel):
 class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
-<<<<<<< HEAD
+
 class EmotionRequest(BaseModel):
     text: str
 
@@ -44,7 +44,7 @@ class DiaryLogCreate(BaseModel):
     selected_emotion: str
     diary_content: str
     detected_emotion: Optional[str] = None  # AI 분석 결과 (없을 수도 있으므로 Optional)
-=======
+
 
 
 class ApplianceSettingUpsert(BaseModel):
@@ -58,4 +58,3 @@ class ApplianceSettingUpsert(BaseModel):
 class ApplianceSettingsBulkUpsert(BaseModel):
     user_id: Optional[int] = None
     settings: list[ApplianceSettingUpsert]
->>>>>>> origin/pkb_workspace.ver2

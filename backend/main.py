@@ -1,180 +1,56 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from datetime import datetime
-import models, schemas, database
-app = FastAPI()
-# backend/main.py
-from fastapi.middleware.cors import CORSMiddleware # 1. 필수 import
-import random
-import string
-from database import get_db 
-from pydantic import BaseModel
-import smalltalk_service
-from datetime import date
-import subprocess
-import json
-from sqlalchemy.orm import Session
-import models, database, schemas
-import requests # 🚀 날씨 API 호출을 위해 추가!
-
-<<<<<<< HEAD
-import os
-from dotenv import load_dotenv
-import os
-import shutil
-import subprocess
-import requests
-from fastapi import FastAPI, Depends, Form, File, UploadFile # 🚀 Form, File, UploadFile 추가!
-from sqlalchemy.orm import Session
-import models, database
 import os
 import sys
-import importlib
 import json
 import shutil
+import random
+import string
 import requests
-from fastapi import FastAPI, Depends, Form, File, UploadFile
+import importlib
+from datetime import datetime, date
+
+from fastapi import FastAPI, Depends, HTTPException, Form, File, UploadFile, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-import models, database, schemas
+from sqlalchemy import func
+from pydantic import BaseModel
 from dotenv import load_dotenv
-# main.py 상단 라이브러리 임포트 영역에 아래를 추가합니다.
-from fastapi.staticfiles import StaticFiles
-=======
+
+import models
+import schemas
+import database
+import smalltalk_service
+
+# =====================================================================
+# 🛠️ 1. 초기 설정 (DB, CORS, 정적 파일)
+# =====================================================================
+load_dotenv()
 models.Base.metadata.create_all(bind=database.engine)
 
->>>>>>> origin/pkb_workspace.ver2
+app = FastAPI()
 
-# 앱 생성 코드(app = FastAPI()) 바로 아래에 다음 1줄을 추가하여 uploads 폴더를 웹에 개방합니다.
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-load_dotenv()
-# CORS 정책 설정 (이게 있어야 브라우저가 통신을 허용합니다)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # 모든 도메인에서의 접속을 허용
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], # 모든 통신 방식 허용
-    allow_headers=["*"], # 모든 헤더 허용
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-<<<<<<< HEAD
-=======
-
-
-def get_appliance_owner_id(user_id: int, db: Session) -> int:
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.role == "GUARDIAN" and user.parent_user_id:
-        return user.parent_user_id
-
-    return user.id
-
-
-@app.get("/api/appliances/{user_id}")
-def get_appliance_settings(user_id: int, db: Session = Depends(database.get_db)):
-    owner_id = get_appliance_owner_id(user_id, db)
-    rows = db.query(models.ApplianceSetting).filter(
-        models.ApplianceSetting.user_id == owner_id
-    ).all()
-
-    return {
-        "status": "Success",
-        "owner_user_id": owner_id,
-        "settings": [
-            {
-                "setting_id": row.setting_id,
-                "analysis_id": row.analysis_id,
-                "user_id": row.user_id,
-                "appliance_name": row.appliance_name,
-                "control_command": row.control_command,
-                "execution_status": row.execution_status,
-            }
-            for row in rows
-        ],
-    }
-
-
-@app.post("/api/appliances")
-def upsert_appliance_setting(payload: schemas.ApplianceSettingUpsert, db: Session = Depends(database.get_db)):
-    if payload.user_id is None:
-        raise HTTPException(status_code=400, detail="user_id is required")
-
-    owner_id = get_appliance_owner_id(payload.user_id, db)
-    setting = db.query(models.ApplianceSetting).filter(
-        models.ApplianceSetting.user_id == owner_id,
-        models.ApplianceSetting.appliance_name == payload.appliance_name,
-    ).first()
-
-    if not setting:
-        setting = models.ApplianceSetting(
-            user_id=owner_id,
-            appliance_name=payload.appliance_name,
-        )
-        db.add(setting)
-
-    setting.analysis_id = payload.analysis_id
-    setting.control_command = payload.control_command
-    setting.execution_status = payload.execution_status
-    db.commit()
-    db.refresh(setting)
-    return {"status": "Success", "setting_id": setting.setting_id}
-
-
-@app.post("/api/appliances/bulk")
-def upsert_appliance_settings(payload: schemas.ApplianceSettingsBulkUpsert, db: Session = Depends(database.get_db)):
-    if payload.user_id is None:
-        raise HTTPException(status_code=400, detail="user_id is required")
-
-    owner_id = get_appliance_owner_id(payload.user_id, db)
-    for item in payload.settings:
-        setting = db.query(models.ApplianceSetting).filter(
-            models.ApplianceSetting.user_id == owner_id,
-            models.ApplianceSetting.appliance_name == item.appliance_name,
-        ).first()
-
-        if not setting:
-            setting = models.ApplianceSetting(
-                user_id=owner_id,
-                appliance_name=item.appliance_name,
-            )
-            db.add(setting)
-
-        setting.analysis_id = item.analysis_id
-        setting.control_command = item.control_command
-        setting.execution_status = item.execution_status
-
-    db.commit()
-    return {"status": "Success"}
-# 설정 만들기
->>>>>>> origin/pkb_workspace.ver2
 
 os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# 🚀 [API 1] AI 감정 분석 (프론트에서 버튼 누를 때 실행)
+
+# =====================================================================
+# 🤖 2. AI 감정 분석 모델 적재
 # =====================================================================
 print("🚀 AI 감정 분석 모델을 메모리에 적재 중입니다...")
-
-# diary_emotion_ai/scripts 폴더를 파이썬 모듈 경로에 강제 추가
-ai_scripts_path = os.path.abspath("../diary_emotion_ai/scripts")
-if ai_scripts_path not in sys.path:
-    sys.path.append(ai_scripts_path)
-
-# 숫자로 시작하는 파이썬 파일을 동적으로 Import
-# =====================================================================
-# 🚀 [DX 혁신] AI 감정 분석 모델 In-Memory 단일 적재 (경로 자동 추적기 탑재)
-# =====================================================================
-print("🚀 AI 감정 분석 모델을 메모리에 적재 중입니다...")
-
-# 현재 백엔드 폴더(main.py 위치)와 최상단 루트 폴더 계산
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 
-# 마이 로드의 폴더 구조를 모두 탐색하여 AI 스크립트 폴더를 찾아냅니다!
 possible_paths = [
-    os.path.join(ROOT_DIR, "Project", "diary_emotion_ai", "scripts"), # 마이로드 탐색기 구조
-    os.path.join(ROOT_DIR, "diary_emotion_ai", "scripts")             # 기본 예비 구조
+    os.path.join(ROOT_DIR, "Project", "diary_emotion_ai", "scripts"),
+    os.path.join(ROOT_DIR, "diary_emotion_ai", "scripts")
 ]
 
 ai_scripts_path = None
@@ -193,891 +69,45 @@ if ai_scripts_path:
     except Exception as e:
         print(f"❌ AI 모델 로드 실패: {e}")
 else:
-    print(f"❌ AI 스크립트 경로를 찾지 못했습니다. 폴더 구조를 확인해주세요. (현재 검색 경로: {possible_paths})")
+    print(f"❌ AI 스크립트 경로를 찾지 못했습니다. (현재 검색 경로: {possible_paths})")
+
 
 # =====================================================================
-
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 모든 주소 허용 (실무에서는 ["http://localhost:5173"] 등으로 지정)
-    allow_credentials=True,
-    allow_methods=["*"],  # POST, GET, OPTIONS 등 모든 방식 허용
-    allow_headers=["*"],  # 모든 헤더 허용
-)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-os.makedirs("uploads", exist_ok=True)
+# 📦 3. 데이터 검증용 스키마 (Pydantic Models)
+# =====================================================================
 class CommentCreate(BaseModel):
     user_id: int
     content: str
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class EmotionRequest(BaseModel):
     text: str
-# -------------------------------------------------------------------
-# 🤖 [API 1] AI 감정 분석 (In-Memory Direct Call - 응답속도 0.05초)
-# -------------------------------------------------------------------
-@app.post("/api/ai/emotion")
-def analyze_diary_emotion(req: schemas.EmotionRequest):
-    if not req.text.strip():
-        return {"status": "Error", "message": "텍스트가 없습니다."}
 
-    try:
-        # 💡 subprocess 폐기! 메모리에 올라간 마이 로드의 predict 함수를 즉각 호출합니다.
-        # 반환값인 prediction에는 문자열(예: "화남", "행복")이 정확히 떨어집니다.
-        prediction, probabilities = diary_ai.predict(AI_MODEL, req.text)
-        
-        emoji_map = {
-            "행복": "😊", "안정": "🙂", "설렘": "🥰", 
-            "중립": "😐", "불안": "😟", "피로": "😫", 
-            "우울": "😔", "화남": "😡"
-        }
-        
-        return {
-            "status": "Success", 
-            "emotion_label": prediction,
-            "emoji": emoji_map.get(prediction, "😐")
-        }
-    except Exception as e:
-        print("AI 다이렉트 분석 에러:", e)
-        return {"status": "Error", "message": "서버 내부 AI 엔진 오류가 발생했습니다."}
-    if not req.text.strip():
-        return {"status": "Error", "message": "텍스트가 없습니다."}
-
-    try:
-        # 💡 [주의] 이 경로가 백엔드 폴더(backend) 기준으로 정확해야 합니다!
-        script_path = "../diary_emotion_ai/scripts/03_predict_diary_emotion.py"
-        
-        # 파이썬 스크립트 실행
-        result = subprocess.run(
-            ["python", script_path, req.text], 
-            capture_output=True, text=True, encoding='utf-8'
-        )
-        
-        output = result.stdout.strip()
-        error_output = result.stderr.strip() # 에러 로그 캡처
-        
-        # 🔥 마이 로드, 백엔드 검은 창에 뜨는 이 로그를 반드시 확인하십시오! 🔥
-        print(f"=== 🤖 AI 분석 결과 로그 ===")
-        print(f"입력문장: {req.text}")
-        print(f"정상출력(stdout): {output}")
-        print(f"에러출력(stderr): {error_output}")
-        print(f"=============================")
-
-        predicted_label = "중립" 
-        emotions = ["행복", "안정", "설렘", "중립", "불안", "피로", "우울", "화남"]
-        for e in emotions:
-            if e in output: # 스크립트가 뱉은 글자 중에 감정 단어가 있으면 교체!
-                predicted_label = e
-                break
-                
-        emoji_map = {"행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐", "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"}
-        
-        return {"status": "Success", "emotion_label": predicted_label, "emoji": emoji_map.get(predicted_label, "😐")}
-    except Exception as e:
-        print("AI 실행 자체 에러:", e)
-        return {"status": "Error", "message": str(e)}
-
-# -------------------------------------------------------------------
-# 💾 [API 2] 다이어리 + 사진 + 날씨 DB 저장 API (Form 데이터 방식)
-# -------------------------------------------------------------------
-# 🚀 2. 다이어리 저장 API 교체 (날짜 지정 기능 추가!)
-@app.post("/api/diary/logs")
-def create_diary_log(
-    user_id: int = Form(...),
-    selected_emotion: str = Form(...),
-    diary_content: str = Form(...),
-    detected_emotion: str = Form(None),
-    image: UploadFile = File(None),
-    date: str = Form(None), # 🗓️ 프론트엔드에서 선택한 날짜를 받습니다!
-    db: Session = Depends(database.get_db)
-):
-    try:
-        saved_image_path = None
-        if image:
-            saved_image_path = f"uploads/{image.filename}"
-            with open(saved_image_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-
-        # ---------------------------------------------------------
-        # ⛅ 1. 날씨 API 가져오기 (.env 파일 수정하셨으니 이제 잘 될 겁니다!)
-        # ---------------------------------------------------------
-        WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
-        city = "Seoul"
-        weather_desc = "알 수 없음"
-        if WEATHER_API_KEY:
-            weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&lang=kr"
-            res = requests.get(weather_url)
-            if res.status_code == 200:
-                weather_desc = res.json()['weather'][0]['description']
-            else:
-                print(f"⛅ 날씨 API 에러: {res.status_code} - {res.text}")
-
-        # ---------------------------------------------------------
-        # 📝 2. 이모지 -> 텍스트 키워드 변환 (😊 -> 행복)
-        # ---------------------------------------------------------
-        reverse_emoji_map = {
-            "😊": "행복", "🙂": "안정", "🥰": "설렘", "😐": "중립",
-            "😟": "불안", "😫": "피로", "😔": "우울", "😡": "화남"
-        }
-        db_emotion_text = reverse_emoji_map.get(selected_emotion, selected_emotion)
-
-        # ---------------------------------------------------------
-        # 🌡️ 3. 가전 센서 온습도 랜덤 생성기 (21~26도 / 40~60%)
-        # ---------------------------------------------------------
-        dummy_temperature = round(random.uniform(21.0, 26.0), 1)
-        dummy_humidity = round(random.uniform(40.0, 60.0), 1)
-        
-        # 4. DB 테이블에 데이터 맵핑
-        new_diary = models.DiaryLog(
-            user_id=user_id,
-            selected_emotion=db_emotion_text,   # 🚀 변환된 텍스트('행복' 등) 저장!
-            diary_content=diary_content,
-            image_path=saved_image_path,
-            temperature_ambient=dummy_temperature, # 🚀 랜덤 온도 저장!
-            humidity_ambient=dummy_humidity,       # 🚀 랜덤 습도 저장!
-            weather_ambient=weather_desc           
-        )
-        
-        # 🔥 유저가 날짜를 선택해서 보냈다면, DB의 시간을 그 날짜로 덮어씁니다!
-        if date:
-            new_diary.recorded_at = datetime.strptime(date, "%Y-%m-%d")
-
-        db.add(new_diary)
-        db.flush()
-
-        if detected_emotion:
-            new_analysis = models.AiAnalysisResult(
-                diary_id=new_diary.diary_id,
-                detected_emotion=detected_emotion
-            )
-            db.add(new_analysis)
-
-        db.commit()
-        return {"status": "Success", "message": "성공적으로 저장되었습니다."}
-        
-    except Exception as e:
-        db.rollback() 
-        return {"status": "Error", "message": str(e)}
-
-# 🚀 3. 내 일기 불러오기 API가 잘 있는지 확인! (안 보였던 이유 해결)
-# 🚀 [API 3] 내 다이어리 목록 불러오기 (DB 텍스트 -> 프론트 이모지 변환 탑재)
-@app.get("/api/diary/logs/{user_id}")
-def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
-    try:
-        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
-        
-        # ---------------------------------------------------------
-        # 📝 텍스트(DB) -> 이모지(화면) 강제 변환기
-        # ---------------------------------------------------------
-        keyword_to_emoji = {
-            "행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐",
-            "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"
-        }
-        
-        result = []
-        for log in logs:
-            date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
-            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
-
-            # 🚀 DB에 저장된 '행복'을 꺼내 다시 '😊'로 바꿔줍니다. (매칭 안되면 기본 😐)
-            display_mood = keyword_to_emoji.get(log.selected_emotion, "😐")
-
-            result.append({
-                "id": log.diary_id,
-                "date": date_str,
-                "mood": display_mood, # 🚀 프론트엔드에는 이모지로 날아갑니다!
-                "content": log.diary_content,
-                "images": img_list,
-                "type": "daily" 
-            })
-            
-        return {"status": "Success", "entries": result}
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-    try:
-        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
-        result = []
-        for log in logs:
-            # 시간까지 나오는 DB 데이터를 'YYYY-MM-DD' 날짜만 나오게 깔끔하게 자름
-            date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
-            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
-
-            result.append({
-                "id": log.diary_id,
-                "date": date_str,
-                "mood": log.selected_emotion,
-                "content": log.diary_content,
-                "images": img_list,
-                "type": "daily" 
-            })
-        return {"status": "Success", "entries": result}
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-    
-# 🚀 [API 4] COMMUNITY_POSTS 개수 조회 API
-@app.get("/api/community/posts/count/{user_id}")
-def get_community_posts_count(user_id: int, db: Session = Depends(database.get_db)):
-    try:
-        # 내 user_id로 작성된 전체 게시글 수를 카운트합니다
-        count = db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).count()
-        return {"status": "Success", "count": count}
-    except Exception as e:
-        return {"status": "Success", "count": 0, "note": f"아직 테이블이 없거나 에러: {str(e)}"}
-
-# 🚀 [API 5] COMMUNITY_COMMENTS 개수 조회 API
-@app.get("/api/community/comments/count/{user_id}")
-def get_community_comments_count(user_id: int, db: Session = Depends(database.get_db)):
-    try:
-        # 내 user_id로 작성된 전체 댓글 수를 카운트합니다
-        count = db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).count()
-        return {"status": "Success", "count": count}
-    except Exception as e:
-        return {"status": "Success", "count": 0, "note": f"아직 테이블이 없거나 에러: {str(e)}"}
-
-# 🚀 [API 6] 캘린더 연동: 최근/다음 검진일 자동 계산 API
-@app.get("/api/calendar/checkups/{connection_code}")
-def get_checkup_dates(connection_code: str, db: Session = Depends(database.get_db)):
-    try:
-        today = date.today()
-        
-        # 🏥 병원 관련 이벤트 타입들 (DB 사진에 있는 hospital, ultrasound 포함)
-        hospital_types = ["hospital", "ultrasound", "clinic"]
-
-        # 연동 코드와 일치하고, 이벤트 타입이 병원인 일정만 싹 다 가져옵니다.
-        events = db.query(models.SharedCalendarEvent).filter(
-            models.SharedCalendarEvent.connection_code == connection_code,
-            models.SharedCalendarEvent.event_type.in_(hospital_types)
-        ).all()
-
-        recent_event = None
-        next_event = None
-
-        # 📅 날짜 비교를 통해 과거(최근)와 미래(다음)를 분리합니다.
-        past_events = [e for e in events if e.event_date and e.event_date <= today]
-        future_events = [e for e in events if e.event_date and e.event_date > today]
-
-        # 과거 일정 중 가장 최신 날짜
-        if past_events:
-            recent_event = max(past_events, key=lambda x: x.event_date)
-            
-        # 미래 일정 중 가장 가까운 날짜
-        if future_events:
-            next_event = min(future_events, key=lambda x: x.event_date)
-
-        def format_date(d):
-            if not d: return "등록된 일정 없음"
-            return f"{d.year}년 {d.month}월 {d.day}일"
-
-        return {
-            "status": "Success",
-            "recent_checkup": format_date(recent_event.event_date) if recent_event else "등록된 일정 없음",
-            "next_checkup": format_date(next_event.event_date) if next_event else "등록된 일정 없음"
-        }
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-
-# 🚀 [API 7] 내가 작성한 게시글 목록 전체 조회
-
-@app.get("/api/community/my-posts/{user_id}")
-def get_my_posts(user_id: int, db: Session = Depends(database.get_db)):
-    from sqlalchemy import func
-    try:
-        results = db.query(
-            models.CommunityPost,
-            models.User.name.label("author_name"),
-            models.User.role.label("author_role"),
-            func.count(models.CommunityComment.comment_id).label("comment_count")
-        ).outerjoin(
-            models.User, models.CommunityPost.user_id == models.User.id
-        ).outerjoin(
-            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
-        ).filter(
-            models.CommunityPost.user_id == user_id
-        ).group_by(
-            models.CommunityPost.post_id, models.User.id
-        ).order_by(
-            models.CommunityPost.created_at.desc()
-        ).all()
-
-        posts = []
-        for post, author_name, author_role, count in results:
-            posts.append({
-                "post_id": post.post_id,
-                "user_id": post.user_id,
-                "pregnancy_period": post.pregnancy_period,
-                "title": post.title,
-                "content": post.content,
-                "created_at": post.created_at,
-                "author": author_name or "익명",
-                "role": author_role,
-                "comment_count": count
-            })
-        return {"status": "Success", "posts": posts}
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-
-# 🚀 [API 8] 내가 작성한 댓글 목록 전체 조회 (어떤 게시글에 달았는지 제목 포함)
-
-@app.get("/api/community/my-comments/{user_id}")
-def get_my_commented_posts(user_id: int, db: Session = Depends(database.get_db)):
-    from sqlalchemy import func
-    try:
-        # 1. 내가 댓글을 단 게시글 ID를 서브쿼리로 모두 찾습니다.
-        subquery = db.query(models.CommunityComment.post_id).filter(
-            models.CommunityComment.user_id == user_id
-        ).distinct().subquery()
-
-        # 2. 해당 게시글들의 정보를 완벽하게 조인해서 가져오기 (메인 커뮤니티와 100% 동일)
-        results = db.query(
-            models.CommunityPost,
-            models.User.name.label("author_name"),
-            models.User.role.label("author_role"),
-            func.count(models.CommunityComment.comment_id).label("comment_count")
-        ).outerjoin(
-            models.User, models.CommunityPost.user_id == models.User.id
-        ).outerjoin(
-            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
-        ).filter(
-            models.CommunityPost.post_id.in_(subquery)  # 🚀 내가 댓글 단 글만 쏙쏙 뽑기!
-        ).group_by(
-            models.CommunityPost.post_id, models.User.id
-        ).order_by(
-            models.CommunityPost.created_at.desc()
-        ).all()
-
-        posts = []
-        for post, author_name, author_role, count in results:
-            posts.append({
-                "post_id": post.post_id,
-                "user_id": post.user_id,
-                "pregnancy_period": post.pregnancy_period,
-                "title": post.title,
-                "content": post.content,
-                "created_at": post.created_at,
-                "author": author_name or "익명",
-                "role": author_role,
-                "comment_count": count
-            })
-        # 프론트엔드가 'comments' 키로 받기 때문에 이름만 맞춰줍니다.
-        return {"status": "Success", "comments": posts} 
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-    try:
-        # 댓글과 게시글을 Join하여 게시글 제목까지 한꺼번에 가져옵니다.
-        results = db.query(
-            models.CommunityComment, 
-            models.CommunityPost.title.label("post_title")
-        ).join(
-            models.CommunityPost, 
-            models.CommunityComment.post_id == models.CommunityPost.post_id
-        ).filter(models.CommunityComment.user_id == user_id).order_by(models.CommunityComment.created_at.desc()).all()
-        
-        comments = []
-        for c, post_title in results:
-            comments.append({
-                "comment_id": c.comment_id,
-                "post_id": c.post_id,
-                "post_title": post_title,
-                "content": c.content,
-                "created_at": c.created_at
-            })
-        return {"status": "Success", "comments": comments}
-    except Exception as e:
-        return {"status": "Error", "message": str(e)}
-
-
-@app.post("/api/posts/{post_id}/comments")
-def create_post_comment(post_id: int, comment_data: CommentCreate, db: Session = Depends(database.get_db)):
-    try:
-        # DB의 COMMUNITY_COMMENTS 테이블에 새로운 댓글 한 줄을 생성합니다.
-        new_comment = models.CommunityComment(
-            post_id=post_id,
-            user_id=comment_data.user_id,
-            content=comment_data.content
-        )
-        db.add(new_comment)  # DB에 올리고
-        db.commit()          # 도장 쾅! (저장)
-        
-        return {"status": "Success", "message": "댓글이 성공적으로 등록되었습니다."}
-    except Exception as e:
-        db.rollback() # 에러 나면 롤백(취소)
-        print(f"🚨 댓글 저장 에러: {str(e)}")
-        return {"status": "Error", "message": "댓글 등록에 실패했습니다."}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 일정 등록용 데이터 검증 스키마
 class EventCreate(BaseModel):
     connection_code: str
     event_type: str
     title: str
     content: str
     event_date: date
+
 class EventUpdate(BaseModel):
     event_type: str
     title: str
     content: str
     event_date: date
-# 🚀 1. 캘린더 일정 불러오기 API (부부의 connection_code로 검색)
-@app.get("/api/calendar/events/{connection_code}")
-def get_calendar_events(connection_code: str, db: Session = Depends(database.get_db)):
-    # connection_code가 없는 경우(연동 안됨) 빈 배열 반환
-    if not connection_code or connection_code == "None":
-        return {"status": "Success", "events": []}
-        
-    events = db.query(models.SharedCalendarEvent).filter(
-        models.SharedCalendarEvent.connection_code == connection_code
-    ).all()
-    
-    result = []
-    for e in events:
-        result.append({
-            "event_id": e.event_id,
-            "event_type": e.event_type,
-            "title": e.title,
-            "content": e.content,
-            "event_date": str(e.event_date)
-        })
-    return {"status": "Success", "events": result}
 
-# 🚀 2. 새 일정 등록 API
-@app.post("/api/calendar/events")
-def create_calendar_event(event: EventCreate, db: Session = Depends(database.get_db)):
-    if not event.connection_code or event.connection_code == "None":
-        raise HTTPException(status_code=400, detail="부부 연동 코드가 필요합니다.")
-        
-    new_event = models.SharedCalendarEvent(
-        connection_code=event.connection_code,
-        event_type=event.event_type,
-        title=event.title,
-        content=event.content,
-        event_date=event.event_date
-    )
-    db.add(new_event)
-    db.commit()
-    return {"status": "Success", "message": "일정이 등록되었습니다."}
-
-# 🚀 4. 일정 삭제 API
-@app.delete("/api/calendar/events/{event_id}")
-def delete_calendar_event(event_id: int, db: Session = Depends(database.get_db)):
-    event = db.query(models.SharedCalendarEvent).filter(models.SharedCalendarEvent.event_id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다.")
-    
-    db.delete(event)
-    db.commit()
-    return {"status": "Success", "message": "일정이 삭제되었습니다."}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 1. 프로필 수정 API
-@app.put("/api/user/profile/{user_id}")
-def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    user.name = profile.name
-    user.baby_nickname = profile.baby_nickname
-    db.commit()
-    return {"status": "Success", "message": "프로필이 수정되었습니다."}
-
-# 2. 비밀번호 변경 API
-@app.put("/api/user/password/{user_id}")
-def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
-    if user.password != passwords.current_password:
-        raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
-        
-    user.password = passwords.new_password
-    db.commit()
-    return {"status": "Success", "message": "비밀번호가 변경되었습니다."}
-
-
-# 🚀 1. 특정 게시글의 댓글 불러오기 API (작성자 ID 추가)
-\
-# 🚀 1. 댓글 불러오기 API
-# 🚀  특정 게시글에 달린 댓글 상세 목록 불러오기
-
-
-# 🚀 [API 1] 게시글 목록 + 닉네임 + 댓글 개수 조회 (무적 버전)
-@app.get("/api/community/posts")
-def get_community_posts(db: Session = Depends(database.get_db)):
-    try:
-        results = db.query(
-            models.CommunityPost,
-            models.User.name,
-            models.User.role,
-            models.User.pregnancy_start_date,
-            func.count(models.CommunityComment.comment_id).label("comment_count")
-        ).outerjoin(  # 일반 join 대신 outerjoin 사용: 작성자 정보가 날아가도 글은 무조건 뜨게 만듦!
-            models.User, models.CommunityPost.user_id == models.User.id
-        ).outerjoin(
-            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
-        ).group_by(
-            models.CommunityPost.post_id, models.User.id
-        ).order_by(
-            models.CommunityPost.created_at.desc()
-        ).all()
-        
-        posts = []
-        for post, user_name, user_role, preg_date, count in results:
-            posts.append({
-                "post_id": post.post_id,
-                "user_id": post.user_id,
-                "pregnancy_period": post.pregnancy_period,
-                "title": post.title,
-                "content": post.content,
-                "created_at": post.created_at,
-                "author": user_name or "익명",
-                "role": user_role,
-                "comment_count": count
-            })
-        return {"status": "Success", "posts": posts}
-    except Exception as e:
-        print(f"🚨 게시글 로드 에러: {e}")
-        return {"status": "Error", "message": str(e)}
-
-# 🚀 [API 2] 특정 게시글의 댓글 상세 조회 (무적 버전)
-@app.get("/api/posts/{post_id}/comments")
-def get_post_comments(post_id: int, db: Session = Depends(database.get_db)):
-    try:
-        comments = db.query(
-            models.CommunityComment,
-            models.User.name,
-            models.User.role,
-            models.User.pregnancy_start_date
-        ).outerjoin(  # 여기도 outerjoin 적용: 꼬인 댓글 데이터가 있어도 무조건 화면에 뿌려줌!
-            models.User, models.CommunityComment.user_id == models.User.id
-        ).filter(
-            models.CommunityComment.post_id == post_id
-        ).order_by(
-            models.CommunityComment.created_at.asc()
-        ).all()
-
-        result = []
-        for c, user_name, user_role, start_date in comments:
-            result.append({
-                "id": c.comment_id,
-                "user_id": c.user_id,
-                "content": c.content,
-                "created_at": c.created_at,
-                "author_name": user_name or "익명",
-                "author_role": user_role,
-                "pregnancy_start_date": str(start_date) if start_date else None
-            })
-        return {"status": "Success", "comments": result}
-    except Exception as e:
-        print(f"🚨 댓글 로드 에러: {e}")
-        return {"status": "Error", "message": str(e)}
-    new_comment = models.Comment(
-        post_id=post_id,
-        user_id=comment.user_id,
-        content=comment.content,
-        created_at=datetime.now()
-    )
-    db.add(new_comment)
-    db.commit()
-    return {"status": "Success", "message": "댓글이 등록되었습니다."}
-
-# 🚀 3. 댓글 삭제 API
-@app.delete("/api/comments/{comment_id}")
-def delete_comment(comment_id: int, user_id: int, db: Session = Depends(database.get_db)):
-    # 🚀 삭제할 때도 comment_id로 찾습니다!
-    comment = db.query(models.Comment).filter(models.Comment.comment_id == comment_id).first()
-    if not comment:
-        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
-    
-    if comment.user_id != user_id:
-        raise HTTPException(status_code=403, detail="본인의 댓글만 삭제할 수 있습니다.")
-        
-    db.delete(comment)
-    db.commit()
-    return {"status": "Success", "message": "댓글이 삭제되었습니다."}
-
-
-
-# 스몰토크 가져오기
-@app.get("/api/smalltalk/{user_id}")
-def get_smalltalk(user_id: int, db: Session = Depends(database.get_db)):
-    # 1. 내 정보 가져오기 (컬럼명 user_id, 객체 속성 id)
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user: raise HTTPException(status_code=404, detail="User not found")
-    
-    # 2. 파트너 정보 가져오기
-    partner = None
-    if user.parent_user_id:
-        partner = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
-    else:
-        partner = db.query(models.User).filter(models.User.parent_user_id == user.id).first()
-
-    # 3. 질문 선정
-    today_topic = smalltalk_service.get_today_topic(db)
-    
-    # 4. 내/파트너 답변 가져오기
-    my_answer_obj = db.query(models.SmallTalkAnswer).filter(
-        models.SmallTalkAnswer.topic_id == today_topic.topic_id,
-        models.SmallTalkAnswer.user_id == user.id
-    ).first()
-
-    partner_answer_obj = None
-    if partner:
-        partner_answer_obj = db.query(models.SmallTalkAnswer).filter(
-            models.SmallTalkAnswer.topic_id == today_topic.topic_id,
-            models.SmallTalkAnswer.user_id == partner.id # 🚀 .id로 통일
-        ).first()
-
-    return {
-        "status": "Success",
-        "topic": {"topic_id": today_topic.topic_id, "question_text": today_topic.question_text},
-        "my_answer": my_answer_obj.answer_content if my_answer_obj else None,
-        "partner_name": partner.name if partner else "파트너",
-        "is_partner_answered": bool(partner_answer_obj),
-        "partner_answer": partner_answer_obj.answer_content if (my_answer_obj and partner_answer_obj) else None
-    }
-    
-# 스몰토크 답변 저장
-@app.post("/api/smalltalk/answer")
-def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.id == ans.user_id).first()
-    conn_code = user.connection_code if user.connection_code else "DEMO_CODE"
-    
-    new_ans = models.SmallTalkAnswer(
-        topic_id=ans.topic_id,
-        user_id=ans.user_id,
-        connection_code=conn_code,
-        answer_content=ans.answer_content
-    )
-    db.add(new_ans)
-    db.commit()
-    return {"status": "Success"}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 🚀 1. 커뮤니티 게시글 목록 불러오기 (USERS 테이블과 JOIN하여 진짜 이름/역할 연동)
-from sqlalchemy import func # 맨 위에 이 import가 있는지 확인하세요!
-
-@app.get("/api/community/posts")
-def get_community_posts(db: Session = Depends(database.get_db)):
-    try:
-        # 1. 게시글과 댓글 개수를 한 번에 조회 (SQL의 GROUP BY 기능 사용)
-        results = db.query(
-            models.CommunityPost,
-            func.count(models.CommunityComment.comment_id).label("comment_count")
-        ).outerjoin(
-            models.CommunityComment, 
-            models.CommunityPost.post_id == models.CommunityComment.post_id
-        ).group_by(models.CommunityPost.post_id).order_by(models.CommunityPost.created_at.desc()).all()
-        
-        # 2. 결과 데이터를 프론트엔드가 쓰기 좋게 변환
-        posts = []
-        for post, count in results:
-            posts.append({
-                "post_id": post.post_id,
-                "user_id": post.user_id,
-                "pregnancy_period": post.pregnancy_period,
-                "title": post.title,
-                "content": post.content,
-                "created_at": post.created_at,
-                "comment_count": count  # 🚀 댓글 개수 주입!
-            })
-            
-        return {"status": "Success", "posts": posts}
-    except Exception as e:
-        print(f"🚨 게시글 목록 조회 에러: {str(e)}")
-        return {"status": "Error", "message": "게시글을 불러오지 못했습니다."}
-    # COMMUNITY_POSTS와 USERS 테이블을 작성자 ID(user_id) 기준으로 조인합니다.
-    results = db.query(models.CommunityPost, models.User)\
-                .join(models.User, models.CommunityPost.user_id == models.User.id)\
-                .order_by(models.CommunityPost.created_at.desc()).all()
-    
-    posts_list = []
-    for post, user in results:
-        posts_list.append({
-            "id": post.post_id,
-            "user_id": post.user_id,
-            "period": post.pregnancy_period,
-            "title": post.title,
-            "content": post.content,
-            "created_at": post.created_at,
-            # 🚀 데베 USERS 테이블에서 실시간으로 가져온 진짜 회원 정보 연동!
-            "role": "pregnant" if user.role == "PREGNANT" else "guardian", 
-            "author": user.name, # 유저 테이블의 진짜 이름
-            "avatar": "🤰" if user.role == "PREGNANT" else "👨",
-            "likes": 0,
-            "comments": 0
-        })
-    return {"status": "Success", "posts": posts_list}
 class PostCreate(BaseModel):
     user_id: int
     pregnancy_period: str
     title: str
     content: str
 
-# 🚀 2. 새 게시글 작성하기 (schemas.PostCreate 규격 사용)
-@app.post("/api/community/posts")
-def create_community_post(post: PostCreate, db: Session = Depends(database.get_db)):
-    # ERD 기준: 테이블명 COMMUNITY_POSTS
-    new_post = models.CommunityPost(
-        user_id=post.user_id,
-        pregnancy_period=post.pregnancy_period,
-        title=post.title,
-        content=post.content
-    )
-    db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
-    return {"status": "Success", "post": new_post}
-    # schemas.py에 정의한 규격을 그대로 사용하여 안전하게 DB에 인서트합니다.
-    new_post = models.CommunityPost(
-        user_id=post.user_id,
-        pregnancy_period=post.pregnancy_period,
-        title=post.title,
-        content=post.content
-    )
-    db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
-    return {"status": "Success", "post": new_post}
-# main.py 의 게시글 작성(post) 코드 아래에 추가하십시오.
-# 삭제버튼을 허용하는 게시글 삭제 코드
-@app.delete("/api/community/posts/{post_id}")
-def delete_community_post(post_id: int, db: Session = Depends(database.get_db)):
-    # DB에서 해당 ID의 게시글을 찾습니다
-    post = db.query(models.CommunityPost).filter(models.CommunityPost.post_id == post_id).first()
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
-    
-    # 찾았으면 삭제합니다
-    db.delete(post)
-    db.commit()
-    return {"status": "Success", "message": "게시글이 삭제되었습니다."}
 
-
-
-
-
-
-
-
-
-
-# 로그인 기능 
-
-# 🚀 1. 기존 로그인 API를 이걸로 덮어쓰십시오!
-@app.post("/api/auth/login")
-def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
-    # 1. 사용자 인증
-    user = db.query(models.User).filter(models.User.email == request.email).first()
-    if not user or user.password != request.password:
-        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
-    
-    # 2. 보호자(GUARDIAN)일 경우 연결된 임산부 정보(parent) 조회
-    pregnant_info = None
-    if user.role == "GUARDIAN" and user.parent_user_id:
-        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
-        if parent:
-            pregnant_info = {
-                "name": parent.name,
-                "baby_nickname": parent.baby_nickname,
-                "pregnancy_start_date": str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None,
-                "connection_code": parent.connection_code
-            }
-    
-    # 3. 프론트엔드로 전달할 최종 데이터 구성
-    return {
-        "status": "Success",
-        "user": {
-            "user_id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "role": user.role,
-            "baby_nickname": user.baby_nickname,
-            # 🚀 바로 이 부분! 임산부의 임신 시작일을 프론트로 보냅니다.
-            "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
-            "connection_code": user.connection_code,
-            "parent_user_id": user.parent_user_id,
-            "connected_pregnant": pregnant_info
-        }
-    }
-# 회원가입 API
+# =====================================================================
+# 🔐 4. 계정 및 프로필 API
+# =====================================================================
 @app.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
-    parent_user_id = None # 기본값 설정
+    parent_user_id = None
     if user.role == "PREGNANT":
         while True:
             new_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -1089,7 +119,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         pregnant_user = db.query(models.User).filter(models.User.connection_code == user.input_connection_code).first()
         if not pregnant_user:
             raise HTTPException(status_code=400, detail="유효하지 않은 인증코드입니다.")
-        parent_user_id = pregnant_user.id # 🚀 수정: .id 대신 .user_id
+        parent_user_id = pregnant_user.id
 
     new_user = models.User(
         email=user.email,
@@ -1104,28 +134,41 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
     db.add(new_user)
     db.commit()
     return {"status": "Success", "connection_code": connection_code}
-# 현재 주차 계산 API (필요할 때 호출)
-@app.get("/api/user/pregnancy-week/{user_id}")
-def get_week(user_id: int, db: Session = Depends(database.get_db)):
 
-
+@app.post("/api/auth/login")
+def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or user.password != request.password:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user or not user.pregnancy_start_date:
-        return {"week": 0}
+    pregnant_info = None
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if parent:
+            pregnant_info = {
+                "name": parent.name,
+                "baby_nickname": parent.baby_nickname,
+                "pregnancy_start_date": str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None,
+                "connection_code": parent.connection_code
+            }
     
-    # 오늘 날짜 - 시작 날짜 = 지난 일수
-    delta = datetime.now().date() - user.pregnancy_start_date
-    current_week = (delta.days // 7) + 1 # 1주차부터 시작
-    return {"week": current_week}
+    return {
+        "status": "Success",
+        "user": {
+            "user_id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "baby_nickname": user.baby_nickname,
+            "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
+            "connection_code": user.connection_code,
+            "parent_user_id": user.parent_user_id,
+            "connected_pregnant": pregnant_info
+        }
+    }
 
-
-
-# 🚀 설정창 & 메인화면 전용 데이터 불러오기 API (주차 계산용 데이터 추가됨!)
 @app.get("/api/user/info/{identifier}")
 def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
-
-    # identifier가 숫자(ID)인지 문자열(이메일)인지 판별하여 검색
     if identifier.isdigit():
         user = db.query(models.User).filter(models.User.id == int(identifier)).first()
     else:
@@ -1147,7 +190,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
 
     return {
         "status": "Success",
-        "user_id": user.id, # 🚀 회원가입 직후 동기화를 위해 고유 ID도 함께 반환합니다.
+        "user_id": user.id,
         "name": user.name,
         "baby_nickname": user.baby_nickname,
         "connection_code": user.connection_code,
@@ -1155,29 +198,426 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         "pregnancy_start_date": pregnant_start_date,
         "connected_name": connected_name
     }
+
+@app.put("/api/user/profile/{user_id}")
+def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = Depends(database.get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    user.name = profile.name
+    user.baby_nickname = profile.baby_nickname
+    db.commit()
+    return {"status": "Success", "message": "프로필이 수정되었습니다."}
 
-    partner_code = None
-    # 🚀 임산부 본인의 시작일
-    pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
-    connected_name = None
+@app.put("/api/user/password/{user_id}")
+def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if user.password != passwords.current_password:
+        raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
+    user.password = passwords.new_password
+    db.commit()
+    return {"status": "Success", "message": "비밀번호가 변경되었습니다."}
 
-    # 🚀 보호자일 경우, 아내의 시작일과 이름을 가져옴
-    if user.role == "GUARDIAN" and user.parent_user_id:
-        parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
-        if parent:
-            partner_code = parent.connection_code
-            pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
-            connected_name = parent.name    
+
+# =====================================================================
+# 🏠 5. 스마트홈(가전 제어) API (🚀 찐 DB 연동 완료!)
+# =====================================================================
+@app.post("/api/appliances/bulk")
+def update_appliances_bulk(payload: schemas.ApplianceSettingsBulkUpsert, db: Session = Depends(database.get_db)):
+    try:
+        # 프론트가 보낸 여러 개의 가전 설정을 하나씩 꺼내어 DB에 저장합니다.
+        for item in payload.settings:
+            # 1. 이미 저장된 설정이 있는지 DB에서 찾기
+            setting = db.query(models.ApplianceSetting).filter(
+                models.ApplianceSetting.user_id == payload.user_id,
+                models.ApplianceSetting.appliance_name == item.appliance_name
+            ).first()
+
+            if setting:
+                # 2. 있으면 새 값으로 덮어쓰기 (Update)
+                setting.control_command = item.control_command
+                setting.execution_status = item.execution_status
+            else:
+                # 3. 없으면 새로 만들어 넣기 (Insert)
+                new_setting = models.ApplianceSetting(
+                    user_id=payload.user_id,
+                    appliance_name=item.appliance_name,
+                    control_command=item.control_command,
+                    execution_status=item.execution_status
+                )
+                db.add(new_setting)
+        
+        db.commit()
+        return {"status": "Success", "message": "가전 설정이 DB에 완벽하게 저장되었습니다!"}
+    except Exception as e:
+        db.rollback()
+        print(f"🚨 가전 설정 저장 에러: {str(e)}")
+        return {"status": "Error", "message": str(e)}
+
+@app.get("/api/appliances/{user_id}")
+def get_user_appliances(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        # DB에서 해당 유저의 가전 설정을 모두 불러옵니다.
+        settings = db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).all()
+        
+        result = []
+        for s in settings:
+            result.append({
+                "appliance_name": s.appliance_name,
+                "control_command": s.control_command,
+                "execution_status": s.execution_status
+            })
+            
+        return {"status": "Success", "settings": result}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+
+# =====================================================================
+# 📖 6. 다이어리 & AI 감정 분석 API
+# =====================================================================
+@app.post("/api/ai/emotion")
+def analyze_diary_emotion(req: EmotionRequest):
+    if not req.text.strip():
+        return {"status": "Error", "message": "텍스트가 없습니다."}
+    try:
+        prediction, probabilities = diary_ai.predict(AI_MODEL, req.text)
+        emoji_map = {
+            "행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐",
+            "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"
+        }
+        return {"status": "Success", "emotion_label": prediction, "emoji": emoji_map.get(prediction, "😐")}
+    except Exception as e:
+        return {"status": "Error", "message": "AI 오류가 발생했습니다."}
+
+@app.post("/api/diary/logs")
+def create_diary_log(
+    user_id: int = Form(...),
+    selected_emotion: str = Form(...),
+    diary_content: str = Form(...),
+    detected_emotion: str = Form(None),
+    image: UploadFile = File(None),
+    date: str = Form(None),
+    db: Session = Depends(database.get_db)
+):
+    try:
+        saved_image_path = None
+        if image:
+            saved_image_path = f"uploads/{image.filename}"
+            with open(saved_image_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+
+        WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+        weather_desc = "알 수 없음"
+        if WEATHER_API_KEY:
+            res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Seoul&appid={WEATHER_API_KEY}&lang=kr")
+            if res.status_code == 200:
+                weather_desc = res.json()['weather'][0]['description']
+
+        reverse_emoji_map = {"😊": "행복", "🙂": "안정", "🥰": "설렘", "😐": "중립", "😟": "불안", "😫": "피로", "😔": "우울", "😡": "화남"}
+        db_emotion_text = reverse_emoji_map.get(selected_emotion, selected_emotion)
+
+        dummy_temperature = round(random.uniform(21.0, 26.0), 1)
+        dummy_humidity = round(random.uniform(40.0, 60.0), 1)
+        
+        new_diary = models.DiaryLog(
+            user_id=user_id,
+            selected_emotion=db_emotion_text,
+            diary_content=diary_content,
+            image_path=saved_image_path,
+            temperature_ambient=dummy_temperature,
+            humidity_ambient=dummy_humidity,
+            weather_ambient=weather_desc           
+        )
+        if date:
+            new_diary.recorded_at = datetime.strptime(date, "%Y-%m-%d")
+
+        db.add(new_diary)
+        db.flush()
+
+        if detected_emotion:
+            new_analysis = models.AiAnalysisResult(diary_id=new_diary.diary_id, detected_emotion=detected_emotion)
+            db.add(new_analysis)
+
+        db.commit()
+        return {"status": "Success", "message": "성공적으로 저장되었습니다."}
+    except Exception as e:
+        db.rollback() 
+        return {"status": "Error", "message": str(e)}
+
+@app.get("/api/diary/logs/{user_id}")
+def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
+        keyword_to_emoji = {"행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐", "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"}
+        result = []
+        for log in logs:
+            date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
+            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
+            display_mood = keyword_to_emoji.get(log.selected_emotion, "😐")
+            result.append({
+                "id": log.diary_id,
+                "date": date_str,
+                "mood": display_mood,
+                "content": log.diary_content,
+                "images": img_list,
+                "type": "daily" 
+            })
+        return {"status": "Success", "entries": result}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+
+# =====================================================================
+# 💬 7. 커뮤니티 API (게시글 & 댓글)
+# =====================================================================
+@app.get("/api/community/posts")
+def get_community_posts(db: Session = Depends(database.get_db)):
+    try:
+        results = db.query(
+            models.CommunityPost,
+            models.User.name,
+            models.User.role,
+            models.User.pregnancy_start_date,
+            func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(
+            models.User, models.CommunityPost.user_id == models.User.id
+        ).outerjoin(
+            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
+        ).group_by(models.CommunityPost.post_id, models.User.id).order_by(models.CommunityPost.created_at.desc()).all()
+        
+        posts = []
+        for post, user_name, user_role, preg_date, count in results:
+            posts.append({
+                "post_id": post.post_id,
+                "user_id": post.user_id,
+                "pregnancy_period": post.pregnancy_period,
+                "title": post.title,
+                "content": post.content,
+                "created_at": post.created_at,
+                "author": user_name or "익명",
+                "role": user_role,
+                "comment_count": count
+            })
+        return {"status": "Success", "posts": posts}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+@app.post("/api/community/posts")
+def create_community_post(post: PostCreate, db: Session = Depends(database.get_db)):
+    new_post = models.CommunityPost(
+        user_id=post.user_id,
+        pregnancy_period=post.pregnancy_period,
+        title=post.title,
+        content=post.content
+    )
+    db.add(new_post)
+    db.commit()
+    return {"status": "Success"}
+
+@app.delete("/api/community/posts/{post_id}")
+def delete_community_post(post_id: int, db: Session = Depends(database.get_db)):
+    post = db.query(models.CommunityPost).filter(models.CommunityPost.post_id == post_id).first()
+    if not post: raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    db.delete(post)
+    db.commit()
+    return {"status": "Success"}
+
+@app.get("/api/posts/{post_id}/comments")
+def get_post_comments(post_id: int, db: Session = Depends(database.get_db)):
+    try:
+        comments = db.query(
+            models.CommunityComment, models.User.name, models.User.role, models.User.pregnancy_start_date
+        ).outerjoin(
+            models.User, models.CommunityComment.user_id == models.User.id
+        ).filter(models.CommunityComment.post_id == post_id).order_by(models.CommunityComment.created_at.asc()).all()
+
+        result = []
+        for c, user_name, user_role, start_date in comments:
+            result.append({
+                "id": c.comment_id,
+                "user_id": c.user_id,
+                "content": c.content,
+                "created_at": c.created_at,
+                "author_name": user_name or "익명",
+                "author_role": user_role,
+                "pregnancy_start_date": str(start_date) if start_date else None
+            })
+        return {"status": "Success", "comments": result}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+@app.post("/api/posts/{post_id}/comments")
+def create_post_comment(post_id: int, comment_data: CommentCreate, db: Session = Depends(database.get_db)):
+    try:
+        new_comment = models.CommunityComment(
+            post_id=post_id,
+            user_id=comment_data.user_id,
+            content=comment_data.content
+        )
+        db.add(new_comment)
+        db.commit()
+        return {"status": "Success"}
+    except Exception as e:
+        db.rollback()
+        return {"status": "Error", "message": str(e)}
+
+@app.delete("/api/comments/{comment_id}")
+def delete_comment(comment_id: int, user_id: int, db: Session = Depends(database.get_db)):
+    comment = db.query(models.CommunityComment).filter(models.CommunityComment.comment_id == comment_id).first()
+    if not comment: raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    if comment.user_id != user_id: raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    db.delete(comment)
+    db.commit()
+    return {"status": "Success"}
+
+
+# =====================================================================
+# 📊 8. 마이페이지 (내 활동 내역) API
+# =====================================================================
+@app.get("/api/community/posts/count/{user_id}")
+def get_community_posts_count(user_id: int, db: Session = Depends(database.get_db)):
+    count = db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).count()
+    return {"status": "Success", "count": count}
+
+@app.get("/api/community/comments/count/{user_id}")
+def get_community_comments_count(user_id: int, db: Session = Depends(database.get_db)):
+    count = db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).count()
+    return {"status": "Success", "count": count}
+
+@app.get("/api/community/my-posts/{user_id}")
+def get_my_posts(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        results = db.query(
+            models.CommunityPost, models.User.name.label("author_name"), models.User.role.label("author_role"), func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(models.User, models.CommunityPost.user_id == models.User.id)\
+         .outerjoin(models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id)\
+         .filter(models.CommunityPost.user_id == user_id)\
+         .group_by(models.CommunityPost.post_id, models.User.id).order_by(models.CommunityPost.created_at.desc()).all()
+
+        posts = []
+        for post, author_name, author_role, count in results:
+            posts.append({
+                "post_id": post.post_id, "user_id": post.user_id, "pregnancy_period": post.pregnancy_period,
+                "title": post.title, "content": post.content, "created_at": post.created_at,
+                "author": author_name or "익명", "role": author_role, "comment_count": count
+            })
+        return {"status": "Success", "posts": posts}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+@app.get("/api/community/my-comments/{user_id}")
+def get_my_commented_posts(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        subquery = db.query(models.CommunityComment.post_id).filter(models.CommunityComment.user_id == user_id).distinct().subquery()
+        results = db.query(
+            models.CommunityPost, models.User.name.label("author_name"), models.User.role.label("author_role"), func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(models.User, models.CommunityPost.user_id == models.User.id)\
+         .outerjoin(models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id)\
+         .filter(models.CommunityPost.post_id.in_(subquery))\
+         .group_by(models.CommunityPost.post_id, models.User.id).order_by(models.CommunityPost.created_at.desc()).all()
+
+        posts = []
+        for post, author_name, author_role, count in results:
+            posts.append({
+                "post_id": post.post_id, "user_id": post.user_id, "pregnancy_period": post.pregnancy_period,
+                "title": post.title, "content": post.content, "created_at": post.created_at,
+                "author": author_name or "익명", "role": author_role, "comment_count": count
+            })
+        return {"status": "Success", "comments": posts} 
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+
+# =====================================================================
+# 📅 9. 캘린더 (일정 관리) API
+# =====================================================================
+@app.get("/api/calendar/events/{connection_code}")
+def get_calendar_events(connection_code: str, db: Session = Depends(database.get_db)):
+    if not connection_code or connection_code == "None":
+        return {"status": "Success", "events": []}
+    events = db.query(models.SharedCalendarEvent).filter(models.SharedCalendarEvent.connection_code == connection_code).all()
+    result = [{"event_id": e.event_id, "event_type": e.event_type, "title": e.title, "content": e.content, "event_date": str(e.event_date)} for e in events]
+    return {"status": "Success", "events": result}
+
+@app.post("/api/calendar/events")
+def create_calendar_event(event: EventCreate, db: Session = Depends(database.get_db)):
+    new_event = models.SharedCalendarEvent(
+        connection_code=event.connection_code, event_type=event.event_type,
+        title=event.title, content=event.content, event_date=event.event_date
+    )
+    db.add(new_event)
+    db.commit()
+    return {"status": "Success"}
+
+@app.delete("/api/calendar/events/{event_id}")
+def delete_calendar_event(event_id: int, db: Session = Depends(database.get_db)):
+    event = db.query(models.SharedCalendarEvent).filter(models.SharedCalendarEvent.event_id == event_id).first()
+    if not event: raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다.")
+    db.delete(event)
+    db.commit()
+    return {"status": "Success"}
+
+@app.get("/api/calendar/checkups/{connection_code}")
+def get_checkup_dates(connection_code: str, db: Session = Depends(database.get_db)):
+    try:
+        today = date.today()
+        hospital_types = ["hospital", "ultrasound", "clinic"]
+        events = db.query(models.SharedCalendarEvent).filter(
+            models.SharedCalendarEvent.connection_code == connection_code,
+            models.SharedCalendarEvent.event_type.in_(hospital_types)
+        ).all()
+
+        past_events = [e for e in events if e.event_date and e.event_date <= today]
+        future_events = [e for e in events if e.event_date and e.event_date > today]
+
+        recent_event = max(past_events, key=lambda x: x.event_date) if past_events else None
+        next_event = min(future_events, key=lambda x: x.event_date) if future_events else None
+
+        def format_date(d): return f"{d.year}년 {d.month}월 {d.day}일" if d else "등록된 일정 없음"
+
+        return {
+            "status": "Success",
+            "recent_checkup": format_date(recent_event.event_date) if recent_event else "등록된 일정 없음",
+            "next_checkup": format_date(next_event.event_date) if next_event else "등록된 일정 없음"
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+
+# =====================================================================
+# 💬 10. 스몰토크 API
+# =====================================================================
+@app.get("/api/smalltalk/{user_id}")
+def get_smalltalk(user_id: int, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user: raise HTTPException(status_code=404)
+    
+    partner = db.query(models.User).filter(models.User.id == user.parent_user_id).first() if user.parent_user_id else db.query(models.User).filter(models.User.parent_user_id == user.id).first()
+    today_topic = smalltalk_service.get_today_topic(db)
+    
+    my_answer_obj = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.topic_id == today_topic.topic_id, models.SmallTalkAnswer.user_id == user.id).first()
+    partner_answer_obj = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.topic_id == today_topic.topic_id, models.SmallTalkAnswer.user_id == partner.id).first() if partner else None
 
     return {
         "status": "Success",
-        "name": user.name,
-        "baby_nickname": user.baby_nickname,
-        "connection_code": user.connection_code,
-        "partner_code": partner_code,
-        "pregnancy_start_date": pregnant_start_date, # 🚀 추가됨!
-        "connected_name": connected_name             # 🚀 추가됨!
+        "topic": {"topic_id": today_topic.topic_id, "question_text": today_topic.question_text},
+        "my_answer": my_answer_obj.answer_content if my_answer_obj else None,
+        "partner_name": partner.name if partner else "파트너",
+        "is_partner_answered": bool(partner_answer_obj),
+        "partner_answer": partner_answer_obj.answer_content if (my_answer_obj and partner_answer_obj) else None
     }
+    
+@app.post("/api/smalltalk/answer")
+def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.id == ans.user_id).first()
+    new_ans = models.SmallTalkAnswer(
+        topic_id=ans.topic_id, user_id=ans.user_id,
+        connection_code=user.connection_code if user.connection_code else "DEMO_CODE",
+        answer_content=ans.answer_content
+    )
+    db.add(new_ans)
+    db.commit()
+    return {"status": "Success"}

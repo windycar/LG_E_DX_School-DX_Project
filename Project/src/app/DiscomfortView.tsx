@@ -99,6 +99,7 @@ function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
     </div>
   );
 }
+
 export default function DiscomfortView({
   user,
   onBack,
@@ -167,8 +168,9 @@ export default function DiscomfortView({
   const toggleArr = (arr: string[], val: string, set: (v: string[]) => void) =>
     set(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);
 
+  // 🚀 수정 포인트 1: key의 타입을 string에서 ApplianceKey로 변경하여 안전성 확보!
   const getRecs = () => {
-    const map: Record<string, { key: string; name: string; action: string; icon: string; reason: string }> = {};
+    const map: Record<string, { key: ApplianceKey; name: string; action: string; icon: string; reason: string }> = {};
     if (selSymptoms.includes("입덧")) {
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "냄새 차단으로 입덧 완화" };
       map.aircon = { key: "aircon", name: "에어컨", action: "18~20℃ 냉방", icon: "❄️", reason: "시원한 공기로 열기 차단" };
@@ -191,9 +193,10 @@ export default function DiscomfortView({
     return Object.values(map);
   };
 
+  // 🚀 수정 포인트 2: as ApplianceKey를 명시하여 TS에게 에러를 내지 않도록 지시!
   const handleSubmit = () => {
     const next = { ...appliances };
-    getRecs().forEach((r) => { next[r.key] = true; });
+    getRecs().forEach((r) => { next[r.key as ApplianceKey] = true; });
     const nextSettings = { ...applianceSettings };
     Object.keys(next).forEach((key) => {
       nextSettings[key as ApplianceKey] = { ...nextSettings[key as ApplianceKey], power: next[key as ApplianceKey] };
@@ -213,7 +216,7 @@ export default function DiscomfortView({
     }
   };
 
-  const APPLIANCE_LIST = [
+  const APPLIANCE_LIST: { key: ApplianceKey; name: string; icon: string }[] = [
     { key: "moodLight", name: "무드등", icon: "💡" },
     { key: "aircon", name: "에어컨", icon: "❄️" },
     { key: "humidifier", name: "가습기", icon: "💧" },
@@ -221,7 +224,7 @@ export default function DiscomfortView({
     { key: "airPurifier", name: "공기청정기", icon: "💨" },
   ];
 
-  const getApplianceStatus = (key: string) => {
+  const getApplianceStatus = (key: ApplianceKey) => {
     const settings = applianceSettings[key];
     if (!settings) return "설정 없음";
     switch (key) {
@@ -678,5 +681,3 @@ export default function DiscomfortView({
     </div>
   );
 }
-
-// ── MENTAL CARE VIEW ───────────────────────────────────────────────────────
