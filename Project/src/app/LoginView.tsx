@@ -97,13 +97,6 @@ export default function LoginView({
             {loading ? "로그인 중..." : "로그인"}
           </button>
 
-          <div className="pt-2 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center mb-3">데모 계정으로 빠른 로그인</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setEmail("mom@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors">🤰 임산부 계정</button>
-              <button onClick={() => { setEmail("dad@demo.kr"); setPassword("1234"); }} className="text-xs py-2 px-2 rounded-lg border border-border text-muted-foreground transition-colors hover:border-purple-500 hover:text-purple-500">👨 보호자 계정</button>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-6">

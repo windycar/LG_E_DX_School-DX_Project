@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date
+from sqlalchemy import DECIMAL, Column, Integer, String, Date
 from database import Base
 from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.sql import func
@@ -75,3 +75,29 @@ class SharedCalendarEvent(Base):
     content = Column(Text)           # 일정 상세 내용
     event_date = Column(Date)        # 일정 날짜
     created_at = Column(DateTime, default=func.now())  
+
+
+# models.py 내 테이블 정의 확인/추가
+
+class DiaryLog(Base):
+    __tablename__ = "DIARY_LOGS"
+    diary_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("USERS.user_id"))
+    temperature_ambient = Column(DECIMAL(4,2), nullable=True)
+    humidity_ambient = Column(DECIMAL(4,2), nullable=True)
+    weather_ambient = Column(String(50), nullable=True)
+    selected_emotion = Column(String(50))
+    stress_level = Column(Integer, nullable=True)
+    diary_content = Column(Text)
+    small_talk_topic_id = Column(Integer, nullable=True)
+    recorded_at = Column(DateTime, default=func.now())
+    image_path = Column(String(255), nullable=True)
+class AiAnalysisResult(Base):
+    __tablename__ = "AI_ANALYSIS_RESULTS"
+    analysis_id = Column(Integer, primary_key=True, index=True)
+    diary_id = Column(Integer, ForeignKey("DIARY_LOGS.diary_id"), unique=True)
+    detected_emotion = Column(String(50))
+    analyzed_at = Column(DateTime, default=func.now())
+
+
+

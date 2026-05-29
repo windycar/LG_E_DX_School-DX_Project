@@ -554,27 +554,9 @@ function HomeView({
           transition={{ delay: 0.6 }}
           className="mt-8 text-center"
         >
-          <p className="text-xs text-muted-foreground mb-3">데모 계정으로 빠른 체험</p>
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={() => onDemoLogin("pregnant")}
-              className="text-xs px-4 py-2 rounded-full border-2 transition-all hover:text-white"
-              style={{ borderColor: "#C94E70", color: "#C94E70" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#C94E70"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              🤰 임산부 계정
-            </button>
-            <button
-              onClick={() => onDemoLogin("guardian")}
-              className="text-xs px-4 py-2 rounded-full border-2 transition-all hover:text-white"
-              style={{ borderColor: "#7B68B5", color: "#7B68B5" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#7B68B5"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              👨 보호자 계정
-            </button>
-          </div>
+          
+        
+            
         </motion.div>
       </div>
 
@@ -1276,7 +1258,7 @@ function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: 
       <PageHeader title="정신 케어" onBack={onBack} />
 
       <div className="flex border-b border-border overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {([["today", "오늘의 감정"], ["report", "주간 리포트"], ["content", "추천 콘텐츠"]] as const).map(([t, label]) => (
+        {([["report", "주간 리포트"], ["content", "추천 콘텐츠"]] as const).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -1292,44 +1274,8 @@ function MentalCareView({ user, onBack, onNavigate }: { user?: AppUser; onBack: 
       </div>
 
       <div className="px-5 py-6 flex-1 overflow-y-auto pb-20">
-        {tab === "today" && (
-          <div className="space-y-6">
-            <div>
-              <p className="font-semibold text-foreground mb-3">오늘의 감정 일기</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                💡 기분은 입력하신 내용에서 자동으로 분석됩니다
-              </p>
-              <textarea
-                value={journal}
-                onChange={(e) => setJournal(e.target.value)}
-                placeholder="오늘 마음이 어떤지 자유롭게 적어보세요. 여기서는 모든 감정이 유효해요 💙"
-                rows={6}
-                className="w-full px-4 py-3 rounded-2xl border border-border bg-card focus:outline-none focus:border-primary text-sm resize-none leading-relaxed"
-              />
-            </div>
 
-            {!saved ? (
-              <button
-                onClick={() => { if (journal) setSaved(true); }}
-                disabled={!journal}
-                className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95 disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)" }}
-              >
-                오늘의 감정 저장하기
-              </button>
-            ) : (
-              <div
-                className="rounded-2xl p-5 text-center"
-                style={{ background: "rgba(123,104,181,0.08)", border: "1.5px solid rgba(123,104,181,0.2)" }}
-              >
-                <p className="text-2xl mb-2">💙</p>
-                <p className="font-semibold text-foreground">오늘의 감정이 기록되었어요</p>
-                <p className="text-sm text-muted-foreground mt-1">소중한 감정을 나눠주셔서 감사해요</p>
-              </div>
-            )}
-          </div>
-        )}
-
+        
         {tab === "report" && (
           <div className="space-y-6">
             <div>

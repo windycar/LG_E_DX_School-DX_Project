@@ -2,8 +2,6 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 import models, schemas, database
-from fastapi.middleware.cors import CORSMiddleware
-import schemas
 app = FastAPI()
 # backend/main.py
 from fastapi.middleware.cors import CORSMiddleware # 1. 필수 import
@@ -12,10 +10,41 @@ import string
 from database import get_db 
 from pydantic import BaseModel
 import smalltalk_service
+from datetime import date
+import subprocess
+import json
+from sqlalchemy.orm import Session
+import models, database, schemas
+import requests # 🚀 날씨 API 호출을 위해 추가!
 
+import os
+from dotenv import load_dotenv
+import os
+import shutil
+import subprocess
+import requests
+from fastapi import FastAPI, Depends, Form, File, UploadFile # 🚀 Form, File, UploadFile 추가!
+from sqlalchemy.orm import Session
+import models, database
+import os
+import sys
+import importlib
+import json
+import shutil
+import requests
+from fastapi import FastAPI, Depends, Form, File, UploadFile
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+import models, database, schemas
+from dotenv import load_dotenv
+# main.py 상단 라이브러리 임포트 영역에 아래를 추가합니다.
+from fastapi.staticfiles import StaticFiles
 
+# 앱 생성 코드(app = FastAPI()) 바로 아래에 다음 1줄을 추가하여 uploads 폴더를 웹에 개방합니다.
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# 2. CORS 정책 설정 (이게 있어야 브라우저가 통신을 허용합니다)
+load_dotenv()
+# CORS 정책 설정 (이게 있어야 브라우저가 통신을 허용합니다)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # 모든 도메인에서의 접속을 허용
@@ -23,10 +52,320 @@ app.add_middleware(
     allow_methods=["*"], # 모든 통신 방식 허용
     allow_headers=["*"], # 모든 헤더 허용
 )
-# 설정 만들기
 
-from pydantic import BaseModel
-from datetime import date
+os.makedirs("uploads", exist_ok=True)
+
+# 🚀 [API 1] AI 감정 분석 (프론트에서 버튼 누를 때 실행)
+# =====================================================================
+print("🚀 AI 감정 분석 모델을 메모리에 적재 중입니다...")
+
+# diary_emotion_ai/scripts 폴더를 파이썬 모듈 경로에 강제 추가
+ai_scripts_path = os.path.abspath("../diary_emotion_ai/scripts")
+if ai_scripts_path not in sys.path:
+    sys.path.append(ai_scripts_path)
+
+# 숫자로 시작하는 파이썬 파일을 동적으로 Import
+# =====================================================================
+# 🚀 [DX 혁신] AI 감정 분석 모델 In-Memory 단일 적재 (경로 자동 추적기 탑재)
+# =====================================================================
+print("🚀 AI 감정 분석 모델을 메모리에 적재 중입니다...")
+
+# 현재 백엔드 폴더(main.py 위치)와 최상단 루트 폴더 계산
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+
+# 마이 로드의 폴더 구조를 모두 탐색하여 AI 스크립트 폴더를 찾아냅니다!
+possible_paths = [
+    os.path.join(ROOT_DIR, "Project", "diary_emotion_ai", "scripts"), # 마이로드 탐색기 구조
+    os.path.join(ROOT_DIR, "diary_emotion_ai", "scripts")             # 기본 예비 구조
+]
+
+ai_scripts_path = None
+for p in possible_paths:
+    if os.path.exists(p):
+        ai_scripts_path = p
+        break
+
+if ai_scripts_path:
+    if ai_scripts_path not in sys.path:
+        sys.path.append(ai_scripts_path)
+    try:
+        diary_ai = importlib.import_module("03_predict_diary_emotion")
+        AI_MODEL = json.loads(diary_ai.MODEL_PATH.read_text(encoding="utf-8"))
+        print("✅ AI 모델 적재 완료! (추론 대기 상태)")
+    except Exception as e:
+        print(f"❌ AI 모델 로드 실패: {e}")
+else:
+    print(f"❌ AI 스크립트 경로를 찾지 못했습니다. 폴더 구조를 확인해주세요. (현재 검색 경로: {possible_paths})")
+
+# =====================================================================
+
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 주소 허용 (실무에서는 ["http://localhost:5173"] 등으로 지정)
+    allow_credentials=True,
+    allow_methods=["*"],  # POST, GET, OPTIONS 등 모든 방식 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+os.makedirs("uploads", exist_ok=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class EmotionRequest(BaseModel):
+    text: str
+# -------------------------------------------------------------------
+# 🤖 [API 1] AI 감정 분석 (In-Memory Direct Call - 응답속도 0.05초)
+# -------------------------------------------------------------------
+@app.post("/api/ai/emotion")
+def analyze_diary_emotion(req: schemas.EmotionRequest):
+    if not req.text.strip():
+        return {"status": "Error", "message": "텍스트가 없습니다."}
+
+    try:
+        # 💡 subprocess 폐기! 메모리에 올라간 마이 로드의 predict 함수를 즉각 호출합니다.
+        # 반환값인 prediction에는 문자열(예: "화남", "행복")이 정확히 떨어집니다.
+        prediction, probabilities = diary_ai.predict(AI_MODEL, req.text)
+        
+        emoji_map = {
+            "행복": "😊", "안정": "🙂", "설렘": "🥰", 
+            "중립": "😐", "불안": "😟", "피로": "😫", 
+            "우울": "😔", "화남": "😡"
+        }
+        
+        return {
+            "status": "Success", 
+            "emotion_label": prediction,
+            "emoji": emoji_map.get(prediction, "😐")
+        }
+    except Exception as e:
+        print("AI 다이렉트 분석 에러:", e)
+        return {"status": "Error", "message": "서버 내부 AI 엔진 오류가 발생했습니다."}
+    if not req.text.strip():
+        return {"status": "Error", "message": "텍스트가 없습니다."}
+
+    try:
+        # 💡 [주의] 이 경로가 백엔드 폴더(backend) 기준으로 정확해야 합니다!
+        script_path = "../diary_emotion_ai/scripts/03_predict_diary_emotion.py"
+        
+        # 파이썬 스크립트 실행
+        result = subprocess.run(
+            ["python", script_path, req.text], 
+            capture_output=True, text=True, encoding='utf-8'
+        )
+        
+        output = result.stdout.strip()
+        error_output = result.stderr.strip() # 에러 로그 캡처
+        
+        # 🔥 마이 로드, 백엔드 검은 창에 뜨는 이 로그를 반드시 확인하십시오! 🔥
+        print(f"=== 🤖 AI 분석 결과 로그 ===")
+        print(f"입력문장: {req.text}")
+        print(f"정상출력(stdout): {output}")
+        print(f"에러출력(stderr): {error_output}")
+        print(f"=============================")
+
+        predicted_label = "중립" 
+        emotions = ["행복", "안정", "설렘", "중립", "불안", "피로", "우울", "화남"]
+        for e in emotions:
+            if e in output: # 스크립트가 뱉은 글자 중에 감정 단어가 있으면 교체!
+                predicted_label = e
+                break
+                
+        emoji_map = {"행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐", "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"}
+        
+        return {"status": "Success", "emotion_label": predicted_label, "emoji": emoji_map.get(predicted_label, "😐")}
+    except Exception as e:
+        print("AI 실행 자체 에러:", e)
+        return {"status": "Error", "message": str(e)}
+
+# -------------------------------------------------------------------
+# 💾 [API 2] 다이어리 + 사진 + 날씨 DB 저장 API (Form 데이터 방식)
+# -------------------------------------------------------------------
+# 🚀 2. 다이어리 저장 API 교체 (날짜 지정 기능 추가!)
+@app.post("/api/diary/logs")
+def create_diary_log(
+    user_id: int = Form(...),
+    selected_emotion: str = Form(...),
+    diary_content: str = Form(...),
+    detected_emotion: str = Form(None),
+    image: UploadFile = File(None),
+    date: str = Form(None), # 🗓️ 프론트엔드에서 선택한 날짜를 받습니다!
+    db: Session = Depends(database.get_db)
+):
+    try:
+        saved_image_path = None
+        if image:
+            saved_image_path = f"uploads/{image.filename}"
+            with open(saved_image_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+
+        # ---------------------------------------------------------
+        # ⛅ 1. 날씨 API 가져오기 (.env 파일 수정하셨으니 이제 잘 될 겁니다!)
+        # ---------------------------------------------------------
+        WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+        city = "Seoul"
+        weather_desc = "알 수 없음"
+        if WEATHER_API_KEY:
+            weather_url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&lang=kr"
+            res = requests.get(weather_url)
+            if res.status_code == 200:
+                weather_desc = res.json()['weather'][0]['description']
+            else:
+                print(f"⛅ 날씨 API 에러: {res.status_code} - {res.text}")
+
+        # ---------------------------------------------------------
+        # 📝 2. 이모지 -> 텍스트 키워드 변환 (😊 -> 행복)
+        # ---------------------------------------------------------
+        reverse_emoji_map = {
+            "😊": "행복", "🙂": "안정", "🥰": "설렘", "😐": "중립",
+            "😟": "불안", "😫": "피로", "😔": "우울", "😡": "화남"
+        }
+        db_emotion_text = reverse_emoji_map.get(selected_emotion, selected_emotion)
+
+        # ---------------------------------------------------------
+        # 🌡️ 3. 가전 센서 온습도 랜덤 생성기 (21~26도 / 40~60%)
+        # ---------------------------------------------------------
+        dummy_temperature = round(random.uniform(21.0, 26.0), 1)
+        dummy_humidity = round(random.uniform(40.0, 60.0), 1)
+        
+        # 4. DB 테이블에 데이터 맵핑
+        new_diary = models.DiaryLog(
+            user_id=user_id,
+            selected_emotion=db_emotion_text,   # 🚀 변환된 텍스트('행복' 등) 저장!
+            diary_content=diary_content,
+            image_path=saved_image_path,
+            temperature_ambient=dummy_temperature, # 🚀 랜덤 온도 저장!
+            humidity_ambient=dummy_humidity,       # 🚀 랜덤 습도 저장!
+            weather_ambient=weather_desc           
+        )
+        
+        # 🔥 유저가 날짜를 선택해서 보냈다면, DB의 시간을 그 날짜로 덮어씁니다!
+        if date:
+            new_diary.recorded_at = datetime.strptime(date, "%Y-%m-%d")
+
+        db.add(new_diary)
+        db.flush()
+
+        if detected_emotion:
+            new_analysis = models.AiAnalysisResult(
+                diary_id=new_diary.diary_id,
+                detected_emotion=detected_emotion
+            )
+            db.add(new_analysis)
+
+        db.commit()
+        return {"status": "Success", "message": "성공적으로 저장되었습니다."}
+        
+    except Exception as e:
+        db.rollback() 
+        return {"status": "Error", "message": str(e)}
+
+# 🚀 3. 내 일기 불러오기 API가 잘 있는지 확인! (안 보였던 이유 해결)
+# 🚀 [API 3] 내 다이어리 목록 불러오기 (DB 텍스트 -> 프론트 이모지 변환 탑재)
+@app.get("/api/diary/logs/{user_id}")
+def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
+        
+        # ---------------------------------------------------------
+        # 📝 텍스트(DB) -> 이모지(화면) 강제 변환기
+        # ---------------------------------------------------------
+        keyword_to_emoji = {
+            "행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐",
+            "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"
+        }
+        
+        result = []
+        for log in logs:
+            date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
+            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
+
+            # 🚀 DB에 저장된 '행복'을 꺼내 다시 '😊'로 바꿔줍니다. (매칭 안되면 기본 😐)
+            display_mood = keyword_to_emoji.get(log.selected_emotion, "😐")
+
+            result.append({
+                "id": log.diary_id,
+                "date": date_str,
+                "mood": display_mood, # 🚀 프론트엔드에는 이모지로 날아갑니다!
+                "content": log.diary_content,
+                "images": img_list,
+                "type": "daily" 
+            })
+            
+        return {"status": "Success", "entries": result}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+    try:
+        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).order_by(models.DiaryLog.recorded_at.desc()).all()
+        result = []
+        for log in logs:
+            # 시간까지 나오는 DB 데이터를 'YYYY-MM-DD' 날짜만 나오게 깔끔하게 자름
+            date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
+            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
+
+            result.append({
+                "id": log.diary_id,
+                "date": date_str,
+                "mood": log.selected_emotion,
+                "content": log.diary_content,
+                "images": img_list,
+                "type": "daily" 
+            })
+        return {"status": "Success", "entries": result}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # 일정 등록용 데이터 검증 스키마
 class EventCreate(BaseModel):

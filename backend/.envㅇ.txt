@@ -1,0 +1,2 @@
+# backend/.env 파일 안에 이렇게 딱 한 줄만 적습니다. (따옴표나 띄어쓰기 절대 금지!)
+WEATHER_API_KEY=737f6519f2db2f040100e60bb7669ba5

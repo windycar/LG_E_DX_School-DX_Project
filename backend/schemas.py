@@ -35,3 +35,11 @@ class ProfileUpdate(BaseModel):
 class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
+class EmotionRequest(BaseModel):
+    text: str
+
+class DiaryLogCreate(BaseModel):
+    user_id: int
+    selected_emotion: str
+    diary_content: str
+    detected_emotion: Optional[str] = None  # AI 분석 결과 (없을 수도 있으므로 Optional)

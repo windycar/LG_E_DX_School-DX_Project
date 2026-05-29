@@ -3,6 +3,7 @@ import { Plus, X, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { AppUser, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App";
+import DiaryEntryForm from "./DiaryEntryForm";
 
 const EVENT_TYPES = [
   { id: "hospital", label: "🏥 산부인과", color: "#7B68B5", bg: "rgba(123,104,181,0.1)" },
@@ -21,7 +22,11 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
 
   const [connectionCode, setConnectionCode] = useState<string | null>(null);
   const [events, setEvents] = useState<any[]>([]); 
+  
+  // 🚀 이제 가짜 데이터가 아니라 빈 배열([])로 시작합니다!
+  const [entries, setEntries] = useState<any[]>([]);
 
+  // 1. 유저 정보 & 연동 코드 가져오기
   useEffect(() => {
     if (!identifier) return;
     fetch(`http://localhost:8000/api/user/info/${identifier}`)
@@ -34,6 +39,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       .catch(e => console.error("유저 정보 로드 실패:", e));
   }, [identifier, isPregnant]);
 
+  // 2. 캘린더 공유 일정 불러오기
   const fetchEvents = () => {
     if (!connectionCode || connectionCode === "None") return;
     fetch(`http://localhost:8000/api/calendar/events/${connectionCode}`)
@@ -45,32 +51,32 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       });
   };
 
+  // 🚀 3. DB에서 내 다이어리 일지 쫙 긁어오기 함수!
+  const fetchEntries = () => {
+    if (!userId) return;
+    fetch(`http://localhost:8000/api/diary/logs/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "Success" && Array.isArray(data.entries)) {
+          setEntries(data.entries); // DB 데이터를 화면에 꽂아 넣습니다!
+        }
+      })
+      .catch(e => console.error("일기 목록 로드 실패:", e));
+  };
+
   useEffect(() => { fetchEvents(); }, [connectionCode]);
-
-  // 🚀 진짜 달력처럼 월 이동을 위한 상태 추가!
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-
-  const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
   
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
+  // 화면이 켜지거나 로그인 정보가 있을 때 내 일기를 가져옵니다.
+  useEffect(() => { fetchEntries(); }, [userId]);
+
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [entries, setEntries] = useState<any[]>([
-    { id: 1, date: "2026-05-26", mood: "😊", content: "오늘 태동을 많이 느꼈어요. 아기가 건강한 것 같아 행복합니다.", images: [], type: "daily", letter: null },
-    { id: 2, date: "2026-05-25", mood: "😐", content: "허리가 좀 아팠지만 산책하니 괜찮아졌어요.", images: [], type: "daily", letter: null },
-  ]);
+  const [showForm, setShowForm] = useState(false); 
 
-  const [showForm, setShowForm] = useState(false);
-  const [entryType, setEntryType] = useState<"daily" | "ultrasound" | "letter">("daily");
-  const [newContent, setNewContent] = useState("");
-  const [newMood, setNewMood] = useState<string | null>(null);
-  const [weekNumber, setWeekNumber] = useState("");
-
-  const [showEventForm, setShowEventForm] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false); 
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventContent, setNewEventContent] = useState(""); 
@@ -79,34 +85,24 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const MOODS = ["😔", "😟", "😐", "🙂", "😊"];
-
   const addEvent = async () => {
     if (!newEventDate || !newEventTitle.trim()) return;
     if (!connectionCode || connectionCode === "None") {
       alert("부부 연동 상태가 아닙니다. 설정에서 연동 코드를 먼저 연결해 주세요!");
       return;
     }
-
     const payload = {
-      connection_code: connectionCode,
-      event_type: newEventType,
-      title: newEventTitle,
-      content: newEventContent || "상세내용 없음",
-      event_date: newEventDate
+      connection_code: connectionCode, event_type: newEventType,
+      title: newEventTitle, content: newEventContent || "상세내용 없음", event_date: newEventDate
     };
-
     try {
       const res = await fetch("http://localhost:8000/api/calendar/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
       });
       if (res.ok) {
         fetchEvents(); 
         setNewEventDate(""); setNewEventTitle(""); setNewEventContent(""); setNewEventType("hospital");
         setShowEventForm(false);
-        // 🚀 일정 등록 시 해당 달로 달력 이동
         setCurrentMonth(new Date(newEventDate));
       } else { alert("일정 등록 실패"); }
     } catch (e) { alert("서버 통신 오류"); }
@@ -116,34 +112,24 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
     if (!selectedEvent.event_date || !selectedEvent.title.trim()) return;
     try {
       const res = await fetch(`http://localhost:8000/api/calendar/events/${selectedEvent.event_id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          event_type: selectedEvent.event_type,
-          title: selectedEvent.title,
-          content: selectedEvent.content || "상세내용 없음",
-          event_date: selectedEvent.event_date
+          event_type: selectedEvent.event_type, title: selectedEvent.title,
+          content: selectedEvent.content || "상세내용 없음", event_date: selectedEvent.event_date
         })
       });
-      if (res.ok) {
-        fetchEvents();
-        setIsEditing(false);
-      } else { alert("일정 수정 실패"); }
+      if (res.ok) { fetchEvents(); setIsEditing(false); } else { alert("일정 수정 실패"); }
     } catch (e) { alert("서버 통신 오류"); }
   };
 
   const deleteEvent = async (eventId: number) => {
-    if (!window.confirm("이 일정을 정말 삭제하시겠습니까? (부부 캘린더에서 함께 삭제됩니다)")) return;
+    if (!window.confirm("이 일정을 정말 삭제하시겠습니까?")) return;
     try {
       const res = await fetch(`http://localhost:8000/api/calendar/events/${eventId}`, { method: "DELETE" });
-      if (res.ok) {
-        fetchEvents();
-        setSelectedEvent(null);
-      } else { alert("일정 삭제 실패"); }
+      if (res.ok) { fetchEvents(); setSelectedEvent(null); } else { alert("일정 삭제 실패"); }
     } catch (e) { alert("서버 통신 오류"); }
   };
 
-  // 🚀 달력 렌더링 로직 (현재 보고 있는 달 currentMonth 기준으로 계산)
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -165,23 +151,6 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
     return days;
   };
 
-  const addEntry = () => {
-    if (!newContent.trim()) return;
-    const today = new Date().toISOString().split("T")[0];
-    const newEntry: any = {
-      id: Date.now(),
-      date: today,
-      mood: newMood || "😊",
-      content: newContent,
-      images: [],
-      type: entryType,
-      letter: entryType === "letter" ? newContent : null,
-    };
-    if (entryType === "ultrasound" && weekNumber) newEntry.weekNumber = parseInt(weekNumber);
-    setEntries((prev) => [newEntry, ...prev]);
-    setNewContent(""); setNewMood(null); setWeekNumber(""); setEntryType("daily"); setShowForm(false);
-  };
-
   const filteredEntries = selectedDate ? entries.filter((e) => e.date === selectedDate) : entries;
   const filteredEvents = selectedDate ? events.filter((e) => e.event_date === selectedDate) : events;
 
@@ -200,8 +169,8 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           </button>
         </div>
 
+        {/* 달력 영역 */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          {/* 🚀 월 이동이 가능한 진짜 달력 헤더! */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <button onClick={prevMonth} className="p-1 hover:bg-secondary rounded-full transition-colors active:scale-95">
@@ -214,7 +183,6 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                 <ChevronRight size={18} className="text-muted-foreground" />
               </button>
             </div>
-            
             <button onClick={() => setShowEventForm(true)} className="text-xs px-3 py-1.5 rounded-lg font-bold" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}>
               + 일정
             </button>
@@ -228,28 +196,47 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           <div className="grid grid-cols-7 gap-1">
             {getDaysInMonth().map((item, i) => {
               if (!item) return <div key={`empty-${i}`} className="aspect-square" />;
+              
+              // 🚀 일정이나 다이어리(이모지)가 하나라도 있는지 체크!
+              const hasSchedule = item.events.length > 0 || item.mood;
+              const isSelected = selectedDate === item.date;
+
               return (
                 <button
                   key={`day-${i}`}
-                  onClick={() => setSelectedDate(selectedDate === item.date ? null : item.date)}
-                  className="aspect-square flex flex-col items-center justify-center rounded-lg text-xs transition-colors relative"
+                  onClick={() => setSelectedDate(isSelected ? null : item.date)}
+                  className="aspect-square flex flex-col items-center p-1 rounded-xl transition-all relative"
                   style={{
-                    background: selectedDate === item.date ? "rgba(201,78,112,0.1)" : "transparent",
-                    border: selectedDate === item.date ? "1.5px solid #C94E70" : "1px solid transparent",
-                    color: "var(--foreground)",
+                    background: isSelected ? "rgba(201,78,112,0.05)" : "transparent",
                   }}
                 >
-                  <span className="font-medium">{item.day}</span>
-                  {item.mood && <span className="text-base">{item.mood}</span>}
+                  {/* 1. 상단: 날짜 */}
+                  <div 
+                    className="mt-0.5 flex items-center justify-center w-[22px] h-[22px] rounded-md transition-colors"
+                    style={{
+                      // 🚀 일정이 있을 때만 예쁜 분홍색 얇은 선! 선택하면 색상 채우기!
+                      border: hasSchedule && !isSelected ? "1px solid #C94E70" : "1px solid transparent",
+                      backgroundColor: isSelected ? "#C94E70" : "transparent",
+                      color: isSelected ? "#FFFFFF" : "var(--foreground)",
+                    }}
+                  >
+                    <span className="font-bold text-[11px] leading-none mt-[1px]">
+                      {item.day}
+                    </span>
+                  </div>
                   
-                  {item.events.length > 0 && (
-                    <div className="absolute bottom-1 flex gap-0.5 justify-center w-full">
-                      {item.events.slice(0, 3).map((e: any, idx: number) => {
-                        const typeInfo = EVENT_TYPES.find(t => t.id === e.event_type) || EVENT_TYPES[6];
-                        return <span key={`dot-${idx}`} className="w-1.5 h-1.5 rounded-full" style={{ background: typeInfo.color }} />
-                      })}
-                    </div>
-                  )}
+                  {/* 2. 중단: 이모지 (절대 안 겹치게 Flex로 남는 공간 꽉 잡기) */}
+                  <div className="flex-1 flex items-center justify-center w-full">
+                    {item.mood && <span className="text-[17px] leading-none drop-shadow-sm">{item.mood}</span>}
+                  </div>
+                  
+                  {/* 3. 하단: 일정 점 (바닥에 얌전히 고정) */}
+                  <div className="h-1.5 w-full flex justify-center items-center gap-[3px] mb-0.5">
+                    {item.events.length > 0 && item.events.slice(0, 3).map((e: any, idx: number) => {
+                      const typeInfo = EVENT_TYPES.find(t => t.id === e.event_type) || EVENT_TYPES[6];
+                      return <span key={`dot-${idx}`} className="w-[4.5px] h-[4.5px] rounded-full shadow-sm" style={{ background: typeInfo.color }} />
+                    })}
+                  </div>
                 </button>
               );
             })}
@@ -258,7 +245,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       </div>
 
       <div className="px-5 py-5 flex-1 overflow-y-auto">
-        {/* 새 일정 폼 */}
+        {/* 공유 일정 추가 폼 */}
         {showEventForm && (
           <div className="bg-card rounded-2xl p-5 border border-border space-y-4 mb-4 shadow-md">
             <div className="flex items-center justify-between border-b border-border/50 pb-2">
@@ -284,11 +271,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                 <label className="text-[11px] font-semibold text-muted-foreground block mb-2">일정 종류 선택</label>
                 <div className="grid grid-cols-2 gap-2">
                   {EVENT_TYPES.map(type => (
-                    <button
-                      key={type.id} type="button" onClick={() => setNewEventType(type.id)}
-                      className="py-2 px-2 rounded-xl text-[12px] font-bold transition-all text-left flex items-center gap-1.5"
-                      style={{ background: newEventType === type.id ? type.color : "#FCF0F4", color: newEventType === type.id ? "white" : "#888" }}
-                    >
+                    <button key={type.id} type="button" onClick={() => setNewEventType(type.id)} className="py-2 px-2 rounded-xl text-[12px] font-bold transition-all text-left flex items-center gap-1.5" style={{ background: newEventType === type.id ? type.color : "#FCF0F4", color: newEventType === type.id ? "white" : "#888" }}>
                       {type.label}
                     </button>
                   ))}
@@ -301,7 +284,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           </div>
         )}
 
-        {/* 등록된 일정 리스트 */}
+        {/* 공유 일정 리스트 */}
         {(selectedDate ? filteredEvents : events).length > 0 && (
           <div className="mb-6">
             <p className="text-sm font-bold text-foreground mb-3">
@@ -314,27 +297,15 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                 .map((event) => {
                   const typeInfo = EVENT_TYPES.find(t => t.id === event.event_type) || EVENT_TYPES[6];
                   return (
-                    <div 
-                      key={`event-${event.event_id}`} 
-                      onClick={() => setSelectedEvent(event)}
-                      className="bg-white rounded-xl p-3.5 border border-border flex items-center gap-3 shadow-sm cursor-pointer active:scale-[0.98] transition-transform hover:border-primary/50"
-                    >
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: typeInfo.bg }}>
-                        {typeInfo.label.split(" ")[0]}
-                      </div>
+                    <div key={`event-${event.event_id}`} onClick={() => setSelectedEvent(event)} className="bg-white rounded-xl p-3.5 border border-border flex items-center gap-3 shadow-sm cursor-pointer active:scale-[0.98] transition-transform hover:border-primary/50">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: typeInfo.bg }}>{typeInfo.label.split(" ")[0]}</div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: typeInfo.bg, color: typeInfo.color }}>
-                            {typeInfo.label.substring(2)}
-                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: typeInfo.bg, color: typeInfo.color }}>{typeInfo.label.substring(2)}</span>
                           <p className="text-sm font-bold text-foreground">{event.title}</p>
                         </div>
-                        {event.content && event.content !== "상세내용 없음" && (
-                          <p className="text-xs text-muted-foreground/90 mb-1 pl-1 truncate">📝 {event.content}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground font-medium">
-                          {new Date(event.event_date).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" })}
-                        </p>
+                        {event.content && event.content !== "상세내용 없음" && <p className="text-xs text-muted-foreground/90 mb-1 pl-1 truncate">📝 {event.content}</p>}
+                        <p className="text-xs text-muted-foreground font-medium">{new Date(event.event_date).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "short" })}</p>
                       </div>
                     </div>
                   );
@@ -343,37 +314,37 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           </div>
         )}
 
-        {/* 새 일지 폼 */}
+        {/* 🚀 분할된 일기 쓰기 폼 모달 */}
         {showForm && (
-          <div className="bg-card rounded-2xl p-4 border border-border space-y-3 mb-4">
-            <div className="flex gap-2">
-              {[["daily", "일상 기록"], ["ultrasound", "초음파"], ["letter", `${user.babyNickname || "태아"}에게`]].map(([type, label]) => (
-                <button key={type} onClick={() => setEntryType(type as any)} className="flex-1 py-2 rounded-xl text-xs font-medium" style={{ background: entryType === type ? "rgba(201,78,112,0.1)" : "var(--secondary)", border: `1.5px solid ${entryType === type ? "#C94E70" : "transparent"}`, color: entryType === type ? "#C94E70" : "var(--muted-foreground)" }}>{label}</button>
-              ))}
-            </div>
-            
-            {entryType === "daily" && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2 text-center">💡 기분은 자동으로 분석되지만, 직접 선택할 수도 있어요</p>
-                <div className="flex gap-2 justify-center mb-2">
-                  {MOODS.map((m) => (
-                    <button key={m} onClick={() => setNewMood(m)} className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: newMood === m ? "rgba(201,78,112,0.1)" : "var(--secondary)", border: `1.5px solid ${newMood === m ? "#C94E70" : "transparent"}` }}>{m}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {entryType === "ultrasound" && (
-              <input type="number" value={weekNumber} onChange={(e) => setWeekNumber(e.target.value)} placeholder="예: 20주차" className="w-full px-3 py-2 rounded-xl border text-sm" />
-            )}
-            <textarea value={newContent} onChange={(e) => setNewContent(e.target.value)} placeholder="내용을 입력하세요..." rows={4} className="w-full text-sm px-3 py-2 rounded-xl border resize-none" />
-            <div className="flex gap-2">
-              <button onClick={addEntry} className="flex-1 py-2 rounded-xl text-sm font-bold text-white" style={{ background: "#C94E70" }}>저장</button>
-              <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-xl text-sm font-bold border text-muted-foreground">취소</button>
-            </div>
-          </div>
+          <DiaryEntryForm 
+            onClose={() => setShowForm(false)}
+            onSave={async (data) => {
+              const formData = new FormData();
+              formData.append("user_id", userId.toString());
+              formData.append("selected_emotion", data.mood);
+              formData.append("diary_content", data.content);
+              
+              if (data.analyzedEmotion) formData.append("detected_emotion", data.analyzedEmotion);
+              if (data.image) formData.append("image", data.image);
+
+              try {
+                const res = await fetch("http://localhost:8000/api/diary/logs", {
+                  method: "POST", body: formData 
+                });
+                
+                if (res.ok) {
+                  alert("일기와 사진이 성공적으로 저장되었습니다!");
+                  setShowForm(false);
+                  
+                  // 🚀 DB 저장이 끝났으니 목록을 다시 긁어와서 최신 상태로 새로고침!
+                  fetchEntries(); 
+                } else { alert("DB 저장에 실패했습니다."); }
+              } catch (e) { alert("서버 연결 실패!"); }
+            }}
+          />
         )}
 
-        {/* 일지 리스트 영역 */}
+        {/* 내 일지 리스트 영역 */}
         {selectedDate && (
           <div className="mb-3 flex items-center justify-between border-t border-border/50 pt-4 mt-2">
             <p className="text-sm font-bold" style={{ color: "#C94E70" }}>
@@ -394,13 +365,17 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
           ) : (
             filteredEntries.map((entry) => (
               <div key={`entry-${entry.id}`} className="bg-white rounded-2xl p-4 border border-border shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-3">
                   <span className="text-2xl">{entry.mood}</span>
                   <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
-                  {entry.type === "ultrasound" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto" style={{ background: "rgba(105,201,154,0.1)", color: "#69C99A" }}>🔬 {entry.weekNumber}주차 초음파</span>}
-                  {entry.type === "letter" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto" style={{ background: "rgba(255,179,198,0.1)", color: "#FFB3C6" }}>💌 태아에게</span>}
                 </div>
-                <p className="text-sm text-[#444] leading-relaxed">{entry.content}</p>
+                
+                {/* 📸 사진 뿌려주기! */}
+                {entry.images && entry.images.length > 0 && (
+                  <img src={entry.images[0]} alt="diary" className="w-full rounded-xl object-cover aspect-video mb-3 border border-border/50 bg-secondary/30" />
+                )}
+                
+                <p className="text-sm text-[#444] leading-relaxed whitespace-pre-wrap">{entry.content}</p>
               </div>
             ))
           )}
@@ -409,24 +384,16 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       
       <BottomNav current="diary" onNavigate={onNavigate} />
 
-      {/* 🚀 일정 상세 보기 및 수정/삭제 모달 */}
+      {/* 공유 일정 수정 모달 */}
       {selectedEvent && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-5 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
             <div className="px-5 py-4 border-b border-border/50 flex items-center justify-between bg-card">
               <div className="flex items-center gap-2">
-                {isEditing && (
-                  <button onClick={() => setIsEditing(false)} className="p-1 -ml-2 text-muted-foreground">
-                    <ChevronLeft size={20} />
-                  </button>
-                )}
-                <p className="font-bold text-foreground">
-                  {isEditing ? "일정 수정" : "일정 상세"}
-                </p>
+                {isEditing && <button onClick={() => setIsEditing(false)} className="p-1 -ml-2 text-muted-foreground"><ChevronLeft size={20} /></button>}
+                <p className="font-bold text-foreground">{isEditing ? "일정 수정" : "일정 상세"}</p>
               </div>
-              <button onClick={() => { setSelectedEvent(null); setIsEditing(false); }} className="text-muted-foreground hover:bg-secondary p-1 rounded-full">
-                <X size={20} />
-              </button>
+              <button onClick={() => { setSelectedEvent(null); setIsEditing(false); }} className="text-muted-foreground hover:bg-secondary p-1 rounded-full"><X size={20} /></button>
             </div>
 
             <div className="p-5 space-y-4">
@@ -454,9 +421,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                       ))}
                     </div>
                   </div>
-                  <button onClick={updateEvent} className="w-full py-3 mt-2 rounded-xl text-sm font-bold text-white" style={{ background: "#78C9A0" }}>
-                    수정 완료
-                  </button>
+                  <button onClick={updateEvent} className="w-full py-3 mt-2 rounded-xl text-sm font-bold text-white" style={{ background: "#78C9A0" }}>수정 완료</button>
                 </div>
               ) : (
                 <>
@@ -464,9 +429,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                     {(() => {
                       const tInfo = EVENT_TYPES.find(t => t.id === selectedEvent.event_type) || EVENT_TYPES[6];
                       return (
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: tInfo.bg }}>
-                          {tInfo.label.split(" ")[0]}
-                        </div>
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: tInfo.bg }}>{tInfo.label.split(" ")[0]}</div>
                       );
                     })()}
                     <div>
