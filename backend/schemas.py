@@ -35,3 +35,16 @@ class ProfileUpdate(BaseModel):
 class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
+
+
+class ApplianceSettingUpsert(BaseModel):
+    user_id: Optional[int] = None
+    appliance_name: str
+    control_command: str
+    execution_status: str
+    analysis_id: Optional[int] = None
+
+
+class ApplianceSettingsBulkUpsert(BaseModel):
+    user_id: Optional[int] = None
+    settings: list[ApplianceSettingUpsert]

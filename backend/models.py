@@ -64,3 +64,14 @@ class Comment(Base):
     content = Column(String(500))
     # 👇 여기가 핵심입니다! 파이썬 에러가 나지 않는 완벽한 방법
     created_at = Column(DateTime, default=func.now())
+
+
+class ApplianceSetting(Base):
+    __tablename__ = "APPLIANCE_SETTINGS"
+
+    setting_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    analysis_id = Column(BigInteger, nullable=True)
+    user_id = Column(BigInteger, nullable=True, index=True)
+    appliance_name = Column(String(50), nullable=False)
+    control_command = Column(Text, nullable=False)
+    execution_status = Column(String(20), nullable=False, default="OFF")
