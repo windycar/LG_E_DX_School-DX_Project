@@ -110,6 +110,9 @@ app.add_middleware(
 )
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 os.makedirs("uploads", exist_ok=True)
+class CommentCreate(BaseModel):
+    user_id: int
+    content: str
 
 
 
@@ -336,14 +339,195 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
     except Exception as e:
         return {"status": "Error", "message": str(e)}
     
+# 🚀 [API 4] COMMUNITY_POSTS 개수 조회 API
+@app.get("/api/community/posts/count/{user_id}")
+def get_community_posts_count(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        # 내 user_id로 작성된 전체 게시글 수를 카운트합니다
+        count = db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).count()
+        return {"status": "Success", "count": count}
+    except Exception as e:
+        return {"status": "Success", "count": 0, "note": f"아직 테이블이 없거나 에러: {str(e)}"}
+
+# 🚀 [API 5] COMMUNITY_COMMENTS 개수 조회 API
+@app.get("/api/community/comments/count/{user_id}")
+def get_community_comments_count(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        # 내 user_id로 작성된 전체 댓글 수를 카운트합니다
+        count = db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).count()
+        return {"status": "Success", "count": count}
+    except Exception as e:
+        return {"status": "Success", "count": 0, "note": f"아직 테이블이 없거나 에러: {str(e)}"}
+
+# 🚀 [API 6] 캘린더 연동: 최근/다음 검진일 자동 계산 API
+@app.get("/api/calendar/checkups/{connection_code}")
+def get_checkup_dates(connection_code: str, db: Session = Depends(database.get_db)):
+    try:
+        today = date.today()
+        
+        # 🏥 병원 관련 이벤트 타입들 (DB 사진에 있는 hospital, ultrasound 포함)
+        hospital_types = ["hospital", "ultrasound", "clinic"]
+
+        # 연동 코드와 일치하고, 이벤트 타입이 병원인 일정만 싹 다 가져옵니다.
+        events = db.query(models.SharedCalendarEvent).filter(
+            models.SharedCalendarEvent.connection_code == connection_code,
+            models.SharedCalendarEvent.event_type.in_(hospital_types)
+        ).all()
+
+        recent_event = None
+        next_event = None
+
+        # 📅 날짜 비교를 통해 과거(최근)와 미래(다음)를 분리합니다.
+        past_events = [e for e in events if e.event_date and e.event_date <= today]
+        future_events = [e for e in events if e.event_date and e.event_date > today]
+
+        # 과거 일정 중 가장 최신 날짜
+        if past_events:
+            recent_event = max(past_events, key=lambda x: x.event_date)
+            
+        # 미래 일정 중 가장 가까운 날짜
+        if future_events:
+            next_event = min(future_events, key=lambda x: x.event_date)
+
+        def format_date(d):
+            if not d: return "등록된 일정 없음"
+            return f"{d.year}년 {d.month}월 {d.day}일"
+
+        return {
+            "status": "Success",
+            "recent_checkup": format_date(recent_event.event_date) if recent_event else "등록된 일정 없음",
+            "next_checkup": format_date(next_event.event_date) if next_event else "등록된 일정 없음"
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+# 🚀 [API 7] 내가 작성한 게시글 목록 전체 조회
+
+@app.get("/api/community/my-posts/{user_id}")
+def get_my_posts(user_id: int, db: Session = Depends(database.get_db)):
+    from sqlalchemy import func
+    try:
+        results = db.query(
+            models.CommunityPost,
+            models.User.name.label("author_name"),
+            models.User.role.label("author_role"),
+            func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(
+            models.User, models.CommunityPost.user_id == models.User.id
+        ).outerjoin(
+            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
+        ).filter(
+            models.CommunityPost.user_id == user_id
+        ).group_by(
+            models.CommunityPost.post_id, models.User.id
+        ).order_by(
+            models.CommunityPost.created_at.desc()
+        ).all()
+
+        posts = []
+        for post, author_name, author_role, count in results:
+            posts.append({
+                "post_id": post.post_id,
+                "user_id": post.user_id,
+                "pregnancy_period": post.pregnancy_period,
+                "title": post.title,
+                "content": post.content,
+                "created_at": post.created_at,
+                "author": author_name or "익명",
+                "role": author_role,
+                "comment_count": count
+            })
+        return {"status": "Success", "posts": posts}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+
+# 🚀 [API 8] 내가 작성한 댓글 목록 전체 조회 (어떤 게시글에 달았는지 제목 포함)
+
+@app.get("/api/community/my-comments/{user_id}")
+def get_my_commented_posts(user_id: int, db: Session = Depends(database.get_db)):
+    from sqlalchemy import func
+    try:
+        # 1. 내가 댓글을 단 게시글 ID를 서브쿼리로 모두 찾습니다.
+        subquery = db.query(models.CommunityComment.post_id).filter(
+            models.CommunityComment.user_id == user_id
+        ).distinct().subquery()
+
+        # 2. 해당 게시글들의 정보를 완벽하게 조인해서 가져오기 (메인 커뮤니티와 100% 동일)
+        results = db.query(
+            models.CommunityPost,
+            models.User.name.label("author_name"),
+            models.User.role.label("author_role"),
+            func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(
+            models.User, models.CommunityPost.user_id == models.User.id
+        ).outerjoin(
+            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
+        ).filter(
+            models.CommunityPost.post_id.in_(subquery)  # 🚀 내가 댓글 단 글만 쏙쏙 뽑기!
+        ).group_by(
+            models.CommunityPost.post_id, models.User.id
+        ).order_by(
+            models.CommunityPost.created_at.desc()
+        ).all()
+
+        posts = []
+        for post, author_name, author_role, count in results:
+            posts.append({
+                "post_id": post.post_id,
+                "user_id": post.user_id,
+                "pregnancy_period": post.pregnancy_period,
+                "title": post.title,
+                "content": post.content,
+                "created_at": post.created_at,
+                "author": author_name or "익명",
+                "role": author_role,
+                "comment_count": count
+            })
+        # 프론트엔드가 'comments' 키로 받기 때문에 이름만 맞춰줍니다.
+        return {"status": "Success", "comments": posts} 
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
+    try:
+        # 댓글과 게시글을 Join하여 게시글 제목까지 한꺼번에 가져옵니다.
+        results = db.query(
+            models.CommunityComment, 
+            models.CommunityPost.title.label("post_title")
+        ).join(
+            models.CommunityPost, 
+            models.CommunityComment.post_id == models.CommunityPost.post_id
+        ).filter(models.CommunityComment.user_id == user_id).order_by(models.CommunityComment.created_at.desc()).all()
+        
+        comments = []
+        for c, post_title in results:
+            comments.append({
+                "comment_id": c.comment_id,
+                "post_id": c.post_id,
+                "post_title": post_title,
+                "content": c.content,
+                "created_at": c.created_at
+            })
+        return {"status": "Success", "comments": comments}
+    except Exception as e:
+        return {"status": "Error", "message": str(e)}
 
 
-
-
-
-
-
-
+@app.post("/api/posts/{post_id}/comments")
+def create_post_comment(post_id: int, comment_data: CommentCreate, db: Session = Depends(database.get_db)):
+    try:
+        # DB의 COMMUNITY_COMMENTS 테이블에 새로운 댓글 한 줄을 생성합니다.
+        new_comment = models.CommunityComment(
+            post_id=post_id,
+            user_id=comment_data.user_id,
+            content=comment_data.content
+        )
+        db.add(new_comment)  # DB에 올리고
+        db.commit()          # 도장 쾅! (저장)
+        
+        return {"status": "Success", "message": "댓글이 성공적으로 등록되었습니다."}
+    except Exception as e:
+        db.rollback() # 에러 나면 롤백(취소)
+        print(f"🚨 댓글 저장 에러: {str(e)}")
+        return {"status": "Error", "message": "댓글 등록에 실패했습니다."}
 
 
 
@@ -475,32 +659,81 @@ def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session
 
 
 # 🚀 1. 특정 게시글의 댓글 불러오기 API (작성자 ID 추가)
-class CommentCreate(BaseModel):
-    user_id: int
-    content: str
-
+\
 # 🚀 1. 댓글 불러오기 API
-@app.get("/api/posts/{post_id}/comments")
-def get_comments(post_id: int, db: Session = Depends(database.get_db)):
-    comments = db.query(models.Comment).filter(models.Comment.post_id == post_id).order_by(models.Comment.created_at.asc()).all()
-    
-    result = []
-    for c in comments:
-        user = db.query(models.User).filter(models.User.id == c.user_id).first()
-        result.append({
-            "id": c.comment_id, # 🚀 프론트엔드로 보낼 땐 c.comment_id 값을 꺼내서 보냅니다!
-            "user_id": c.user_id,
-            "content": c.content,
-            "created_at": c.created_at,
-            "author_name": user.name if user else "알 수 없는 유저", 
-            "author_role": user.role if user else "",
-            "pregnancy_start_date": str(user.pregnancy_start_date) if user and user.pregnancy_start_date else None
-        })
-    return {"status": "Success", "comments": result}
+# 🚀  특정 게시글에 달린 댓글 상세 목록 불러오기
 
-# 🚀 2. 댓글 등록 API
-@app.post("/api/posts/{post_id}/comments")
-def create_comment(post_id: int, comment: CommentCreate, db: Session = Depends(database.get_db)):
+
+# 🚀 [API 1] 게시글 목록 + 닉네임 + 댓글 개수 조회 (무적 버전)
+@app.get("/api/community/posts")
+def get_community_posts(db: Session = Depends(database.get_db)):
+    try:
+        results = db.query(
+            models.CommunityPost,
+            models.User.name,
+            models.User.role,
+            models.User.pregnancy_start_date,
+            func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(  # 일반 join 대신 outerjoin 사용: 작성자 정보가 날아가도 글은 무조건 뜨게 만듦!
+            models.User, models.CommunityPost.user_id == models.User.id
+        ).outerjoin(
+            models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id
+        ).group_by(
+            models.CommunityPost.post_id, models.User.id
+        ).order_by(
+            models.CommunityPost.created_at.desc()
+        ).all()
+        
+        posts = []
+        for post, user_name, user_role, preg_date, count in results:
+            posts.append({
+                "post_id": post.post_id,
+                "user_id": post.user_id,
+                "pregnancy_period": post.pregnancy_period,
+                "title": post.title,
+                "content": post.content,
+                "created_at": post.created_at,
+                "author": user_name or "익명",
+                "role": user_role,
+                "comment_count": count
+            })
+        return {"status": "Success", "posts": posts}
+    except Exception as e:
+        print(f"🚨 게시글 로드 에러: {e}")
+        return {"status": "Error", "message": str(e)}
+
+# 🚀 [API 2] 특정 게시글의 댓글 상세 조회 (무적 버전)
+@app.get("/api/posts/{post_id}/comments")
+def get_post_comments(post_id: int, db: Session = Depends(database.get_db)):
+    try:
+        comments = db.query(
+            models.CommunityComment,
+            models.User.name,
+            models.User.role,
+            models.User.pregnancy_start_date
+        ).outerjoin(  # 여기도 outerjoin 적용: 꼬인 댓글 데이터가 있어도 무조건 화면에 뿌려줌!
+            models.User, models.CommunityComment.user_id == models.User.id
+        ).filter(
+            models.CommunityComment.post_id == post_id
+        ).order_by(
+            models.CommunityComment.created_at.asc()
+        ).all()
+
+        result = []
+        for c, user_name, user_role, start_date in comments:
+            result.append({
+                "id": c.comment_id,
+                "user_id": c.user_id,
+                "content": c.content,
+                "created_at": c.created_at,
+                "author_name": user_name or "익명",
+                "author_role": user_role,
+                "pregnancy_start_date": str(start_date) if start_date else None
+            })
+        return {"status": "Success", "comments": result}
+    except Exception as e:
+        print(f"🚨 댓글 로드 에러: {e}")
+        return {"status": "Error", "message": str(e)}
     new_comment = models.Comment(
         post_id=post_id,
         user_id=comment.user_id,
@@ -598,8 +831,37 @@ def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(
 
 
 # 🚀 1. 커뮤니티 게시글 목록 불러오기 (USERS 테이블과 JOIN하여 진짜 이름/역할 연동)
+from sqlalchemy import func # 맨 위에 이 import가 있는지 확인하세요!
+
 @app.get("/api/community/posts")
 def get_community_posts(db: Session = Depends(database.get_db)):
+    try:
+        # 1. 게시글과 댓글 개수를 한 번에 조회 (SQL의 GROUP BY 기능 사용)
+        results = db.query(
+            models.CommunityPost,
+            func.count(models.CommunityComment.comment_id).label("comment_count")
+        ).outerjoin(
+            models.CommunityComment, 
+            models.CommunityPost.post_id == models.CommunityComment.post_id
+        ).group_by(models.CommunityPost.post_id).order_by(models.CommunityPost.created_at.desc()).all()
+        
+        # 2. 결과 데이터를 프론트엔드가 쓰기 좋게 변환
+        posts = []
+        for post, count in results:
+            posts.append({
+                "post_id": post.post_id,
+                "user_id": post.user_id,
+                "pregnancy_period": post.pregnancy_period,
+                "title": post.title,
+                "content": post.content,
+                "created_at": post.created_at,
+                "comment_count": count  # 🚀 댓글 개수 주입!
+            })
+            
+        return {"status": "Success", "posts": posts}
+    except Exception as e:
+        print(f"🚨 게시글 목록 조회 에러: {str(e)}")
+        return {"status": "Error", "message": "게시글을 불러오지 못했습니다."}
     # COMMUNITY_POSTS와 USERS 테이블을 작성자 ID(user_id) 기준으로 조인합니다.
     results = db.query(models.CommunityPost, models.User)\
                 .join(models.User, models.CommunityPost.user_id == models.User.id)\
@@ -762,10 +1024,10 @@ def get_week(user_id: int, db: Session = Depends(database.get_db)):
 
 
 
-
 # 🚀 설정창 & 메인화면 전용 데이터 불러오기 API (주차 계산용 데이터 추가됨!)
 @app.get("/api/user/info/{identifier}")
 def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
+
     # identifier가 숫자(ID)인지 문자열(이메일)인지 판별하여 검색
     if identifier.isdigit():
         user = db.query(models.User).filter(models.User.id == int(identifier)).first()

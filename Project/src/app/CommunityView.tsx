@@ -29,21 +29,18 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const isPregnant = String(user.role).toUpperCase() === "PREGNANT";
   const userId = (user as any).id || user.user_id; 
   
-  // 🚀 1. 이메일 백업: 회원가입 직후 ID가 없을 때를 대비
   const identifier = userId || user.email;
 
   const [dbInfo, setDbInfo] = useState({
     pregnancy_start_date: "",
   });
 
-  // 🚀 2. 커뮤니티 화면도 독립 선언! 켜지자마자 내 진짜 시작일을 DB에서 가져옵니다.
   useEffect(() => {
     if (!identifier) return;
     fetch(`http://localhost:8000/api/user/info/${identifier}`)
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {
-          // 전역 user 객체에 최신 ID 주입
           if (data.user_id) {
             (user as any).user_id = data.user_id;
             (user as any).id = data.user_id;
@@ -56,7 +53,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       .catch(e => console.error("커뮤니티 유저 정보 갱신 실패:", e));
   }, [identifier]);
 
-  // 최신 DB 데이터로 진짜 주차와 시기를 계산
   const currentWeek = calculateWeek(dbInfo.pregnancy_start_date);
   
   const getPeriod = (week: number) => {
@@ -66,7 +62,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   };
   const currentPeriod = getPeriod(currentWeek);
   
-  // 🚀 3. 디폴트 탭을 "전체"로 강제 고정!
   const [selPeriod, setSelPeriod] = useState<string>("전체");
   
   const [posts, setPosts] = useState<any[]>([]);
@@ -129,7 +124,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const submitComment = async (postId: number) => {
     if (!newComment.trim()) return;
     try {
-      // 🚀 현재 안전하게 주입된 user_id를 사용
       const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`, {
         method: "POST",
@@ -139,6 +133,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       if (res.ok) {
         setNewComment(""); 
         fetchComments(postId); 
+        fetchPosts(); // 댓글 개수 갱신
       } else alert("댓글 등록 실패");
     } catch (e) { alert("서버 오류"); }
   };
@@ -148,8 +143,10 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     try {
       const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(`http://localhost:8000/api/comments/${commentId}?user_id=${currentUserId}`, { method: "DELETE" });
-      if (res.ok) fetchComments(postId);
-      else {
+      if (res.ok) {
+        fetchComments(postId);
+        fetchPosts(); // 댓글 개수 갱신
+      } else {
         const err = await res.json();
         alert(err.detail || "삭제 실패");
       }
@@ -174,7 +171,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     
     const currentUserId = (user as any).id || (user as any).user_id || 1;
     
-    // 🚀 전송 시에는 무조건 '현재 시기(currentPeriod)'로 태그를 달아줍니다
     const payload = {
       user_id: currentUserId, 
       pregnancy_period: currentPeriod, 
@@ -197,10 +193,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       setShowForm(false);
       setNewTitle("");
       setNewPost("");
-      
-      // 글을 쓰고 나면 본인 글을 확인할 수 있게 내 시기 탭으로 이동!
       setSelPeriod(currentPeriod); 
-      
     } catch (e) { alert("서버 연결 실패"); }
   };
 
@@ -239,7 +232,6 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
           </div>
         </div>
 
-        {/* 🚀 전체 보기에 있어도, 글쓰기 버튼은 항상 내 시기로 뜹니다 */}
         <button onClick={() => setShowForm(!showForm)} className="w-full py-4 rounded-2xl border-[1.5px] border-dashed font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[#78C9A0]/5" style={{ borderColor: "#78C9A0", color: "#78C9A0" }}>
           <Plus size={18} strokeWidth={2.5} /> 내 임신 시기({currentPeriod}) 이야기 나누기
         </button>
@@ -296,14 +288,21 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
                   {post.title && <p className="text-[15px] font-bold text-[#333] mb-1">{post.title}</p>}
                   <p className="text-[14px] text-[#555] leading-relaxed mb-4">{post.content}</p>
 
-                  <div className="pt-3 border-t border-border/50">
+                  <div className="pt-3 border-t border-border/50 flex items-center justify-between">
                     <button 
                       onClick={() => toggleComments(postId)} 
                       className="flex items-center gap-1.5 text-xs font-medium transition-colors"
                       style={{ color: isExpanded ? "#C94E70" : "#888" }}
                     >
-                      <MessageCircle size={16} /> {isExpanded ? "댓글 닫기" : "댓글 보기 및 쓰기"}
+                      <MessageCircle size={16} /> 
+                      {isExpanded ? "댓글 닫기" : `댓글 ${post.comment_count || 0}개 보기`}
                     </button>
+                    
+                    {!isExpanded && (post.comment_count || 0) > 0 && (
+                      <span className="text-[10px] bg-secondary px-2 py-0.5 rounded-full font-bold text-muted-foreground">
+                        {post.comment_count}
+                      </span>
+                    )}
                   </div>
 
                   {isExpanded && (
