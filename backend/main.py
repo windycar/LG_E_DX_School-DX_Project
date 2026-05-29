@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 import models, database, schemas
 import requests # 🚀 날씨 API 호출을 위해 추가!
 
+<<<<<<< HEAD
 import os
 from dotenv import load_dotenv
 import os
@@ -39,6 +40,10 @@ import models, database, schemas
 from dotenv import load_dotenv
 # main.py 상단 라이브러리 임포트 영역에 아래를 추가합니다.
 from fastapi.staticfiles import StaticFiles
+=======
+models.Base.metadata.create_all(bind=database.engine)
+
+>>>>>>> origin/pkb_workspace.ver2
 
 # 앱 생성 코드(app = FastAPI()) 바로 아래에 다음 1줄을 추가하여 uploads 폴더를 웹에 개방합니다.
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -52,6 +57,98 @@ app.add_middleware(
     allow_methods=["*"], # 모든 통신 방식 허용
     allow_headers=["*"], # 모든 헤더 허용
 )
+<<<<<<< HEAD
+=======
+
+
+def get_appliance_owner_id(user_id: int, db: Session) -> int:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        return user.parent_user_id
+
+    return user.id
+
+
+@app.get("/api/appliances/{user_id}")
+def get_appliance_settings(user_id: int, db: Session = Depends(database.get_db)):
+    owner_id = get_appliance_owner_id(user_id, db)
+    rows = db.query(models.ApplianceSetting).filter(
+        models.ApplianceSetting.user_id == owner_id
+    ).all()
+
+    return {
+        "status": "Success",
+        "owner_user_id": owner_id,
+        "settings": [
+            {
+                "setting_id": row.setting_id,
+                "analysis_id": row.analysis_id,
+                "user_id": row.user_id,
+                "appliance_name": row.appliance_name,
+                "control_command": row.control_command,
+                "execution_status": row.execution_status,
+            }
+            for row in rows
+        ],
+    }
+
+
+@app.post("/api/appliances")
+def upsert_appliance_setting(payload: schemas.ApplianceSettingUpsert, db: Session = Depends(database.get_db)):
+    if payload.user_id is None:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    owner_id = get_appliance_owner_id(payload.user_id, db)
+    setting = db.query(models.ApplianceSetting).filter(
+        models.ApplianceSetting.user_id == owner_id,
+        models.ApplianceSetting.appliance_name == payload.appliance_name,
+    ).first()
+
+    if not setting:
+        setting = models.ApplianceSetting(
+            user_id=owner_id,
+            appliance_name=payload.appliance_name,
+        )
+        db.add(setting)
+
+    setting.analysis_id = payload.analysis_id
+    setting.control_command = payload.control_command
+    setting.execution_status = payload.execution_status
+    db.commit()
+    db.refresh(setting)
+    return {"status": "Success", "setting_id": setting.setting_id}
+
+
+@app.post("/api/appliances/bulk")
+def upsert_appliance_settings(payload: schemas.ApplianceSettingsBulkUpsert, db: Session = Depends(database.get_db)):
+    if payload.user_id is None:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    owner_id = get_appliance_owner_id(payload.user_id, db)
+    for item in payload.settings:
+        setting = db.query(models.ApplianceSetting).filter(
+            models.ApplianceSetting.user_id == owner_id,
+            models.ApplianceSetting.appliance_name == item.appliance_name,
+        ).first()
+
+        if not setting:
+            setting = models.ApplianceSetting(
+                user_id=owner_id,
+                appliance_name=item.appliance_name,
+            )
+            db.add(setting)
+
+        setting.analysis_id = item.analysis_id
+        setting.control_command = item.control_command
+        setting.execution_status = item.execution_status
+
+    db.commit()
+    return {"status": "Success"}
+# 설정 만들기
+>>>>>>> origin/pkb_workspace.ver2
 
 os.makedirs("uploads", exist_ok=True)
 
