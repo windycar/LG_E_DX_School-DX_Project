@@ -132,9 +132,8 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         parent_user_id=parent_user_id
     )
     db.add(new_user)
-    db.flush()  # 새 사용자의 ID 생성
+    db.flush() 
     
-    # 🚀 양방향 연결: 보호자가 임산부를 선택했으면, 임산부도 보호자를 저장
     if user.role == "GUARDIAN" and parent_user_id:
         pregnant_user = db.query(models.User).filter(models.User.id == parent_user_id).first()
         if pregnant_user:
@@ -153,7 +152,6 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
     guardian_info = None
     
     if user.role == "GUARDIAN" and user.parent_user_id:
-        # 보호자: 연결된 임산부 정보
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
             pregnant_info = {
@@ -163,7 +161,6 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
                 "connection_code": parent.connection_code
             }
     elif user.role == "PREGNANT" and user.parent_user_id:
-        # 임산부: 연결된 보호자 정보
         guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if guardian:
             guardian_info = {
@@ -203,7 +200,6 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
     connected_email = None
 
     if user.role == "GUARDIAN" and user.parent_user_id:
-        # 보호자 계정: 연결된 임산부 정보
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
             partner_code = parent.connection_code
@@ -211,7 +207,6 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
             connected_name = parent.name
             connected_email = parent.email
     elif user.role == "PREGNANT" and user.parent_user_id:
-        # 임산부 계정: 연결된 보호자 정보
         guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if guardian:
             connected_name = guardian.name
@@ -252,116 +247,84 @@ def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session
 
 @app.delete("/api/auth/withdraw/{user_id}")
 def withdraw_user(user_id: int, db: Session = Depends(database.get_db)):
-    """회원탈퇴 API
-    - PREGNANT: 본인 + 관련 보호자 모두 삭제
-    - GUARDIAN: 본인만 삭제"""
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
     try:
         if user.role == "PREGNANT":
-            # 임산부 탈퇴: 본인 + 관련 보호자 모두 삭제
-            
-            # 1. 보호자가 있으면 보호자도 삭제
             if user.parent_user_id:
                 guardian = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
                 if guardian:
-                    # 보호자의 모든 데이터 삭제
                     db.query(models.CommunityPost).filter(models.CommunityPost.user_id == guardian.id).delete()
                     db.query(models.CommunityComment).filter(models.CommunityComment.user_id == guardian.id).delete()
                     db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == guardian.id).delete()
                     db.delete(guardian)
             
-            # 2. 임산부의 모든 데이터 삭제
-            # 다이어리 및 AI 분석 결과
             diary_logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).all()
             for log in diary_logs:
                 db.query(models.AiAnalysisResult).filter(models.AiAnalysisResult.diary_id == log.diary_id).delete()
             db.query(models.DiaryLog).filter(models.DiaryLog.user_id == user_id).delete()
-            
-            # 커뮤니티 게시글 및 댓글
             db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
             db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).delete()
-            
-            # 스몰토크 답변
             db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).delete()
-            
-            # 공유 캘린더 이벤트 (connection_code 기준)
             if user.connection_code:
-                db.query(models.SharedCalendarEvent).filter(
-                    models.SharedCalendarEvent.connection_code == user.connection_code
-                ).delete()
-            
-            # 가전 설정
+                db.query(models.SharedCalendarEvent).filter(models.SharedCalendarEvent.connection_code == user.connection_code).delete()
             db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).delete()
-            
-            # 사용자 계정 삭제
             db.delete(user)
-            
         elif user.role == "GUARDIAN":
-            # 보호자 탈퇴: 보호자만 삭제
-            
-            # 보호자의 모든 데이터 삭제
             db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).delete()
             db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
             db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).delete()
-            
-            # 가전 설정
             db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).delete()
-            
-            # 보호자 계정 삭제
             db.delete(user)
-        
         db.commit()
         return {"status": "Success", "message": "회원탈퇴가 완료되었습니다."}
-        
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"탈퇴 중 오류 발생: {str(e)}")
 
 
 # =====================================================================
-# 🏠 5. 스마트홈(가전 제어) API (🚀 찐 DB 연동 완료!)
+# 🏠 5. 스마트홈(가전 제어) API (🚀 가족 연동 동기화 수문장)
 # =====================================================================
+def get_family_master_id(user_id: int, db: Session):
+    """보호자가 요청하더라도 임산부의 ID를 반환하여 데이터베이스를 하나로 공유합니다."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user and user.role.upper() == "GUARDIAN" and user.parent_user_id:
+        return user.parent_user_id
+    return user_id
+
 @app.post("/api/appliances/bulk")
 def update_appliances_bulk(payload: schemas.ApplianceSettingsBulkUpsert, db: Session = Depends(database.get_db)):
     try:
-        # 프론트가 보낸 여러 개의 가전 설정을 하나씩 꺼내어 DB에 저장합니다.
+        master_id = get_family_master_id(payload.user_id, db)
         for item in payload.settings:
-            # 1. 이미 저장된 설정이 있는지 DB에서 찾기
             setting = db.query(models.ApplianceSetting).filter(
-                models.ApplianceSetting.user_id == payload.user_id,
+                models.ApplianceSetting.user_id == master_id,
                 models.ApplianceSetting.appliance_name == item.appliance_name
             ).first()
-
             if setting:
-                # 2. 있으면 새 값으로 덮어쓰기 (Update)
                 setting.control_command = item.control_command
                 setting.execution_status = item.execution_status
             else:
-                # 3. 없으면 새로 만들어 넣기 (Insert)
                 new_setting = models.ApplianceSetting(
-                    user_id=payload.user_id,
+                    user_id=master_id,
                     appliance_name=item.appliance_name,
                     control_command=item.control_command,
                     execution_status=item.execution_status
                 )
                 db.add(new_setting)
-        
         db.commit()
-        return {"status": "Success", "message": "가전 설정이 DB에 완벽하게 저장되었습니다!"}
+        return {"status": "Success", "message": "가족 연동 가전 설정이 저장되었습니다!"}
     except Exception as e:
         db.rollback()
-        print(f"🚨 가전 설정 저장 에러: {str(e)}")
         return {"status": "Error", "message": str(e)}
 
 @app.get("/api/appliances/{user_id}")
 def get_user_appliances(user_id: int, db: Session = Depends(database.get_db)):
     try:
-        # DB에서 해당 유저의 가전 설정을 모두 불러옵니다.
-        settings = db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == user_id).all()
-        
+        master_id = get_family_master_id(user_id, db)
+        settings = db.query(models.ApplianceSetting).filter(models.ApplianceSetting.user_id == master_id).all()
         result = []
         for s in settings:
             result.append({
@@ -369,7 +332,6 @@ def get_user_appliances(user_id: int, db: Session = Depends(database.get_db)):
                 "control_command": s.control_command,
                 "execution_status": s.execution_status
             })
-            
         return {"status": "Success", "settings": result}
     except Exception as e:
         return {"status": "Error", "message": str(e)}
@@ -454,7 +416,6 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
         keyword_to_emoji = {"행복": "😊", "안정": "🙂", "설렘": "🥰", "중립": "😐", "불안": "😟", "피로": "😫", "우울": "😔", "화남": "😡"}
         diary_result = []
         
-        # 유저의 파트너 정보 가져오기
         user = db.query(models.User).filter(models.User.id == user_id).first()
         partner_id = user.parent_user_id if user else None
         
@@ -472,20 +433,16 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
                 "type": "daily"
             }
             
-            # 🚀 같은 날짜의 스몰토크도 포함
             if partner_id:
                 try:
                     from datetime import datetime as dt
                     date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
-                    
-                    # 해당 날짜에 사용자가 답변한 스몰토크
                     my_smalltalk = db.query(models.SmallTalkAnswer).filter(
                         models.SmallTalkAnswer.user_id == user_id,
                         func.date(models.SmallTalkAnswer.created_at) == date_obj
                     ).first()
                     
                     if my_smalltalk:
-                        # 파트너도 같은 주제에 답변했는지 확인
                         partner_smalltalk = db.query(models.SmallTalkAnswer).filter(
                             models.SmallTalkAnswer.user_id == partner_id,
                             models.SmallTalkAnswer.topic_id == my_smalltalk.topic_id
@@ -502,23 +459,18 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
                                     "my_answer": my_smalltalk.answer_content,
                                     "partner_answer": partner_smalltalk.answer_content
                                 }
-                except Exception as e:
+                except Exception:
                     pass
-            
             diary_result.append(entry)
         
-        # 🚀 스몰토크 전체 목록 (다이어리 여부 무관)
         smalltalk_result = []
-        
         if partner_id:
             try:
-                # 사용자가 답변한 모든 스몰토크
                 my_answers = db.query(models.SmallTalkAnswer).filter(
                     models.SmallTalkAnswer.user_id == user_id
                 ).order_by(models.SmallTalkAnswer.created_at.desc()).all()
                 
                 for my_ans in my_answers:
-                    # 파트너가 같은 주제에 답변했는지 확인
                     partner_ans = db.query(models.SmallTalkAnswer).filter(
                         models.SmallTalkAnswer.user_id == partner_id,
                         models.SmallTalkAnswer.topic_id == my_ans.topic_id
@@ -538,7 +490,7 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
                                 "my_answer": my_ans.answer_content,
                                 "partner_answer": partner_ans.answer_content
                             })
-            except Exception as e:
+            except Exception:
                 pass
         
         return {
@@ -547,8 +499,6 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
             "smalltalk_entries": smalltalk_result
         }
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return {"status": "Error", "message": str(e)}
 
 
@@ -803,3 +753,119 @@ def submit_smalltalk_answer(ans: schemas.SmallTalkSubmit, db: Session = Depends(
     db.add(new_ans)
     db.commit()
     return {"status": "Success"}
+
+
+# =====================================================================
+# 🤖 11. AI 복합 가전 추천 API (🚀 감정 가중치 모델 + 날씨 복합 실시간 보정 연산)
+# =====================================================================
+@app.get("/api/ai/recommend-appliances/{user_id}")
+def recommend_appliances(user_id: int, db: Session = Depends(database.get_db)):
+    try:
+        master_id = get_family_master_id(user_id, db)
+        logs = db.query(models.DiaryLog).filter(models.DiaryLog.user_id == master_id).all()
+        
+        # 1. 역사적 감정 가중치(Score) 테이블
+        emotion_weights = {
+            "행복": 1.0, "안정": 1.0, "설렘": 1.0,     # 긍정 상태: 최적 수치를 해당 방향으로 인력 발생
+            "중립": 0.0,                               # 중립 상태: 영향 없음
+            "불안": -1.0, "피로": -1.0, "우울": -1.0, "화남": -1.0  # 부정 상태: 최적 수치를 반대 방향으로 척력 발생
+        }
+        
+        # 기본 실내 권장 최적 기준점 (학습 기준 시작선)
+        learned_temp = 24.0  
+        learned_humidity = 50.0 
+        learning_rate = 0.15  # 보정 민감도 (15%씩 반영)
+        
+        # 과거 일기 데이터를 통한 유저 성향 비동기 기계학습
+        for log in logs:
+            if log.temperature_ambient is not None and log.humidity_ambient is not None:
+                weight = emotion_weights.get(log.selected_emotion, 0.0)
+                
+                temp_diff = float(log.temperature_ambient) - learned_temp
+                hum_diff = float(log.humidity_ambient) - learned_humidity
+                
+                # 가중치 연산 수행
+                learned_temp += temp_diff * weight * learning_rate
+                learned_humidity += hum_diff * weight * learning_rate
+                
+        # 비정상 수치 튐 방지 예외 제어선
+        learned_temp = max(21.0, min(27.0, learned_temp))
+        learned_humidity = max(40.0, min(60.0, learned_humidity))
+
+        # 2. 현재 실시간 외부 날씨 데이터 연동 (OpenWeatherMap)
+        WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+        current_temp = 25.0
+        current_humidity = 55.0
+        current_weather_desc = "맑음"
+        
+        if WEATHER_API_KEY:
+            try:
+                res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Seoul&appid={WEATHER_API_KEY}&units=metric&lang=kr")
+                if res.status_code == 200:
+                    w_data = res.json()
+                    current_temp = float(w_data['main']['temp'])
+                    current_humidity = float(w_data['main']['humidity'])
+                    current_weather_desc = w_data['weather'][0]['description']
+            except Exception:
+                pass
+
+        # 3. 🚀 마이 로드의 핵심 기획: [과거 성향 + 현재 날씨 실시간 온습도] 복합 연산 최적값 도출
+        # 신체 면역력과 실외 적응력을 고려한 '외기 적응형 복합 조율 공식' 적용
+        # 최종 최적 온도 = 학습 선호도 + (실외 온도 - 학습 선호도) * 외기 순응 계수 (10%)
+        final_optimal_temp = learned_temp + (current_temp - learned_temp) * 0.1
+        final_optimal_temp = round(max(22.0, min(26.0, final_optimal_temp)), 1)
+        
+        # 최종 최적 습도 = 실외 습도 유입 및 공기 질량 밸런싱 공식 연산 (5%)
+        final_optimal_humidity = learned_humidity + (current_humidity - learned_humidity) * 0.05
+        final_optimal_humidity = round(max(45.0, min(60.0, final_optimal_humidity)), 1)
+        
+        # 4. 도출된 복합 최적 목표값을 바탕으로 가전 제어 가이드라인 패키지 생성
+        recommendations = []
+        
+        # 에어컨 냉난방 제어 판별
+        if current_temp > final_optimal_temp + 0.5:
+            recommendations.append({
+                "key": "aircon", "name": "에어컨", "action": f"{int(final_optimal_temp)}℃ 냉방", "icon": "❄️",
+                "reason": f"현재 실외({int(current_temp)}℃)가 더운 상태입니다. 과거 일기 기록과 외기를 복합 고려한 최적 온도({final_optimal_temp}℃)로 낮출게요.",
+                "settings": {"temp": int(final_optimal_temp), "mode": "냉방", "fan": 2}
+            })
+        elif current_temp < final_optimal_temp - 0.5:
+            recommendations.append({
+                "key": "aircon", "name": "에어컨", "action": f"{int(final_optimal_temp)}℃ 난방", "icon": "☀️",
+                "reason": f"바깥 날씨({int(current_temp)}℃)가 쌀쌀합니다. 산모 신체 적응력을 고려해 설계한 최적 온도({final_optimal_temp}℃)로 온도를 올릴게요.",
+                "settings": {"temp": int(final_optimal_temp), "mode": "난방", "fan": 1}
+            })
+            
+        # 제습기 및 가습기 조율 판별
+        if current_humidity > final_optimal_humidity + 4.0:
+            recommendations.append({
+                "key": "dehumidifier", "name": "제습기", "action": f"{int(final_optimal_humidity)}% 제습", "icon": "🌊",
+                "reason": f"실외 습도({int(current_humidity)}%)가 높아 실내 유입이 우려됩니다. 도출된 최적 습도({final_optimal_humidity}%)로 보정할게요.",
+                "settings": {"humidity": int(final_optimal_humidity), "intensity": 2}
+            })
+        elif current_humidity < final_optimal_humidity - 4.0:
+            recommendations.append({
+                "key": "humidifier", "name": "가습기", "action": f"{int(final_optimal_humidity)}% 가습", "icon": "💧",
+                "reason": f"현재 공기({int(current_humidity)}%)가 많이 건조하여 기관지가 예민해질 수 있습니다. 쾌적 최적 습도({final_optimal_humidity}%)로 조절할게요.",
+                "settings": {"humidity": int(final_optimal_humidity), "intensity": 2}
+            })
+            
+        # 기상 조건에 따른 실내 공기청정기 제어
+        if any(keyword in current_weather_desc for keyword in ["비", "흐림", "구름", "안개", "먼지"]):
+            recommendations.append({
+                "key": "airPurifier", "name": "공기청정기", "action": "자동 모드", "icon": "💨",
+                "reason": f"현재 바깥 날씨가 '{current_weather_desc}' 상태로 환기가 제한되므로 실내 공기를 정화 가동합니다.",
+                "settings": {"mode": "자동", "speed": 2}
+            })
+            
+        return {
+            "status": "Success",
+            "optimal_temp": final_optimal_temp,
+            "optimal_humidity": final_optimal_humidity,
+            "current_temp": int(current_temp),
+            "current_weather": current_weather_desc,
+            "recommendations": recommendations
+        }
+    except Exception as e:
+        print(f"🚨 복합 가전 추천 시스템 가동 에러: {str(e)}")
+        return {"status": "Error", "message": str(e)}
