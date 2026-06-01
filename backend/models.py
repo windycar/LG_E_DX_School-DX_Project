@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, String, Text, DateTime, Date, ForeignKey, DECIMAL
+from sqlalchemy import Column, BigInteger, Integer, String, Text, DateTime, Date, ForeignKey, DECIMAL, Boolean
 from sqlalchemy.sql import func
 from database import Base
 
@@ -100,3 +100,62 @@ class ApplianceSetting(Base):
     appliance_name = Column(String(50), nullable=False)
     control_command = Column(Text, nullable=False)
     execution_status = Column(String(20), nullable=False, default="OFF")
+
+
+class GuardianMission(Base):
+    __tablename__ = "GUARDIAN_MISSIONS"
+
+    mission_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    analysis_id = Column(BigInteger, ForeignKey("AI_ANALYSIS_RESULTS.analysis_id"), nullable=True, index=True)
+    status_check_id = Column(BigInteger, ForeignKey("PREGNANCY_STATUS_CHECKS.status_check_id"), nullable=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, index=True)
+    mission_title = Column(String(200), nullable=False)
+    mission_content = Column(Text, nullable=False)
+    mission_reason = Column(Text, nullable=True)
+    mission_type = Column(String(50), nullable=False, default="emotional_support")
+    execution_status = Column(String(50), nullable=False, default="PENDING")
+    created_at = Column(DateTime, default=func.now())
+    completed_at = Column(DateTime, nullable=True)
+
+
+class UserCarePreference(Base):
+    __tablename__ = "USER_CARE_PREFERENCES"
+
+    preference_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, unique=True, index=True)
+    preferred_mission_type = Column(String(50), nullable=False, default="balanced")
+    notification_enabled = Column(Boolean, nullable=False, default=True)
+    mission_time = Column(String(20), nullable=True)
+    care_style = Column(String(50), nullable=False, default="warm")
+    avoid_mission_keywords = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class PregnancyStatusCheck(Base):
+    __tablename__ = "PREGNANCY_STATUS_CHECKS"
+
+    status_check_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, index=True)
+    symptoms = Column(Text, nullable=True)
+    emotions = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class WeeklyAiRecommendation(Base):
+    __tablename__ = "WEEKLY_AI_RECOMMENDATIONS"
+
+    recommendation_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    pregnancy_week = Column(Integer, nullable=False, index=True)
+    recommendation_type = Column(String(50), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+
+
+class TrustedPregnancyInfo(Base):
+    __tablename__ = "TRUSTED_PREGNANCY_INFO"
+
+    info_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    source = Column(String(100), nullable=True)
+    pregnancy_period = Column(String(50), nullable=True)

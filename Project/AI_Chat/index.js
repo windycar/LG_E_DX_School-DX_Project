@@ -21,10 +21,19 @@ const allowedOrigins = new Set(
 );
 const allowedDevOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1):517\d$/;
 const knowledgePath = path.resolve(__dirname, "trusted-knowledge.json");
-const aiGenerationEnabled =
-  process.env.ENABLE_AI_GENERATION === "true" && Boolean(process.env.OPENAI_API_KEY);
-const semanticRetrievalEnabled =
-  process.env.ENABLE_SEMANTIC_RETRIEVAL === "true" && Boolean(process.env.OPENAI_API_KEY);
+const openAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
+const hasOpenAiApiKey =
+  Boolean(openAiApiKey) && !["replace_with_your_api_key", "your_openai_api_key_here"].includes(openAiApiKey);
+
+function isOpenAiFeatureEnabled(envName) {
+  const value = (process.env[envName] || "auto").trim().toLowerCase();
+  if (["false", "0", "off", "disabled"].includes(value)) return false;
+  if (["true", "1", "on", "enabled", "auto", ""].includes(value)) return hasOpenAiApiKey;
+  return hasOpenAiApiKey;
+}
+
+const aiGenerationEnabled = isOpenAiFeatureEnabled("ENABLE_AI_GENERATION");
+const semanticRetrievalEnabled = isOpenAiFeatureEnabled("ENABLE_SEMANTIC_RETRIEVAL");
 const minimumSimilarityScore = Number(process.env.MIN_SIMILARITY_SCORE || 0.72);
 const emergencyRules = [
   {

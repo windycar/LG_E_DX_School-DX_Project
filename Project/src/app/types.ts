@@ -1,7 +1,5 @@
-export type Screen =
-  | "home" | "login" | "register" | "dashboard"
-  | "discomfort" | "mental" | "ai" | "info" | "community" | "smalltalk"
-  | "diary" | "profile" | "settings" | "appliance";
+// types.ts 파일 내부의 Screen 타입
+export type Screen = "home" | "login" | "register" | "dashboard" | "discomfort" | "mental" | "ai" | "mission" | "info" | "community" | "smalltalk" | "diary" | "profile" | "settings" | "appliance";
 
 export type Role = "pregnant" | "guardian";
 

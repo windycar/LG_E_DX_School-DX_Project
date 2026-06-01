@@ -11,6 +11,7 @@ function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <div className="flex items-center gap-3 px-5 py-4 bg-card/90 backdrop-blur-sm sticky top-0 z-10 border-b border-border">
       <button onClick={onBack} className="p-2 rounded-xl hover:bg-secondary transition-colors">
+        sasadasdsadsds
         <ArrowLeft size={20} className="text-foreground" />
       </button>
       <h1 className="font-semibold text-foreground">{title}</h1>

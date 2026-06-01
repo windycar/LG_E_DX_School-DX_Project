@@ -160,7 +160,7 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     return Object.values(map);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const next = { ...appliances };
     const nextSettings = { ...applianceSettings };
     
@@ -178,6 +178,23 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     setAppliances(next);
     setApplianceSettings(nextSettings);
     persistDiscomfortAppliances(next, nextSettings);
+
+    if (userId) {
+      try {
+        await fetch(`${API_BASE_URL}/api/status-checks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            symptoms: selSymptoms,
+            emotions: selEmotions,
+          }),
+        });
+      } catch (error) {
+        console.error("보호자 미션 생성 실패:", error);
+      }
+    }
+
     setSubmitted(true);
 
     if (onStatusUpdate) {

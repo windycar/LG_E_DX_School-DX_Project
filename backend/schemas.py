@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class UserCreate(BaseModel):
@@ -58,3 +58,17 @@ class ApplianceSettingUpsert(BaseModel):
 class ApplianceSettingsBulkUpsert(BaseModel):
     user_id: Optional[int] = None
     settings: list[ApplianceSettingUpsert]
+
+
+class UserCarePreferenceUpsert(BaseModel):
+    preferred_mission_type: Optional[str] = "balanced"
+    notification_enabled: Optional[bool] = True
+    mission_time: Optional[str] = None
+    care_style: Optional[str] = "warm"
+    avoid_mission_keywords: Optional[str] = None
+
+
+class PregnancyStatusCheckCreate(BaseModel):
+    user_id: int
+    symptoms: list[str] = Field(default_factory=list)
+    emotions: list[str] = Field(default_factory=list)

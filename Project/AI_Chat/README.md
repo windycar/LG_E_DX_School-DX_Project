@@ -29,14 +29,20 @@ cd Project\AI_Chat
 Copy-Item .env.example .env
 ```
 
-그 다음 `Project\AI_Chat\.env`에 본인 키를 넣습니다. `.env`는 `.gitignore`에 포함되어 GitHub에 올라가지 않습니다.
+그 다음 `Project\AI_Chat\.env`에 본인 키만 넣으면 됩니다. `.env`는 `.gitignore`에 포함되어 GitHub에 올라가지 않습니다.
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
-ENABLE_AI_GENERATION=true
 ```
 
-API 키가 없거나 `ENABLE_AI_GENERATION=false`이면 챗봇은 안전 분기와 `trusted-knowledge.json`의 공식 자료 기반 기본 답변만 사용합니다. API 키를 넣으면 검색된 공식 자료를 근거로 OpenAI 모델이 더 자연스러운 답변을 생성합니다.
+기본값은 `auto`입니다. API 키가 있으면 LangChain 기반 OpenAI 생성형 답변과 의미 검색이 자동으로 켜지고, API 키가 없으면 챗봇은 안전 분기와 `trusted-knowledge.json`의 공식 자료 기반 기본 답변만 사용합니다.
+
+생성형 답변을 강제로 끄고 싶을 때만 아래처럼 설정합니다.
+
+```env
+ENABLE_AI_GENERATION=false
+ENABLE_SEMANTIC_RETRIEVAL=false
+```
 
 ## API
 
