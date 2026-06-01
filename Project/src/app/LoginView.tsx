@@ -19,12 +19,16 @@ export default function LoginView({
     setLoading(true);
     setError("");
 
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+
     try {
       const response = await fetch(apiUrl("/api/auth/login"), {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email, password }),
-});
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
+      });
 
       const data = await response.json();
 
@@ -59,8 +63,13 @@ export default function LoginView({
         setError(data.detail || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
     } catch (err) {
-      setError("서버와 통신할 수 없습니다. 백엔드 서버를 확인해주세요.");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("서버 응답이 지연되고 있습니다. Render 서버가 깨어난 뒤 다시 로그인해주세요.");
+      } else {
+        setError("서버와 통신할 수 없습니다. 백엔드 주소 또는 CORS 설정을 확인해주세요.");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   };
