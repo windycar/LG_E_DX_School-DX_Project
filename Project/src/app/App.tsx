@@ -16,7 +16,7 @@ import {
 import { Screen, Role, AppUser, PartnerStatus } from "./types";
 import LoginView from "./LoginView";
 import DashboardView from "./DashboardView";
-import SmallTalkView from "./SmallTalkView";
+import SmallTalkView from "./SmalltalkView";
 import CommunityView from "./CommunityView";
 import SettingsView from "./SettingsView";
 
