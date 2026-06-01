@@ -111,7 +111,31 @@ The QR code should point to:
 https://your-frontend.vercel.app
 ```
 
-## 5. Arduino Demo
+## 5. Phone Install
+
+The React app includes PWA files:
+
+```text
+Project/public/manifest.webmanifest
+Project/public/service-worker.js
+Project/public/app-icon.svg
+```
+
+After Vercel deployment, open the Vercel URL on a phone.
+
+Android Chrome:
+
+```text
+Menu > Add to Home screen > Install
+```
+
+iPhone Safari:
+
+```text
+Share > Add to Home Screen
+```
+
+## 6. Arduino Demo
 
 For the presentation, Arduino can be used as a visual device-control demo.
 
