@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useRef } from "react";
 import { X, Sparkles, Loader2, ImagePlus } from "lucide-react";
 
@@ -38,7 +39,7 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
     if (!content.trim()) { alert("일기 내용을 먼저 조금 작성해주세요!"); return; }
     setIsAnalyzing(true);
     try {
-      const res = await fetch("http://localhost:8000/api/ai/emotion", {
+      const res = await fetch(apiUrl("/api/ai/emotion"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: content })

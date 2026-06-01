@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { AppUser, Screen } from "./types";
 import MyCommunityView from "./MyCommunityView"; // 🚀 새로 만든 커뮤니티 모달창 Import!
@@ -29,7 +30,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
     if (!identifier) return;
 
     // 1. 내 기본 정보 및 연동 코드 가져오기
-    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+    fetch(apiUrl(`/api/user/info/${identifier}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {
@@ -39,7 +40,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
 
           // 2. 코드를 가져왔다면, 즉시 캘린더 검진일 API 호출!
           if (code) {
-            fetch(`http://localhost:8000/api/calendar/checkups/${code}`)
+            fetch(apiUrl(`/api/calendar/checkups/${code}`))
               .then(res => res.json())
               .then(checkupData => {
                 if (checkupData.status === "Success") {
@@ -57,15 +58,15 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
       });
 
     // 3. 활동 통계 가져오기
-    fetch(`http://localhost:8000/api/diary/logs/${identifier}`)
+    fetch(apiUrl(`/api/diary/logs/${identifier}`))
       .then(res => res.json())
       .then(data => { if (data.status === "Success" && data.entries) setStats(prev => ({ ...prev, diary: data.entries.length })); });
 
-    fetch(`http://localhost:8000/api/community/posts/count/${identifier}`)
+    fetch(apiUrl(`/api/community/posts/count/${identifier}`))
       .then(res => res.json())
       .then(data => { if (data.status === "Success") setStats(prev => ({ ...prev, posts: data.count })); });
 
-    fetch(`http://localhost:8000/api/community/comments/count/${identifier}`)
+    fetch(apiUrl(`/api/community/comments/count/${identifier}`))
       .then(res => res.json())
       .then(data => { if (data.status === "Success") setStats(prev => ({ ...prev, comments: data.count })); });
 

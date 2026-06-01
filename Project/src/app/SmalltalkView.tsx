@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Lock, CheckCircle2 } from "lucide-react";
 import { BottomNav } from "./App";
@@ -23,7 +24,7 @@ export default function SmallTalkView({ user, onBack, onNavigate }: { user: AppU
     if (!userId) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/smalltalk/${userId}`);
+      const res = await fetch(apiUrl(`/api/smalltalk/${userId}`));
       const data = await res.json();
       if (data.status === "Success") {
         setTopic(data.topic);
@@ -44,7 +45,7 @@ export default function SmallTalkView({ user, onBack, onNavigate }: { user: AppU
     if (!myAnswer.trim() || !topic) return;
 
     try {
-      const res = await fetch("http://localhost:8000/api/smalltalk/answer", {
+      const res = await fetch(apiUrl("/api/smalltalk/answer"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

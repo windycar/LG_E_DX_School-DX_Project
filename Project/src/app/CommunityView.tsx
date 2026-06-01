@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, MessageCircle, Plus, Trash2, Send } from "lucide-react";
 import { AppUser, Screen } from "./types";
@@ -37,7 +38,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
 
   useEffect(() => {
     if (!identifier) return;
-    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+    fetch(apiUrl(`/api/user/info/${identifier}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {
@@ -78,7 +79,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/community/posts");
+      const res = await fetch(apiUrl("/api/community/posts"));
       const data = await res.json();
       if (data.status === "Success" && Array.isArray(data.posts)) setPosts(data.posts);
       else setPosts([]);
@@ -93,7 +94,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const deletePost = async (postId: number) => {
     if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/community/posts/${postId}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/community/posts/${postId}`), { method: "DELETE" });
       if (res.ok) fetchPosts();
       else alert("게시글 삭제에 실패했습니다.");
     } catch (e) { alert("서버와 통신 오류가 발생했습니다."); }
@@ -111,7 +112,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
 
   const fetchComments = async (postId: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`);
+      const res = await fetch(apiUrl(`/api/posts/${postId}/comments`));
       const data = await res.json();
       if (data.status === "Success" && Array.isArray(data.comments)) setPostComments(data.comments);
       else setPostComments([]);
@@ -125,7 +126,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     if (!newComment.trim()) return;
     try {
       const currentUserId = (user as any).id || (user as any).user_id || 1;
-      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`, {
+      const res = await fetch(apiUrl(`/api/posts/${postId}/comments`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: currentUserId, content: newComment }),
@@ -142,7 +143,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
     try {
       const currentUserId = (user as any).id || (user as any).user_id || 1;
-      const res = await fetch(`http://localhost:8000/api/comments/${commentId}?user_id=${currentUserId}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/comments/${commentId}?user_id=${currentUserId}`), { method: "DELETE" });
       if (res.ok) {
         fetchComments(postId);
         fetchPosts(); // 댓글 개수 갱신
@@ -179,7 +180,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
     };
     
     try {
-      const res = await fetch("http://localhost:8000/api/community/posts", {
+      const res = await fetch(apiUrl("/api/community/posts"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

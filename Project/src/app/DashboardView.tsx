@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { LogOut, Star } from "lucide-react";
@@ -288,7 +289,7 @@ export default function DashboardView({
 
   useEffect(() => {
     if (!identifier) return;
-    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+    fetch(apiUrl(`/api/user/info/${identifier}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {

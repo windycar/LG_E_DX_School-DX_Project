@@ -1,10 +1,9 @@
-﻿import { useEffect, useState } from "react";
+﻿import { API_BASE_URL } from "./api";
+import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle, Search, X, Sparkles } from "lucide-react";
 import { AppUser, PartnerStatus, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App";
-
-const API_BASE_URL = "http://localhost:8000";
 
 type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier";
 type ApplianceState = Record<ApplianceKey, boolean>;

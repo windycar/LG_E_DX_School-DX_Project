@@ -26,6 +26,12 @@ import smalltalk_service
 # =====================================================================
 load_dotenv()
 models.Base.metadata.create_all(bind=database.engine)
+API_PUBLIC_BASE_URL = os.getenv("API_PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+BACKEND_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("BACKEND_ALLOWED_ORIGINS", "*").split(",")
+    if origin.strip()
+]
 
 
 def ensure_mission_schema():
@@ -245,11 +251,11 @@ try:
 except Exception as e:
     print(f"weekly ai recommendation seed skipped: {e}")
 
-app = FastAPI()
+app = FastAPI(title="Pregnancy Smart Care API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=BACKEND_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -257,6 +263,15 @@ app.add_middleware(
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": "FastAPI backend",
+        "api_public_base_url": API_PUBLIC_BASE_URL,
+    }
 
 
 # =====================================================================
@@ -1021,7 +1036,7 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
         
         for log in logs:
             date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
-            img_list = [f"http://localhost:8000/{log.image_path}"] if log.image_path else []
+            img_list = [f"{API_PUBLIC_BASE_URL}/{log.image_path}"] if log.image_path else []
             display_mood = keyword_to_emoji.get(log.selected_emotion, "😐")
             
             entry = {

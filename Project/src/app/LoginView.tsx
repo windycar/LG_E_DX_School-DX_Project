@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { AppUser } from "./types";
@@ -19,7 +20,7 @@ export default function LoginView({
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/auth/login", {
+      const response = await fetch(apiUrl("/api/auth/login"), {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ email, password }),

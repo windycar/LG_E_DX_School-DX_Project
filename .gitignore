@@ -2,9 +2,14 @@
 .vscode/
 .pnpm-store/
 Project/node_modules
+Project/dist
+Project/.env
+Project/.env.local
+Project/.env.production
 Project/AI_Chat/node_modules
 Project/AI_Chat/.npm-cache
 Project/AI_Chat/.env
 backend/__pycache__/
+backend/.env
 __pycache__/
 *.pyc

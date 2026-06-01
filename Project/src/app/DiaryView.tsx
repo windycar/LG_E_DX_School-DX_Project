@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { Plus, X, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { AppUser, Screen } from "./types";
@@ -30,7 +31,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   // 1. 유저 정보 & 연동 코드 가져오기
   useEffect(() => {
     if (!identifier) return;
-    fetch(`http://localhost:8000/api/user/info/${identifier}`)
+    fetch(apiUrl(`/api/user/info/${identifier}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {
@@ -43,7 +44,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   // 2. 캘린더 공유 일정 불러오기
   const fetchEvents = () => {
     if (!connectionCode || connectionCode === "None") return;
-    fetch(`http://localhost:8000/api/calendar/events/${connectionCode}`)
+    fetch(apiUrl(`/api/calendar/events/${connectionCode}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success" && Array.isArray(data.events)) {
@@ -59,7 +60,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       return;
     }
     console.log(`📥 다이어리 & 스몰토크 조회 시작: userId=${userId}`);
-    fetch(`http://localhost:8000/api/diary/logs/${userId}`)
+    fetch(apiUrl(`/api/diary/logs/${userId}`))
       .then(res => res.json())
       .then(data => {
         console.log("📊 API 응답:", data);
@@ -107,7 +108,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       title: newEventTitle, content: newEventContent || "상세내용 없음", event_date: newEventDate
     };
     try {
-      const res = await fetch("http://localhost:8000/api/calendar/events", {
+      const res = await fetch(apiUrl("/api/calendar/events"), {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
       });
       if (res.ok) {
@@ -122,7 +123,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   const updateEvent = async () => {
     if (!selectedEvent.event_date || !selectedEvent.title.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/calendar/events/${selectedEvent.event_id}`, {
+      const res = await fetch(apiUrl(`/api/calendar/events/${selectedEvent.event_id}`), {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           event_type: selectedEvent.event_type, title: selectedEvent.title,
@@ -136,7 +137,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   const deleteEvent = async (eventId: number) => {
     if (!window.confirm("이 일정을 정말 삭제하시겠습니까?")) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/calendar/events/${eventId}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/calendar/events/${eventId}`), { method: "DELETE" });
       if (res.ok) { fetchEvents(); setSelectedEvent(null); } else { alert("일정 삭제 실패"); }
     } catch (e) { alert("서버 통신 오류"); }
   };
@@ -340,7 +341,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
               if (data.image) formData.append("image", data.image);
 
               try {
-                const res = await fetch("http://localhost:8000/api/diary/logs", {
+                const res = await fetch(apiUrl("/api/diary/logs"), {
                   method: "POST", body: formData 
                 });
                 

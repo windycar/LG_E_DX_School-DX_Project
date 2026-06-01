@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { AppUser, Screen } from "./types";
@@ -43,7 +44,7 @@ export default function AIRecommendView({ user, onBack, onNavigate }: { user: Ap
     if (!identifier) return;
 
     setIsLoading(true);
-    fetch(`http://localhost:8000/api/ai/weekly-recommendations/${identifier}`)
+    fetch(apiUrl(`/api/ai/weekly-recommendations/${identifier}`))
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "Success") {

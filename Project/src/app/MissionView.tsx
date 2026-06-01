@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useEffect, useState, useMemo } from "react";
 import { ArrowLeft, Gift, Heart, Coffee, Wind, CheckCircle, Smile } from "lucide-react";
 import { AppUser, PartnerStatus, Screen } from "./types";
@@ -121,7 +122,7 @@ export default function MissionView({
 
   useEffect(() => {
     if (!userId) return;
-    fetch(`http://localhost:8000/api/guardian/missions/today/${userId}`)
+    fetch(apiUrl(`/api/guardian/missions/today/${userId}`))
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "Success" && data.mission) {
@@ -150,7 +151,7 @@ export default function MissionView({
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/api/guardian/missions/${backendMission.mission_id}/complete`, {
+      const res = await fetch(apiUrl(`/api/guardian/missions/${backendMission.mission_id}/complete`), {
         method: "PUT",
       });
       if (res.ok) {

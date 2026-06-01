@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { X, MessageCircle, Trash2, Send } from "lucide-react";
 
@@ -41,7 +42,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   const fetchData = () => {
     setIsLoading(true);
     const endpoint = activeTab === "posts" ? "my-posts" : "my-comments";
-    fetch(`http://localhost:8000/api/community/${endpoint}/${userId}`)
+    fetch(apiUrl(`/api/community/${endpoint}/${userId}`))
       .then(res => res.json())
       .then(resData => {
         // 백엔드가 내가 댓글 단 '게시글(posts)'을 보내주므로 그냥 쓰면 됩니다.
@@ -55,7 +56,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   // 🚀 게시글 삭제 로직
   const deletePost = async (postId: number) => {
     if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
-    const res = await fetch(`http://localhost:8000/api/community/posts/${postId}`, { method: "DELETE" });
+    const res = await fetch(apiUrl(`/api/community/posts/${postId}`), { method: "DELETE" });
     if (res.ok) fetchData();
     else alert("게시글 삭제에 실패했습니다.");
   };
@@ -73,7 +74,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
 
   const fetchComments = async (postId: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`);
+      const res = await fetch(apiUrl(`/api/posts/${postId}/comments`));
       const data = await res.json();
       if (data.status === "Success" && Array.isArray(data.comments)) setPostComments(data.comments);
       else setPostComments([]);
@@ -84,7 +85,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   const submitComment = async (postId: number) => {
     if (!newComment.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/posts/${postId}/comments`, {
+      const res = await fetch(apiUrl(`/api/posts/${postId}/comments`), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, content: newComment }),
       });
@@ -97,7 +98,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   const deletePostComment = async (commentId: number, postId: number) => {
     if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/comments/${commentId}?user_id=${userId}`, { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/comments/${commentId}?user_id=${userId}`), { method: "DELETE" });
       if (res.ok) { fetchComments(postId); fetchData(); } 
       else alert("삭제 실패");
     } catch (e) { alert("서버 오류"); }

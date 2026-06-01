@@ -1,4 +1,5 @@
-﻿import { useState } from "react";
+﻿import { apiUrl } from "./api";
+import { useState } from "react";
 import { motion } from "motion/react";
 import {
   ArrowLeft, LogOut, MessageCircle, Shield, ThumbsUp,
@@ -240,7 +241,7 @@ function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/auth/register", {
+      const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

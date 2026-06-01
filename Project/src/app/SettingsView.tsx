@@ -1,3 +1,4 @@
+﻿import { apiUrl } from "./api";
 import { useState, useEffect } from "react";
 import { AppUser, Screen } from "./types";
 import { ArrowLeft, ChevronRight, Copy, Shield } from "lucide-react";
@@ -27,7 +28,7 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   // 최신 유저 정보 불러오기 함수
   const fetchLatestUserInfo = () => {
     if (!userId) return;
-    fetch(`http://localhost:8000/api/user/info/${userId}`)
+    fetch(apiUrl(`/api/user/info/${userId}`))
       .then(res => res.json())
       .then(data => {
         if (data.status === "Success") {
@@ -48,7 +49,7 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   // 🚀 로그아웃을 막고 메인 화면까지 즉시 동기화하는 프로필 업데이트 함수
   const handleProfileUpdate = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/user/profile/${userId}`, {
+      const res = await fetch(apiUrl(`/api/user/profile/${userId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editName, baby_nickname: editBabyNickname }),
@@ -85,7 +86,7 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
       return;
     }
     try {
-      const res = await fetch(`http://localhost:8000/api/user/password/${userId}`, {
+      const res = await fetch(apiUrl(`/api/user/password/${userId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
@@ -112,7 +113,7 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
     }
 
     try {
-      const res = await fetch(`http://localhost:8000/api/auth/withdraw/${userId}`, {
+      const res = await fetch(apiUrl(`/api/auth/withdraw/${userId}`), {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });

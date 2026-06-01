@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: pregnancy-care-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: API_PUBLIC_BASE_URL
+        sync: false
+      - key: BACKEND_ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: pregnancy-care-ai-chat
+    runtime: node
+    rootDir: Project/AI_Chat
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ENABLE_AI_GENERATION
+        value: auto
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o-mini
+      - key: ENABLE_SEMANTIC_RETRIEVAL
+        value: auto
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: MIN_SIMILARITY_SCORE
+        value: "0.72"
+      - key: HOST
+        value: 0.0.0.0
+      - key: ALLOWED_ORIGINS
+        sync: false
