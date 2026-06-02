@@ -87,6 +87,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false); 
+  const [expandedSmallTalkIds, setExpandedSmallTalkIds] = useState<Record<number, boolean>>({});
 
   const [showEventForm, setShowEventForm] = useState(false); 
   const [newEventDate, setNewEventDate] = useState("");
@@ -155,7 +156,8 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
       const entry = entries.find((e) => e.date === dateStr);
       const dayEvents = events.filter((e) => e.event_date === dateStr);
-      days.push({ day: i, date: dateStr, mood: entry?.mood, events: dayEvents });
+      const daySmallTalks = smalltalkEntries.filter((e) => e.date === dateStr);
+      days.push({ day: i, date: dateStr, mood: entry?.mood, events: dayEvents, smalltalks: daySmallTalks });
     }
     const endPadding = 6 - lastDay;
     for (let i = 0; i < endPadding; i++) days.push(null);
@@ -166,6 +168,9 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   const filteredEntries = selectedDate ? entries.filter((e) => e.date === selectedDate) : entries;
   const filteredEvents = selectedDate ? events.filter((e) => e.event_date === selectedDate) : events;
   const filteredSmallTalk = selectedDate ? smalltalkEntries.filter((e) => e.date === selectedDate) : smalltalkEntries;
+  const toggleSmallTalk = (entryId: number) => {
+    setExpandedSmallTalkIds((prev) => ({ ...prev, [entryId]: !prev[entryId] }));
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
@@ -211,7 +216,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
               if (!item) return <div key={`empty-${i}`} className="aspect-square" />;
               
               // 🚀 일정이나 다이어리(이모지)가 하나라도 있는지 체크!
-              const hasSchedule = item.events.length > 0 || item.mood;
+              const hasSchedule = item.events.length > 0 || item.mood || item.smalltalks.length > 0;
               const isSelected = selectedDate === item.date;
 
               return (
@@ -249,6 +254,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                       const typeInfo = EVENT_TYPES.find(t => t.id === e.event_type) || EVENT_TYPES[6];
                       return <span key={`dot-${idx}`} className="w-[4.5px] h-[4.5px] rounded-full shadow-sm" style={{ background: typeInfo.color }} />
                     })}
+                    {item.smalltalks.length > 0 && <span className="w-[4.5px] h-[4.5px] rounded-full shadow-sm" style={{ background: "#F48FB1" }} />}
                   </div>
                 </button>
               );
@@ -370,7 +376,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
         )}
 
         {/* 📝 다이어리 섹션 */}
-        <div className="space-y-3 pb-5">
+        {selectedDate && <div className="space-y-3 pb-5">
           {filteredEntries.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <p className="text-3xl mb-3">📖</p>
@@ -395,14 +401,23 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                 </div>
 
                 {/* 🚀 다이어리 날짜의 스몰토크도 함께 표시 */}
-                {entry.smalltalk && (
+                {selectedDate && entry.smalltalk && filteredSmallTalk.length === 0 && (
                   <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-200 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-lg">💕</span>
-                      <p className="text-xs font-bold text-pink-600">그날의 스몰토크</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">💕</span>
+                        <p className="text-xs font-bold text-pink-600">그날의 스몰토크</p>
+                      </div>
+                      <button
+                        onClick={() => toggleSmallTalk(entry.id)}
+                        className="text-xs px-3 py-1.5 rounded-full font-bold"
+                        style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+                      >
+                        {expandedSmallTalkIds[entry.id] ? "닫기" : "보기"}
+                      </button>
                     </div>
                     
-                    <div className="space-y-3">
+                    {expandedSmallTalkIds[entry.id] && <div className="space-y-3 mt-3">
                       {/* 질문 */}
                       <div>
                         <p className="text-xs font-semibold text-muted-foreground mb-1.5">❓ 질문</p>
@@ -420,52 +435,53 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                         <p className="text-xs font-semibold text-purple-600 mb-1">💬 파트너의 답변</p>
                         <p className="text-sm text-foreground leading-relaxed">{entry.smalltalk.partner_answer}</p>
                       </div>
-                    </div>
+                    </div>}
                   </div>
                 )}
               </div>
             ))
           )}
-        </div>
+        </div>}
 
-        {/* 🚀 스몰토크 섹션 (다이어리와 독립적) */}
-        {filteredSmallTalk.length > 0 && (
-          <div className="border-t border-border/50 pt-5 mt-5">
-            <p className="text-sm font-bold mb-3" style={{ color: "#C94E70" }}>
-              💕 우리의 스몰토크
-            </p>
-            <div className="space-y-3 pb-20">
-              {filteredSmallTalk.map((st) => (
-                <div key={`smalltalk-${st.id}`} className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-200 shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
+        {selectedDate && filteredSmallTalk.length > 0 && (
+          <div className="space-y-3 pb-20">
+            {filteredSmallTalk.map((st) => (
+              <div key={`selected-smalltalk-${st.id}`} className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-4 border border-pink-200 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
                     <span className="text-lg">💕</span>
-                    <p className="text-xs font-bold text-pink-600">{new Date(st.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+                    <p className="text-xs font-bold text-pink-600">그날의 스몰토크</p>
                   </div>
-                  
-                  <div className="space-y-3">
-                    {/* 질문 */}
+                  <button
+                    onClick={() => toggleSmallTalk(st.id)}
+                    className="text-xs px-3 py-1.5 rounded-full font-bold"
+                    style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}
+                  >
+                    {expandedSmallTalkIds[st.id] ? "닫기" : "보기"}
+                  </button>
+                </div>
+
+                {expandedSmallTalkIds[st.id] && (
+                  <div className="space-y-3 mt-3">
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground mb-1.5">❓ 질문</p>
                       <p className="text-sm font-medium text-foreground leading-relaxed">{st.topic}</p>
                     </div>
-
-                    {/* 내 답변 */}
                     <div className="bg-white/70 rounded-xl p-3 border border-pink-100">
                       <p className="text-xs font-semibold text-pink-600 mb-1">💬 내 답변</p>
                       <p className="text-sm text-foreground leading-relaxed">{st.my_answer}</p>
                     </div>
-
-                    {/* 파트너 답변 */}
                     <div className="bg-white/70 rounded-xl p-3 border border-purple-100">
                       <p className="text-xs font-semibold text-purple-600 mb-1">💬 파트너의 답변</p>
                       <p className="text-sm text-foreground leading-relaxed">{st.partner_answer}</p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
+
       </div>
       
       <BottomNav current="diary" onNavigate={onNavigate} />

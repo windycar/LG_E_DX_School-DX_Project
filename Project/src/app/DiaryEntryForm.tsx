@@ -26,6 +26,66 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
   const [aiResultLabel, setAiResultLabel] = useState<string>("");
 
   const MOODS = ["😡", "😔", "😫", "😟", "😐", "🙂", "🥰", "😊"]; 
+  const MOOD_LABELS: Record<string, string> = {
+    "😡": "화남",
+    "😔": "우울",
+    "😫": "힘듦",
+    "😟": "불안",
+    "😐": "보통",
+    "🙂": "괜찮음",
+    "🥰": "사랑스러움",
+    "😊": "행복",
+  };
+
+  const ruleBasedEmotion = (text: string) => {
+    const weights: Record<string, { emoji: string; score: number }> = {
+      화남: { emoji: "😡", score: 0 },
+      우울: { emoji: "😔", score: 0 },
+      힘듦: { emoji: "😫", score: 0 },
+      불안: { emoji: "😟", score: 0 },
+      보통: { emoji: "😐", score: 0.4 },
+      괜찮음: { emoji: "🙂", score: 0 },
+      사랑스러움: { emoji: "🥰", score: 0 },
+      행복: { emoji: "😊", score: 0 },
+    };
+    const lexicon: Array<{ label: keyof typeof weights; words: string[]; score: number }> = [
+      { label: "화남", score: 2.2, words: ["화가", "화남", "짜증", "분노", "열받", "빡", "피해다니", "싫다"] },
+      { label: "우울", score: 2.0, words: ["우울", "슬프", "눈물", "외롭", "속상", "무기력", "서럽"] },
+      { label: "힘듦", score: 1.8, words: ["힘들", "지침", "피곤", "아픔", "통증", "입덧", "못자", "버겁"] },
+      { label: "불안", score: 2.0, words: ["불안", "걱정", "무섭", "두렵", "초조", "긴장", "혹시"] },
+      { label: "괜찮음", score: 1.8, words: ["괜찮", "풀렸", "나아졌", "안정", "차분", "버틸만"] },
+      { label: "행복", score: 2.0, words: ["행복", "좋았", "기쁘", "웃", "편안", "고마", "다행"] },
+      { label: "사랑스러움", score: 2.0, words: ["사랑", "태동", "아기", "설렘", "소중", "귀여"] },
+    ];
+    const sentences = text
+      .toLowerCase()
+      .split(/[.!?\n。！？]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const targetSentences = sentences.length ? sentences : [text.toLowerCase()];
+
+    targetSentences.forEach((sentence, index) => {
+      let multiplier = 1;
+      if (index === targetSentences.length - 1) multiplier += 0.4;
+      if (/(하지만|그래도|근데|그런데|결국|다행히|그래서)/.test(sentence)) multiplier += 0.8;
+      if (/(아니|않|안 |못 |없)/.test(sentence)) multiplier -= 0.25;
+
+      lexicon.forEach((rule) => {
+        const hitCount = rule.words.filter((word) => sentence.includes(word)).length;
+        if (hitCount > 0) weights[rule.label].score += rule.score * hitCount * Math.max(0.4, multiplier);
+      });
+    });
+
+    if (/(마음이 풀|괜찮아졌|나아졌|고마웠|다행)/.test(text)) {
+      weights.화남.score *= 0.45;
+      weights.불안.score *= 0.7;
+      weights.괜찮음.score += 1.5;
+      weights.행복.score += 0.8;
+    }
+
+    const result = Object.entries(weights).sort((a, b) => b[1].score - a[1].score)[0];
+    return { label: result[0], emoji: result[1].emoji, score: result[1].score.toFixed(1) };
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,10 +107,15 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
       const data = await res.json();
       
       if (data.status === "Success") {
-        setMood(data.emoji); 
-        setAiResultLabel(data.emotion_label); 
+        const corrected = ruleBasedEmotion(content);
+        setMood(corrected.emoji); 
+        setAiResultLabel(`${corrected.label} · 맥락 가중치 ${corrected.score}`); 
       } else { alert("AI 분석에 실패했습니다."); }
-    } catch (error) { alert("서버 연결에 실패했습니다."); } 
+    } catch (error) {
+      const corrected = ruleBasedEmotion(content);
+      setMood(corrected.emoji);
+      setAiResultLabel(`${corrected.label} · 로컬 가중치 ${corrected.score}`);
+    } 
     finally { setIsAnalyzing(false); }
   };
 
@@ -114,11 +179,16 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
         {/* 기분 표시/선택 영역 */}
         <div className="bg-[#FCF0F4]/30 rounded-xl p-3 border border-[#C94E70]/10">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold text-muted-foreground">{aiResultLabel ? `🤖 AI 분석 결과: ${aiResultLabel}` : "💡 직접 기분을 선택하거나 AI에게 맡겨보세요"}</p>
+            <p className="text-[11px] font-bold text-muted-foreground">
+              {aiResultLabel ? `🤖 분석 결과: ${aiResultLabel}` : mood ? `선택한 감정: ${MOOD_LABELS[mood]}` : "💡 직접 기분을 선택하거나 분석을 눌러보세요"}
+            </p>
           </div>
           <div className="grid grid-cols-4 gap-2">
             {MOODS.map((m) => (
-              <button key={m} onClick={() => { setMood(m); setAiResultLabel(""); }} className="h-10 rounded-xl flex items-center justify-center text-xl transition-all" style={{ background: mood === m ? "rgba(201,78,112,0.15)" : "white", border: `1.5px solid ${mood === m ? "#C94E70" : "var(--border)"}` }}>{m}</button>
+              <button key={m} onClick={() => { setMood(m); setAiResultLabel(""); }} className="h-12 rounded-xl flex flex-col items-center justify-center text-lg transition-all" style={{ background: mood === m ? "rgba(201,78,112,0.15)" : "white", border: `1.5px solid ${mood === m ? "#C94E70" : "var(--border)"}` }}>
+                <span>{m}</span>
+                {mood === m && <span className="text-[10px] font-bold" style={{ color: "#C94E70" }}>{MOOD_LABELS[m]}</span>}
+              </button>
             ))}
           </div>
         </div>

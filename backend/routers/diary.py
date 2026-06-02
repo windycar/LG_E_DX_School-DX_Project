@@ -204,6 +204,51 @@ def get_weekly_ai_recommendations(identifier: str, db: Session = Depends(databas
 @router.post("/api/ai/emotion")
 def analyze_diary_emotion(req: schemas.EmotionRequest, request: Request):
     if not req.text.strip(): return {"status": "Error", "message": "텍스트가 없습니다."}
+    text = req.text.lower()
+    scores = {
+        "화남": {"emoji": "😡", "score": 0.0},
+        "우울": {"emoji": "😔", "score": 0.0},
+        "힘듦": {"emoji": "😫", "score": 0.0},
+        "불안": {"emoji": "😟", "score": 0.0},
+        "중립": {"emoji": "😐", "score": 0.4},
+        "안정": {"emoji": "🙂", "score": 0.0},
+        "설렘": {"emoji": "🥰", "score": 0.0},
+        "행복": {"emoji": "😊", "score": 0.0},
+    }
+    lexicon = [
+        ("화남", 2.2, ["화가", "화남", "짜증", "분노", "열받", "빡", "피해다니", "싫다"]),
+        ("우울", 2.0, ["우울", "슬프", "눈물", "외롭", "속상", "무기력", "서럽"]),
+        ("힘듦", 1.8, ["힘들", "지침", "피곤", "아픔", "통증", "입덧", "못자", "버겁"]),
+        ("불안", 2.0, ["불안", "걱정", "무섭", "두렵", "초조", "긴장", "혹시"]),
+        ("안정", 1.8, ["괜찮", "풀렸", "나아졌", "안정", "차분", "버틸만"]),
+        ("행복", 2.0, ["행복", "좋았", "기쁘", "웃", "편안", "고마", "다행"]),
+        ("설렘", 2.0, ["사랑", "태동", "아기", "설렘", "소중", "귀여"]),
+    ]
+    sentences = [part.strip() for part in text.replace("!", ".").replace("?", ".").replace("\n", ".").split(".") if part.strip()] or [text]
+    for index, sentence in enumerate(sentences):
+        multiplier = 1.0
+        if index == len(sentences) - 1:
+            multiplier += 0.4
+        if any(token in sentence for token in ["하지만", "그래도", "근데", "그런데", "결국", "다행히", "그래서"]):
+            multiplier += 0.8
+        if any(token in sentence for token in ["아니", "않", "안 ", "못 ", "없"]):
+            multiplier -= 0.25
+        multiplier = max(0.4, multiplier)
+
+        for label, weight, keywords in lexicon:
+            hit_count = sum(1 for keyword in keywords if keyword in sentence)
+            if hit_count:
+                scores[label]["score"] += weight * hit_count * multiplier
+
+    if any(token in text for token in ["마음이 풀", "괜찮아졌", "나아졌", "고마웠", "다행"]):
+        scores["화남"]["score"] *= 0.45
+        scores["불안"]["score"] *= 0.7
+        scores["안정"]["score"] += 1.5
+        scores["행복"]["score"] += 0.8
+
+    best_label, best = max(scores.items(), key=lambda item: item[1]["score"])
+    if best["score"] > 0.4:
+        return {"status": "Success", "emotion_label": best_label, "emoji": best["emoji"], "method": "weighted_context", "score": round(best["score"], 1)}
     try:
         diary_ai = request.app.state.diary_ai
         AI_MODEL = request.app.state.AI_MODEL
@@ -281,25 +326,29 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
                 date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
                 my_smalltalk = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id, func.date(models.SmallTalkAnswer.created_at) == date_obj).first()
                 
-                if my_smalltalk:
+                if my_smalltalk and partner_id:
                     partner_ans_content = "아직 답변하지 않았습니다."
                     if partner_id:
                         partner_smalltalk = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == partner_id, models.SmallTalkAnswer.topic_id == my_smalltalk.topic_id).first()
                         if partner_smalltalk: partner_ans_content = partner_smalltalk.answer_content
                     
                     topic = db.query(models.SmallTalkTopic).filter(models.SmallTalkTopic.topic_id == my_smalltalk.topic_id).first()
-                    if topic:
-                        entry["smalltalk"] = {"topic": topic.question_text, "my_answer": my_smalltalk.answer_content, "partner_answer": partner_ans_content}
+                    if topic and partner_smalltalk:
+                        entry["smalltalk"] = {"topic": topic.question_text, "my_answer": my_smalltalk.answer_content, "partner_answer": partner_smalltalk.answer_content}
             except Exception: pass
             diary_result.append(entry)
         
         try:
             my_answers = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).order_by(models.SmallTalkAnswer.created_at.desc()).all()
             for my_ans in my_answers:
+                if not partner_id:
+                    continue
                 partner_ans_content = "아직 답변하지 않았습니다."
                 if partner_id:
                     partner_ans = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == partner_id, models.SmallTalkAnswer.topic_id == my_ans.topic_id).first()
                     if partner_ans: partner_ans_content = partner_ans.answer_content
+                if not partner_ans:
+                    continue
                         
                 topic = db.query(models.SmallTalkTopic).filter(models.SmallTalkTopic.topic_id == my_ans.topic_id).first()
                 if topic:
