@@ -57,6 +57,14 @@ class CommunityComment(Base):
     content = Column(Text)
     created_at = Column(DateTime, default=func.now())
 
+
+class CommunityPostLike(Base):
+    __tablename__ = "COMMUNITY_POST_LIKES"
+    like_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    post_id = Column(BigInteger, ForeignKey("COMMUNITY_POSTS.post_id"), nullable=False, index=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=func.now())
+
 # 6. 스몰토크 주제 테이블
 class SmallTalkTopic(Base):
     __tablename__ = "SMALL_TALK_TOPICS"

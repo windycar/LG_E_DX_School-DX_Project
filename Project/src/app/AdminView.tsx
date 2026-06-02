@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BarChart2,
   CheckCircle,
+  Heart,
   LogIn,
   LogOut,
   MessageSquare,
@@ -46,6 +47,7 @@ type AdminPostRow = {
   content: string | null;
   created_at: string | null;
   comment_count: number;
+  like_count: number;
   comments: AdminCommentRow[];
 };
 
@@ -379,6 +381,7 @@ export default function AdminView({
       </nav>
 
       <main className="px-4 py-5 flex-1 overflow-y-auto pb-10 space-y-4">
+        {tab !== "analytics" && (
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -389,6 +392,7 @@ export default function AdminView({
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:border-primary"
           />
         </div>
+        )}
 
         {tab === "users" && (
           <section className="space-y-3">
@@ -459,7 +463,13 @@ export default function AdminView({
                   {post.title && <p className="font-bold text-sm text-foreground mb-1">{post.title}</p>}
                   <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
                   <div className="flex items-center justify-between mt-3">
-                    <p className="text-xs text-muted-foreground">댓글 {post.comment_count}개</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>댓글 {post.comment_count}개</span>
+                      <span className="inline-flex items-center gap-1" style={{ color: "#C94E70" }}>
+                        <Heart size={12} fill="#C94E70" />
+                        {post.like_count || 0}
+                      </span>
+                    </div>
                     <button onClick={() => deletePost(post.post_id)} className="text-xs px-2 py-1 rounded-lg border border-border flex items-center gap-1" style={{ color: "#C94E70" }}>
                       <Trash2 size={12} /> 삭제
                     </button>
@@ -497,8 +507,8 @@ export default function AdminView({
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <StatCard label="평균 체감 온도" value={data.analytics.environment_average.felt_temperature ?? 0} color="#C94E70" />
-              <StatCard label="평균 체감 습도" value={data.analytics.environment_average.felt_humidity ?? 0} color="#4D8AF0" />
+              <StatCard label="만족 평균 온도" value={data.analytics.appliance_average.target_temperature ?? 0} color="#C94E70" />
+              <StatCard label="만족 평균 습도" value={data.analytics.appliance_average.target_humidity ?? 0} color="#4D8AF0" />
             </div>
             <div className="bg-card rounded-2xl p-4 border border-border">
               <p className="text-sm font-bold text-foreground mb-3">임산부 평균 가전 세팅</p>

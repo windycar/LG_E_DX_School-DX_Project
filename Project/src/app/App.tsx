@@ -18,6 +18,7 @@ import MentalCareView from "./MentalCareView";
 import AIRecommendView from "./AIRecommendView";
 import MissionView from "./MissionView";
 import InfoView from "./InfoView";
+import PregnancyBenefitsView from "./PregnancyBenefitsView";
 
 export function BottomNav({ current, onNavigate }: { current: Screen; onNavigate: (screen: Screen) => void }) {
   const tabs: Array<{ id: Screen; icon: typeof Home; label: string }> = [
@@ -175,6 +176,7 @@ export default function App() {
         {screen === "ai" && user && <AIRecommendView user={user} onBack={back} onNavigate={go} />}
         {screen === "mission" && user && <MissionView user={user} onBack={back} onNavigate={go} partnerStatus={partnerStatus} />}
         {screen === "info" && <InfoView onBack={back} onNavigate={go} />}
+        {screen === "benefits" && <PregnancyBenefitsView user={user} onBack={() => go("info")} onNavigate={go} />}
         {screen === "community" && user && <CommunityView user={user} onBack={back} onNavigate={go} />}
         {screen === "smalltalk" && user && <SmallTalkView user={user} onBack={back} onNavigate={go} />}
         {screen === "diary" && user && <DiaryView user={user} onNavigate={go} />}

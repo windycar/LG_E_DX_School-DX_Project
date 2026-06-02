@@ -1,6 +1,6 @@
 ﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, MessageCircle, Plus, Trash2, Send } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Plus, Trash2, Send } from "lucide-react";
 import { AppUser, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App";
@@ -75,11 +75,12 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   const [postComments, setPostComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
 
-  useEffect(() => { fetchPosts(); }, []);
+  useEffect(() => { fetchPosts(); }, [userId]);
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch(apiUrl("/api/community/posts"));
+      const query = userId ? `?user_id=${encodeURIComponent(String(userId))}` : "";
+      const res = await fetch(apiUrl(`/api/community/posts${query}`));
       const data = await res.json();
       if (data.status === "Success" && Array.isArray(data.posts)) setPosts(data.posts);
       else setPosts([]);
@@ -98,6 +99,42 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       if (res.ok) fetchPosts();
       else alert("게시글 삭제에 실패했습니다.");
     } catch (e) { alert("서버와 통신 오류가 발생했습니다."); }
+  };
+
+  const toggleLike = async (postId: number) => {
+    const currentUserId = (user as any).id || (user as any).user_id;
+    if (!currentUserId) {
+      alert("로그인 사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
+
+    setPosts((prev) =>
+      prev.map((post) => {
+        const targetId = post.id || post.post_id;
+        if (targetId !== postId) return post;
+        const wasLiked = Boolean(post.liked_by_me);
+        return {
+          ...post,
+          liked_by_me: !wasLiked,
+          like_count: Math.max(0, Number(post.like_count || 0) + (wasLiked ? -1 : 1)),
+        };
+      })
+    );
+
+    try {
+      const res = await fetch(apiUrl(`/api/community/posts/${postId}/like?user_id=${currentUserId}`), { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.status !== "Success") throw new Error(data.detail || data.message || "좋아요 처리 실패");
+      setPosts((prev) =>
+        prev.map((post) => {
+          const targetId = post.id || post.post_id;
+          return targetId === postId ? { ...post, liked_by_me: data.liked, like_count: data.like_count } : post;
+        })
+      );
+    } catch (e) {
+      alert("좋아요 처리 중 오류가 발생했습니다.");
+      fetchPosts();
+    }
   };
 
   const toggleComments = async (postId: number) => {
@@ -290,15 +327,25 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
                   <p className="text-[14px] text-[#555] leading-relaxed mb-4">{post.content}</p>
 
                   <div className="pt-3 border-t border-border/50 flex items-center justify-between">
-                    <button 
-                      onClick={() => toggleComments(postId)} 
-                      className="flex items-center gap-1.5 text-xs font-medium transition-colors"
-                      style={{ color: isExpanded ? "#C94E70" : "#888" }}
-                    >
-                      <MessageCircle size={16} /> 
-                      {isExpanded ? "댓글 닫기" : `댓글 ${post.comment_count || 0}개 보기`}
-                    </button>
-                    
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => toggleLike(postId)}
+                        className="flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                        style={{ color: post.liked_by_me ? "#C94E70" : "#888" }}
+                      >
+                        <Heart size={16} fill={post.liked_by_me ? "#C94E70" : "none"} />
+                        좋아요 {post.like_count || 0}
+                      </button>
+                      <button
+                        onClick={() => toggleComments(postId)}
+                        className="flex items-center gap-1.5 text-xs font-medium transition-colors"
+                        style={{ color: isExpanded ? "#C94E70" : "#888" }}
+                      >
+                        <MessageCircle size={16} />
+                        {isExpanded ? "댓글 닫기" : `댓글 ${post.comment_count || 0}개 보기`}
+                      </button>
+                    </div>
+
                     {!isExpanded && (post.comment_count || 0) > 0 && (
                       <span className="text-[10px] bg-secondary px-2 py-0.5 rounded-full font-bold text-muted-foreground">
                         {post.comment_count}

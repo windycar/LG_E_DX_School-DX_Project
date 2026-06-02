@@ -131,22 +131,32 @@ def get_admin_overview(admin_identifier: str, db: Session = Depends(database.get
     get_admin_user(admin_identifier, db)
 
     users = db.query(models.User).order_by(models.User.id.desc()).all()
+    like_count_subquery = (
+        db.query(
+            models.CommunityPostLike.post_id.label("post_id"),
+            func.count(models.CommunityPostLike.like_id).label("like_count"),
+        )
+        .group_by(models.CommunityPostLike.post_id)
+        .subquery()
+    )
     posts = (
         db.query(
             models.CommunityPost,
             models.User.name.label("author_name"),
             func.count(models.CommunityComment.comment_id).label("comment_count"),
+            func.coalesce(like_count_subquery.c.like_count, 0).label("like_count"),
         )
         .outerjoin(models.User, models.CommunityPost.user_id == models.User.id)
         .outerjoin(models.CommunityComment, models.CommunityPost.post_id == models.CommunityComment.post_id)
-        .group_by(models.CommunityPost.post_id, models.User.name)
+        .outerjoin(like_count_subquery, models.CommunityPost.post_id == like_count_subquery.c.post_id)
+        .group_by(models.CommunityPost.post_id, models.User.name, like_count_subquery.c.like_count)
         .order_by(models.CommunityPost.created_at.desc())
         .limit(30)
         .all()
     )
 
     post_payloads = []
-    for post, author_name, comment_count in posts:
+    for post, author_name, comment_count, like_count in posts:
         comments = (
             db.query(models.CommunityComment, models.User.name.label("author_name"))
             .outerjoin(models.User, models.CommunityComment.user_id == models.User.id)
@@ -164,6 +174,7 @@ def get_admin_overview(admin_identifier: str, db: Session = Depends(database.get
             "content": post.content,
             "created_at": post.created_at.isoformat() if post.created_at else None,
             "comment_count": int(comment_count or 0),
+            "like_count": int(like_count or 0),
             "comments": [
                 {
                     "comment_id": int(comment.comment_id),
@@ -248,9 +259,11 @@ def admin_delete_user(user_id: int, admin_identifier: str = Query(...), db: Sess
     diary_ids = [row.diary_id for row in db.query(models.DiaryLog.diary_id).filter(models.DiaryLog.user_id == user_id).all()]
     if diary_ids:
         db.query(models.AiAnalysisResult).filter(models.AiAnalysisResult.diary_id.in_(diary_ids)).delete(synchronize_session=False)
+    db.query(models.CommunityPostLike).filter(models.CommunityPostLike.user_id == user_id).delete()
     db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
     post_ids = [row.post_id for row in db.query(models.CommunityPost.post_id).filter(models.CommunityPost.user_id == user_id).all()]
     if post_ids:
+        db.query(models.CommunityPostLike).filter(models.CommunityPostLike.post_id.in_(post_ids)).delete(synchronize_session=False)
         db.query(models.CommunityComment).filter(models.CommunityComment.post_id.in_(post_ids)).delete(synchronize_session=False)
     db.query(models.CommunityPost).filter(models.CommunityPost.user_id == user_id).delete()
     db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).delete()
@@ -270,6 +283,7 @@ def admin_delete_post(post_id: int, admin_identifier: str = Query(...), db: Sess
     post = db.query(models.CommunityPost).filter(models.CommunityPost.post_id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    db.query(models.CommunityPostLike).filter(models.CommunityPostLike.post_id == post_id).delete()
     db.query(models.CommunityComment).filter(models.CommunityComment.post_id == post_id).delete()
     db.delete(post)
     db.commit()

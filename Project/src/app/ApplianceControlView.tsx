@@ -1,6 +1,6 @@
 ﻿import { API_BASE_URL } from "./api";
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, ShoppingBag, X } from "lucide-react";
 import { AppUser, Screen } from "./types";
 import { BottomNav } from "./App";
 
@@ -202,6 +202,30 @@ export default function ApplianceControlView({
               )}
             </div>
           ))}
+        </div>
+
+        <div className="mt-5 rounded-2xl p-4 border border-border bg-card">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}>
+              <ShoppingBag size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-foreground">LG 가전을 연동하여 더 많은 가전을 연결해보세요</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                에어컨, 공기청정기, 가습기처럼 임산부 생활 환경에 필요한 가전을 확장하면 더 정밀한 맞춤 제어가 가능합니다.
+              </p>
+              <a
+                href="https://www.lge.co.kr/bestshop/store-finder/"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white"
+                style={{ background: "#C94E70" }}
+              >
+                LG 가전 보러가기
+                <ExternalLink size={13} />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 

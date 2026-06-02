@@ -1,8 +1,9 @@
 ﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { LogOut, Star } from "lucide-react";
+import { Gift, LogOut, Star } from "lucide-react";
 import { AppUser, PartnerStatus, Screen } from "./types";
+import { getDailyBenefit } from "./pregnancyBenefitsData";
 // @ts-ignore
 import { BottomNav } from "./App"; 
 
@@ -311,6 +312,15 @@ export default function DashboardView({
 
   const currentWeek = calculateWeek(dbInfo.pregnancy_start_date);
   const weeklyTip = getWeeklyTip(currentWeek);
+  const dailyBenefit = getDailyBenefit(currentWeek);
+  const [tipSlide, setTipSlide] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTipSlide((prev) => (prev + 1) % 2);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const getMissionFromStatus = (status: PartnerStatus | null) => {
     if (!status) return null;
@@ -482,19 +492,36 @@ export default function DashboardView({
         <div className="rounded-2xl p-4" style={{ background: "linear-gradient(135deg, #FFF0F5, #F9E4EC)" }}>
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-2">
-              <Star size={14} style={{ color: "#C94E70" }} />
-              <p className="text-xs font-semibold" style={{ color: "#C94E70" }}>오늘의 팁</p>
+              {tipSlide === 0 ? <Star size={14} style={{ color: "#C94E70" }} /> : <Gift size={14} style={{ color: "#2D7A9A" }} />}
+              <p className="text-xs font-semibold" style={{ color: tipSlide === 0 ? "#C94E70" : "#2D7A9A" }}>
+                {tipSlide === 0 ? "오늘의 팁" : "오늘의 혜택 추천"}
+              </p>
             </div>
             <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}>
-              {weeklyTip.label}
+              {tipSlide === 0 ? weeklyTip.label : dailyBenefit.stage}
             </span>
           </div>
           <div className="flex items-start gap-3">
-            <span className="text-2xl leading-none mt-0.5">{weeklyTip.emoji}</span>
+            <span className="text-2xl leading-none mt-0.5">{tipSlide === 0 ? weeklyTip.emoji : dailyBenefit.emoji}</span>
             <div>
-              <p className="text-sm text-foreground font-medium leading-snug">{weeklyTip.title}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{weeklyTip.detail}</p>
+              <p className="text-sm text-foreground font-medium leading-snug">
+                {tipSlide === 0 ? weeklyTip.title : dailyBenefit.title}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                {tipSlide === 0 ? weeklyTip.detail : `${dailyBenefit.amount} · ${dailyBenefit.summary}`}
+              </p>
             </div>
+          </div>
+          <div className="flex justify-center gap-1.5 mt-3">
+            {[0, 1].map((index) => (
+              <button
+                key={index}
+                onClick={() => setTipSlide(index)}
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: tipSlide === index ? "#C94E70" : "rgba(201,78,112,0.25)" }}
+                aria-label={`${index + 1}번째 팁 보기`}
+              />
+            ))}
           </div>
         </div>
       </div>

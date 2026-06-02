@@ -1,6 +1,6 @@
 ﻿import { aiChatUrl } from "./api";
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, ExternalLink, MessageCircle, Send, Shield } from "lucide-react";
+import { ArrowLeft, ChevronRight, ExternalLink, Gift, MessageCircle, Send, Shield } from "lucide-react";
 import { Screen } from "./types";
 import { BottomNav } from "./App";
 
@@ -479,6 +479,15 @@ export default function InfoView({ onBack, onNavigate }: { onBack: () => void; o
         >
           <MessageCircle size={18} />
           의학 정보 AI 챗봇 상담
+        </button>
+
+        <button
+          onClick={() => onNavigate?.("benefits")}
+          className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+          style={{ background: "linear-gradient(135deg, #69C99A, #2D7A9A)" }}
+        >
+          <Gift size={18} />
+          현재 받을 수 있는 혜택보기
         </button>
 
         <div className="grid grid-cols-3 gap-2">
