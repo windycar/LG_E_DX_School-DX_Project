@@ -10,6 +10,28 @@ import database
 
 router = APIRouter(tags=["Auth & Profile"])
 
+def ensure_admin_user():
+    with database.SessionLocal() as db:
+        admin_user = (
+            db.query(models.User)
+            .filter((models.User.email == "admin") | (models.User.role == "ADMIN"))
+            .first()
+        )
+        if admin_user:
+            return
+
+        db.add(models.User(
+            email="admin",
+            password="admin",
+            name="admin",
+            role="ADMIN",
+            baby_nickname=None,
+            pregnancy_start_date=None,
+            connection_code=None,
+            parent_user_id=None,
+        ))
+        db.commit()
+
 @router.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     parent_user_id = None

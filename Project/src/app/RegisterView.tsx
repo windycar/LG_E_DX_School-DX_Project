@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { apiUrl } from "./api";
 import { AppUser } from "./types";
 
 export default function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
@@ -28,7 +29,7 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
 
     try {
       // 🚀 로컬 백엔드 주소로 명확히 연결
-      const response = await fetch("http://localhost:8000/api/auth/register", {
+      const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

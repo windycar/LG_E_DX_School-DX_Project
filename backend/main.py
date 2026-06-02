@@ -27,6 +27,9 @@ except Exception as e: print(f"guardian mission schema check skipped: {e}")
 try: community.ensure_community_like_schema()
 except Exception as e: print(f"community like schema check skipped: {e}")
 
+try: auth.ensure_admin_user()
+except Exception as e: print(f"admin user seed skipped: {e}")
+
 try: diary.ensure_ai_recommendation_seed()
 except Exception as e: print(f"weekly ai recommendation seed skipped: {e}")
 
