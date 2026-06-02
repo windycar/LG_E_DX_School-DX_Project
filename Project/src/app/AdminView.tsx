@@ -349,7 +349,7 @@ export default function AdminView({
               <Shield size={16} style={{ color: "#B9A9FF" }} />
               <p className="text-xs font-medium" style={{ color: "#B9A9FF" }}>관리자 모드</p>
             </div>
-            <h2 className="text-2xl font-bold text-white">맘달 Admin</h2>
+            <h2 className="text-2xl font-bold text-white">MOMent Admin</h2>
             <p className="text-xs mt-1" style={{ color: "#B9A9FF" }}>{user.email}</p>
           </div>
           <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: "rgba(255,255,255,0.08)", color: "#B9A9FF" }}>

@@ -90,7 +90,7 @@ export default function LoginView({
             <span className="text-3xl">🌸</span>
           </div>
           <h2 className="text-2xl font-bold" style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}>다시 오셨군요 👋</h2>
-          <p className="text-muted-foreground text-sm mt-1">맘달 계정으로 로그인하세요</p>
+          <p className="text-muted-foreground text-sm mt-1">MOMent 계정으로 로그인하세요</p>
         </div>
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">

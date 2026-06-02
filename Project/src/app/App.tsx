@@ -77,7 +77,7 @@ function HomeView({ onLogin, onRegister }: { onLogin: () => void; onRegister: ()
             className="text-5xl font-bold mb-2"
             style={{ fontFamily: "'Nanum Myeongjo', serif", color: "#2D1B33" }}
           >
-            맘달
+            MOMent
           </h1>
           <p className="text-xs tracking-[0.3em] font-medium text-muted-foreground uppercase">MomDal Care</p>
         </motion.div>

@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 const DEFAULT_API_BASE_URL = import.meta.env.PROD
   ? "https://pregnancy-care-backend-smo8.onrender.com"
   : "http://localhost:8000";

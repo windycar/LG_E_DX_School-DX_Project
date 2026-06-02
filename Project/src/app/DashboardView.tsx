@@ -36,6 +36,8 @@ const getWeeklyTip = (week: number): WeeklyTip => {
         emoji: "📅",
       },
       {
+
+        
         title: "마지막 생리 시작일이나 병원 기준일을 확인하세요",
         detail: "주차 계산은 기준일에 따라 달라질 수 있습니다. 산부인과에서 안내받은 기준일을 입력하면 더 정확합니다.",
         emoji: "🗓️",
