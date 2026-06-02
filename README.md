@@ -1,48 +1,144 @@
-## 📅 2026.05.27 개발 일지 (Development Log)
+# 맘달 - 임산부 맞춤 케어 DX 프로젝트
 
-### 🤝 주요 구현 내용: 회원가입/로그인 및 가족 연동 시스템 완료
-기존 UI 디자인과 레이아웃을 100% 유지하면서, 백엔드 DB와 프론트엔드 상태 관리를 유기적으로 연결하여 실시간 가족(보호자-임산부) 데이터 연동을 마쳤습니다.
+맘달은 임산부와 보호자가 함께 사용하는 임신 케어 웹앱입니다. 임산부의 오늘 상태, 일기, 감정, 날씨, 온습도, 커뮤니티 데이터를 기반으로 맞춤 추천과 보호자 미션, 가전 제어 추천, 신뢰 임신 정보, 관리자용 데이터 분석 화면을 제공합니다.
 
----
+## 프로젝트 한줄 설명
 
-### 1. 🖥️ Frontend (React / TypeScript)
-- **UI 및 데이터 전송 분리 최적화:** `RegisterView` 및 `LoginView` 디자인을 해치지 않고 백엔드 API 규격에 맞게 전송 데이터(Body) 매핑 구조 보강.
-- **보호자 대시보드 동적 연동 (`DashboardView`):** 보호자로 로그인 시, 하드코딩된 가짜 데이터를 제거하고 DB에서 연동된 임산부의 실제 이름과 태명이 실시간 출력되도록 바인딩.
-- **실시간 임신 주차 자동 계산:** 가짜 '28주차' 문구를 제거하고, DB의 임신 시작일(`pregnancy_start_date`)과 현재 날짜를 비교하여 주차를 자동으로 계산해 주는 `getPregnancyWeek` 알고리즘 반영.
-- **TypeScript 무결성 확보:** 백엔드 연동 데이터(`user_id`, `parent_user_id`, `connected_pregnant`) 처리를 위해 `AppUser` 인터페이스 구조 확장 및 타입 단언(`as AppUser`)을 통한 컴파일 에러 해결.
+임산부의 일상 데이터를 모아 AI 추천, 보호자 미션, 가전 제어, 커뮤니티 분석까지 연결한 DX School 최종 프로젝트입니다.
 
-### 2. ⚙️ Backend (FastAPI / SQLAlchemy)
-- **고유 인증 코드(Connection Code) 보안:** 임산부 가입 시 중복 검사를 수행하는 `while` 루프 재시도 로직을 적용하여 고유한 6자리 대문자/숫자 랜덤 코드 생성 기능 구현.
-- **보호자 연동 로직 구현:** 보호자 가입 시 입력한 인증 코드로 `USERS` 테이블을 조회하여 매칭되는 임산부의 고유 ID를 보호자의 `parent_user_id` 컬럼에 자동 매핑.
-- **로그인 API 확장:** 로그인 성공 시 유저 정보뿐만 아니라 연동된 임산부 객체(`connected_pregnant`)까지 조인(Join)하여 원패스로 프론트엔드에 응답하도록 로직 고도화.
+## 주요 기능
 
-### 3. 🗄️ Database (MySQL)
-- **테이블 스키마 확장:** 가족 연동을 위한 `parent_user_id (INT)` 컬럼 추가.
-- **데이터 무결성 확보:** `connection_code` 컬럼에 `UNIQUE` 제약 조건 및 인덱스를 부여하여 데이터 중복 생성 원천 차단.
+- 회원가입/로그인: 임산부와 보호자 계정을 분리하고 연결코드로 가족을 연결합니다.
+- 오늘의 상태체크: 임산부가 현재 기분과 증상을 입력하면 보호자에게 맞춤 미션이 생성됩니다.
+- 일기/감정 분석: 일기 내용, 감정, 스트레스, 날씨, 온습도 데이터를 저장하고 AI 분석 및 가전 추천에 활용합니다.
+- AI 맞춤 추천: 임신 주차별 추천 식품, 권장 활동, 주의사항, 스트레칭 영상을 제공합니다.
+- 신뢰 정보: 영양, 운동, 정신건강, 태아발달, 수면 정보를 공신력 있는 자료 중심으로 보여줍니다.
+- 커뮤니티: 임신 시기별 게시글과 댓글을 통해 사용자 경험 데이터를 모읍니다.
+- 스몰토크: 부부가 하루 질문에 답하고 서로의 상태를 확인할 수 있습니다.
+- 공유 캘린더: 임산부와 보호자가 병원 일정과 주요 일정을 함께 관리합니다.
+- 가전 제어 추천: 온도, 습도, 감정 데이터를 기반으로 에어컨, 가습기, 제습기, 공기청정기, 무드등 설정을 추천합니다.
+- 관리자 화면: admin 계정에서 회원, 커뮤니티, 댓글, 오늘 접속자, 평균 온습도, 평균 가전 설정, Kiwi 워드클라우드 분석을 확인합니다.
+- PWA 배포: Vercel 배포 후 휴대폰 홈 화면에 앱처럼 설치해 시연할 수 있습니다.
 
----
+## 기술 스택
 
-### 🚨 오늘 해결한 트러블슈팅 (Troubleshooting)
+- Frontend: React, Vite, TypeScript, Tailwind CSS, lucide-react, Recharts
+- Backend: FastAPI, SQLAlchemy, PyMySQL, Pydantic
+- Database: MySQL
+- AI/Data: 일기 감정 분석, Kiwi 형태소 분석, 커뮤니티 워드클라우드
+- Deploy: Vercel(frontend), Render(backend, AI chat)
+- Device Demo: Arduino 기반 가전 제어 시연 예정
 
-#### 1) `sqlalchemy.exc.IntegrityError: (1062, "Duplicate entry...")`
-- **문제:** 테스트 도중 동일한 이메일/아이디로 중복 가입을 시도하여 DB 단에서 충돌 발생.
-- **해결:** MySQL Workbench의 Safe Update Mode 우회 조건을 활용하여 `DELETE FROM USERS WHERE user_id > 0;` 스크립트로 테스트 데이터를 깔끔하게 리셋하고 `AUTO_INCREMENT`를 초기화하여 해결.
+## 로컬 실행 방법
 
-#### 2) `sqlalchemy.exc.OperationalError: (1054, "Unknown column 'USERS.id'")`
-- **문제:** DB는 `user_id`라는 컬럼명을 사용하나, SQLAlchemy 모델은 기본값인 `id`를 찾아 매핑 실패.
-- **해결:** `models.py`에서 `id = Column("user_id", ...)`와 같이 구문을 수정하여 파이썬 속성명(`id`)과 실제 DB 컬럼명(`user_id`)을 명시적으로 매핑하여 해결.
+### 백엔드 실행
 
-#### 3) `TypeError: 'parent_user_id' is an invalid keyword argument for User`
-- **문제:** 백엔드에서 객체를 생성할 때 `parent_user_id` 속성을 주입했으나, `models.py`에 해당 컬럼 정의가 누락되어 발생.
-- **해결:** `models.py`에 `parent_user_id = Column(Integer, nullable=True)` 컬럼을 정식 등록하고 MySQL에 `ALTER TABLE` 명령어로 컬럼을 동기화하여 해결.
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-#### 4) `plugin:vite:react-babel: Unexpected token / TypeScript 컴파일 에러`
-- **문제:** 프론트엔드로 연동 데이터를 넘겨주는 과정에서 끝자리에 오타(`connected_pregnantD`)가 발생하고, 확장된 데이터 포맷을 TypeScript의 `AppUser` 인터페이스가 인지하지 못해 빌드가 차단됨.
-- **해결:** 인터페이스에 새 필드들을 명시하고, 오타 수정 및 컴파일러 지연 현상을 방지하기 위해 `as AppUser` 타입 단언을 적용하여 빌드 에러 완벽 해결.
+백엔드 환경변수는 `backend/.env`에 둡니다.
 
----
+```env
+DATABASE_URL=mysql+pymysql://아이디:비밀번호@호스트:포트/DB명
+BACKEND_ALLOWED_ORIGINS=http://localhost:5173
+API_PUBLIC_BASE_URL=http://localhost:8000
+WEATHER_API_KEY=나중에_입력
+OPENAI_API_KEY=나중에_입력
+```
 
-### 🚀 Next Steps (다음 개발 계획)
-- [ ] 회원가입 시 비밀번호 평문 저장 방식에서 `passlib` / `bcrypt`를 활용한 암호화(Hashing) 도입
-- [ ] 로그인 성공 시 `JWT(JSON Web Token)` 발급 및 프론트엔드 Axios/Fetch 인터셉터 연동
-- [ ] 연동된 임산부-보호자 간 실시간 '오늘의 상태 체크(불편 증상)' 및 '감정 일기(정신 케어)' 데이터 공유 API 개발
+### 프론트엔드 실행
+
+```bash
+cd Project
+npm install
+npm run dev
+```
+
+프론트 환경변수는 `Project/.env`에 둡니다.
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_AI_CHAT_URL=http://localhost:8100
+```
+
+### 빌드 확인
+
+```bash
+cd Project
+npm run build
+```
+
+## 배포 방법
+
+### Render 백엔드
+
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Environment Variables: `DATABASE_URL`, `BACKEND_ALLOWED_ORIGINS`, `API_PUBLIC_BASE_URL`, 필요한 API 키
+
+### Vercel 프론트엔드
+
+- Framework Preset: `Vite`
+- Root Directory: `Project`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
+- Environment Variables: `VITE_API_BASE_URL`, `VITE_AI_CHAT_URL`
+
+## 관리자 계정 사용법
+
+DB의 `USERS` 테이블에서 다음 중 하나를 만족하면 관리자 화면으로 진입합니다.
+
+- `role` 값이 `ADMIN`
+- `email` 값이 `admin`
+- `name` 값이 `admin`
+
+관리자 화면에서는 회원 대리접속, 회원 삭제, 커뮤니티 게시글/댓글 삭제, 커뮤니티 텍스트 분석, 평균 온습도와 평균 가전 설정 확인이 가능합니다.
+
+## 커뮤니티 분석 사용법
+
+관리자 화면의 `커뮤니티 분석` 탭에서 사용합니다.
+
+1. 불용어 입력칸에 제외할 단어를 하나씩 입력합니다.
+2. `추가` 버튼 또는 Enter로 불용어를 등록합니다.
+3. `커뮤니티 전체 Kiwi 분석 실행` 버튼을 누릅니다.
+4. 게시글과 댓글 전체를 형태소 분석한 결과가 워드클라우드와 키워드 분포로 표시됩니다.
+
+`kiwipiepy`가 설치되어 있으면 Kiwi 형태소 분석을 사용하고, 설치 실패 시 기본 정규식 토큰화로 대체됩니다.
+
+## 개발 일지
+
+- 감정분석 초기 버전: 일기 텍스트를 기반으로 감정 분석 구조를 만들었습니다.
+- 보호자 로그인 연동: 보호자 계정에서 연결된 임산부 정보와 주차를 볼 수 있게 했습니다.
+- 스몰토크 기능 추가: 부부가 같은 질문에 답하고 서로의 답변을 확인하는 기능을 추가했습니다.
+- 커뮤니티 기능 추가: 게시글 작성, 댓글, 본인 글 삭제 기능을 넣었습니다.
+- 임신 주차 동기화: 커뮤니티와 추천 화면에서 임신 초기/중기/말기 태그가 맞도록 수정했습니다.
+- 캘린더 연동: 임산부와 보호자가 병원 일정과 공유 일정을 함께 확인하도록 만들었습니다.
+- 다이어리 데이터 확장: 감정, 온습도, 날씨 API 데이터를 일기에 함께 저장했습니다.
+- 가전 제어 DB 연동: 추천된 가전 설정을 DB에 저장하고 오늘 상태체크와 연결했습니다.
+- AI 추천 기능 추가: 임신 주차별 식품, 활동, 주의사항, 스트레칭 추천을 분리했습니다.
+- 배포 세팅: 로컬 전용 구조를 Vercel/Render 배포 구조로 정리했습니다.
+- 앱 시연 준비: PWA 설정을 추가해 휴대폰에서 앱처럼 설치할 수 있게 했습니다.
+- 관리자 기능 추가: admin 계정 전용으로 회원, 커뮤니티, 분석 데이터를 확인하는 화면을 추가했습니다.
+- 커뮤니티 분석 추가: Kiwi 형태소 분석과 불용어 처리, 워드클라우드, 평균 온습도/가전 설정 지표를 추가했습니다.
+
+## 시연 흐름
+
+1. 임산부 계정으로 로그인합니다.
+2. 오늘의 상태체크를 입력합니다.
+3. 보호자 계정에서 미션이 생성되는 것을 확인합니다.
+4. 일기를 작성하고 감정/온습도 데이터가 누적되는 것을 보여줍니다.
+5. AI 맞춤 추천에서 주차별 추천 정보를 확인합니다.
+6. 가전 제어 화면에서 추천 설정을 확인하고 Arduino 시연 장치로 연결합니다.
+7. 관리자 계정으로 접속해 회원, 커뮤니티, 커뮤니티 분석 워드클라우드를 보여줍니다.
+
+## 개발 메모
+
+- 현재 오늘 접속자는 별도 로그인 로그 테이블이 없어서 게시글, 댓글, 일기, 스몰토크, 상태체크를 남긴 오늘 활동자 기준입니다.
+- 실제 로그인 접속자 수가 필요하면 `LOGIN_LOGS` 테이블을 추가하는 것이 맞습니다.
+- 챗봇은 API 키를 환경변수에 넣으면 LangChain 또는 OpenAI API 기반 생성형 응답으로 확장할 수 있게 준비하는 방향입니다.
+- Arduino 가전 제어는 실제 제품 제어가 아니라 DX 시연용으로 LED, 팬, 서보모터, 릴레이 모듈 등을 이용해 상태 변화를 보여주는 구조가 적합합니다.

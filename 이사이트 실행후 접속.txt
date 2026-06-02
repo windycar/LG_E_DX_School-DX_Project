@@ -1,0 +1,4 @@
+https://pregnancy-care-backend-smo8.onrender.com/api/health
+
+
+https://pregnancy-care-ai-chat.onrender.com/api/health

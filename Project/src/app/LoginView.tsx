@@ -34,10 +34,12 @@ export default function LoginView({
 
       if (response.ok && data.status === "Success") {
         const userInfo = data.user;
+        const normalizedRole = String(userInfo.role || "").toUpperCase();
+        const isAdmin = normalizedRole === "ADMIN" || String(userInfo.email || "").toLowerCase() === "admin";
         
         // 🚀 유저 정보에서 날짜를 빼서 주차를 계산합니다.
         let calcWeek = 0;
-        const targetDate = userInfo.role === "PREGNANT" 
+        const targetDate = normalizedRole === "PREGNANT" 
           ? userInfo.pregnancy_start_date 
           : userInfo.connected_pregnant?.pregnancy_start_date;
 
@@ -53,7 +55,7 @@ export default function LoginView({
           nickname: userInfo.name, 
           babyNickname: userInfo.baby_nickname || "아기", 
           email: email,
-          role: userInfo.role === "PREGNANT" ? "pregnant" : "guardian",
+          role: isAdmin ? "admin" : normalizedRole === "PREGNANT" ? "pregnant" : "guardian",
           pregnancyWeek: calcWeek, 
           user_id: userInfo.user_id,
           parent_user_id: userInfo.parent_user_id,
