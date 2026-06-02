@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import random
 import string
 
@@ -35,6 +35,21 @@ def ensure_admin_user():
 @router.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     parent_user_id = None
+    pregnancy_start_date = None
+
+    if user.role == "PREGNANT":
+        if not user.start_date:
+            raise HTTPException(status_code=400, detail="임신 시작일을 입력해 주세요.")
+        try:
+            pregnancy_start_date = datetime.strptime(user.start_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="임신 시작일 형식이 올바르지 않습니다.")
+
+        today = date.today()
+        min_start_date = today - timedelta(days=280)
+        if pregnancy_start_date < min_start_date or pregnancy_start_date > today:
+            raise HTTPException(status_code=400, detail="임신 시작일은 오늘 기준 280일 전부터 오늘까지만 선택할 수 있습니다.")
+
     if user.role == "PREGNANT":
         while True:
             new_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -54,7 +69,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         name=user.name,
         role=user.role,
         baby_nickname=user.baby_nickname,
-        pregnancy_start_date=datetime.strptime(user.start_date, "%Y-%m-%d").date() if user.start_date else None,
+        pregnancy_start_date=pregnancy_start_date,
         connection_code=connection_code,
         parent_user_id=parent_user_id
     )

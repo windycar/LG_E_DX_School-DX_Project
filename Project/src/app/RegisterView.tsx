@@ -5,6 +5,11 @@ import { ArrowLeft } from "lucide-react";
 import { apiUrl } from "./api";
 import { AppUser } from "./types";
 
+const toDateInputValue = (date: Date) => date.toISOString().split("T")[0];
+const todayDate = new Date();
+const pregnancyDateMax = toDateInputValue(todayDate);
+const pregnancyDateMin = toDateInputValue(new Date(todayDate.getTime() - 280 * 24 * 60 * 60 * 1000));
+
 export default function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -12,7 +17,7 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"pregnant" | "guardian">("pregnant");
-  const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [startDate, setStartDate] = useState(pregnancyDateMax);
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +28,11 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
         (role === "pregnant" && !babyNickname) || 
         (role === "guardian" && !inviteCode)) {
       setError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
+
+    if (role === "pregnant" && (startDate < pregnancyDateMin || startDate > pregnancyDateMax)) {
+      setError("임신 시작일은 오늘 기준 280일 전부터 오늘까지만 선택할 수 있습니다.");
       return;
     }
 
@@ -123,6 +133,8 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
               <input 
                 type="date" 
                 value={startDate} 
+                min={pregnancyDateMin}
+                max={pregnancyDateMax}
                 onChange={e => setStartDate(e.target.value)} 
                 className="w-full px-4 py-3 rounded-xl border border-border bg-white text-sm focus:border-pink-300 outline-none shadow-sm" 
               />
