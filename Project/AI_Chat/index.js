@@ -20,6 +20,7 @@ const allowedOrigins = new Set(
     .filter(Boolean),
 );
 const allowedDevOriginPattern = /^http:\/\/(localhost|127\.0\.0\.1):517\d$/;
+const allowedVercelOriginPattern = /^https:\/\/.*\.vercel\.app$/;
 const knowledgePath = path.resolve(__dirname, "trusted-knowledge.json");
 const openAiApiKey = (process.env.OPENAI_API_KEY || "").trim();
 const hasOpenAiApiKey =
@@ -202,7 +203,12 @@ let chatModel;
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin) || allowedDevOriginPattern.test(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.has(origin) ||
+        allowedDevOriginPattern.test(origin) ||
+        allowedVercelOriginPattern.test(origin)
+      ) {
         callback(null, true);
         return;
       }
