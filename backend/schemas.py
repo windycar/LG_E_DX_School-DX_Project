@@ -71,10 +71,9 @@ class ApplianceSettingUpsert(BaseModel):
     appliance_name: str
     control_command: str
     execution_status: str
-    analysis_id: Optional[int] = None
 
 class ApplianceSettingsBulkUpsert(BaseModel):
-    user_id: Optional[int] = None
+    user_id: int
     settings: list[ApplianceSettingUpsert]
 
 
@@ -86,7 +85,6 @@ class UserCarePreferenceUpsert(BaseModel):
     notification_enabled: Optional[bool] = True
     mission_time: Optional[str] = None
     care_style: Optional[str] = "warm"
-    avoid_mission_keywords: Optional[str] = None
 
 class PregnancyStatusCheckCreate(BaseModel):
     user_id: int

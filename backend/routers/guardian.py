@@ -23,6 +23,14 @@ def ensure_mission_schema():
             if not exists:
                 conn.execute(text(f"ALTER TABLE GUARDIAN_MISSIONS ADD COLUMN {column_name} {column_def}"))
 
+def ensure_care_preference_schema():
+    with database.engine.begin() as conn:
+        avoid_keywords_column = conn.execute(
+            text("SHOW COLUMNS FROM USER_CARE_PREFERENCES LIKE 'avoid_mission_keywords'")
+        ).first()
+        if avoid_keywords_column:
+            conn.execute(text("ALTER TABLE USER_CARE_PREFERENCES DROP COLUMN avoid_mission_keywords"))
+
 def get_guardian_for_pregnant_user(pregnant_user_id: int, db: Session):
     pregnant_user = db.query(models.User).filter(models.User.id == pregnant_user_id).first()
     if not pregnant_user: return None
@@ -66,10 +74,6 @@ def build_guardian_mission(emotion: str, diary_content: str, preference):
     care_style = preference.care_style if preference else "warm"
     if care_style == "practical": content = content.replace("말해주세요", "전달하고 바로 실행해주세요")
     elif care_style == "short": content = content.split(".")[0] + "."
-
-    avoid_keywords = [item.strip() for item in (preference.avoid_mission_keywords or "").split(",") if item.strip()]
-    if any(keyword in content for keyword in avoid_keywords):
-        mission_type = "balanced"; selected = missions["balanced"]; content = selected["content"]
 
     return {"mission_type": mission_type, "mission_title": selected["title"], "mission_content": content, "mission_reason": f"오늘 기록에서 {reason_context}로 판단되어 이 미션을 추천했습니다."}
 
@@ -127,7 +131,7 @@ def complete_guardian_mission(mission_id: int, db: Session = Depends(database.ge
 def get_guardian_preferences(guardian_user_id: int, db: Session = Depends(database.get_db)):
     preference = get_or_create_care_preference(guardian_user_id, db)
     db.commit()
-    return {"status": "Success", "preference": {"preferred_mission_type": preference.preferred_mission_type, "notification_enabled": preference.notification_enabled, "mission_time": preference.mission_time, "care_style": preference.care_style, "avoid_mission_keywords": preference.avoid_mission_keywords}}
+    return {"status": "Success", "preference": {"preferred_mission_type": preference.preferred_mission_type, "notification_enabled": preference.notification_enabled, "mission_time": preference.mission_time, "care_style": preference.care_style}}
 
 @router.put("/api/guardian/preferences/{guardian_user_id}")
 def update_guardian_preferences(guardian_user_id: int, payload: schemas.UserCarePreferenceUpsert, db: Session = Depends(database.get_db)):
@@ -136,6 +140,5 @@ def update_guardian_preferences(guardian_user_id: int, payload: schemas.UserCare
     preference.notification_enabled = bool(payload.notification_enabled)
     preference.mission_time = payload.mission_time
     preference.care_style = payload.care_style or "warm"
-    preference.avoid_mission_keywords = payload.avoid_mission_keywords
     db.commit()
     return {"status": "Success"}

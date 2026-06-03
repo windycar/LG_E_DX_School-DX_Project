@@ -103,8 +103,7 @@ class ApplianceSetting(Base):
     __tablename__ = "APPLIANCE_SETTINGS"
 
     setting_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    analysis_id = Column(BigInteger, nullable=True)
-    user_id = Column(BigInteger, nullable=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, index=True)
     appliance_name = Column(String(50), nullable=False)
     control_command = Column(Text, nullable=False)
     execution_status = Column(String(20), nullable=False, default="OFF")
@@ -135,7 +134,6 @@ class UserCarePreference(Base):
     notification_enabled = Column(Boolean, nullable=False, default=True)
     mission_time = Column(String(20), nullable=True)
     care_style = Column(String(50), nullable=False, default="warm")
-    avoid_mission_keywords = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 

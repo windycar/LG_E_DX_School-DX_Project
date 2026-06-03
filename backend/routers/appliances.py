@@ -1,12 +1,79 @@
 import os
 import requests
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 import models
 import schemas
 import database
 
 router = APIRouter(tags=["Appliances & Smart Home"])
+
+def ensure_appliance_schema():
+    with database.engine.begin() as conn:
+        analysis_column = conn.execute(
+            text("SHOW COLUMNS FROM APPLIANCE_SETTINGS LIKE 'analysis_id'")
+        ).first()
+        if analysis_column:
+            foreign_keys = conn.execute(text("""
+                SELECT CONSTRAINT_NAME
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'APPLIANCE_SETTINGS'
+                  AND COLUMN_NAME = 'analysis_id'
+                  AND REFERENCED_TABLE_NAME IS NOT NULL
+            """)).all()
+            for (constraint_name,) in foreign_keys:
+                conn.execute(text(f"ALTER TABLE APPLIANCE_SETTINGS DROP FOREIGN KEY `{constraint_name}`"))
+            conn.execute(text("ALTER TABLE APPLIANCE_SETTINGS DROP COLUMN analysis_id"))
+
+        # The API treats each appliance as a single current setting per family.
+        conn.execute(text("""
+            DELETE older
+            FROM APPLIANCE_SETTINGS older
+            JOIN APPLIANCE_SETTINGS newer
+              ON older.user_id = newer.user_id
+             AND older.appliance_name = newer.appliance_name
+             AND older.setting_id < newer.setting_id
+        """))
+        conn.execute(text("ALTER TABLE APPLIANCE_SETTINGS MODIFY user_id BIGINT NOT NULL"))
+        conn.execute(text("ALTER TABLE APPLIANCE_SETTINGS MODIFY appliance_name VARCHAR(50) NOT NULL"))
+        conn.execute(text("ALTER TABLE APPLIANCE_SETTINGS MODIFY control_command TEXT NOT NULL"))
+        conn.execute(text("""
+            ALTER TABLE APPLIANCE_SETTINGS
+            MODIFY execution_status VARCHAR(20) NOT NULL DEFAULT 'OFF'
+        """))
+
+        user_fk = conn.execute(text("""
+            SELECT CONSTRAINT_NAME
+            FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'APPLIANCE_SETTINGS'
+              AND COLUMN_NAME = 'user_id'
+              AND REFERENCED_TABLE_NAME = 'USERS'
+              AND REFERENCED_COLUMN_NAME = 'user_id'
+        """)).first()
+        if not user_fk:
+            conn.execute(text("""
+                ALTER TABLE APPLIANCE_SETTINGS
+                ADD CONSTRAINT fk_appliance_settings_user
+                FOREIGN KEY (user_id) REFERENCES USERS(user_id)
+                ON DELETE CASCADE
+            """))
+
+        unique_setting = conn.execute(text("""
+            SELECT INDEX_NAME
+            FROM INFORMATION_SCHEMA.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'APPLIANCE_SETTINGS'
+              AND INDEX_NAME = 'uq_appliance_setting_user_name'
+        """)).first()
+        if not unique_setting:
+            conn.execute(text("""
+                ALTER TABLE APPLIANCE_SETTINGS
+                ADD CONSTRAINT uq_appliance_setting_user_name
+                UNIQUE (user_id, appliance_name)
+            """))
 
 def get_family_master_id(user_id: int, db: Session):
     user = db.query(models.User).filter(models.User.id == user_id).first()
@@ -90,7 +157,7 @@ def recommend_appliances(user_id: int, db: Session = Depends(database.get_db)):
         
         if WEATHER_API_KEY:
             try:
-                res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Seoul&appid={WEATHER_API_KEY}&units=metric&lang=kr")
+                res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Gwangju,KR&appid={WEATHER_API_KEY}&units=metric&lang=kr")
                 if res.status_code == 200:
                     w_data = res.json()
                     current_temp = float(w_data['main']['temp'])

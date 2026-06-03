@@ -29,9 +29,19 @@ except Exception as e:
     print(f"guardian mission schema check skipped: {e}")
 
 try:
+    guardian.ensure_care_preference_schema()
+except Exception as e:
+    print(f"care preference schema check skipped: {e}")
+
+try:
     community.ensure_community_like_schema()
 except Exception as e:
     print(f"community like schema check skipped: {e}")
+
+try:
+    appliances.ensure_appliance_schema()
+except Exception as e:
+    print(f"appliance schema check skipped: {e}")
 
 try:
     auth.ensure_admin_user()

@@ -274,7 +274,7 @@ def create_diary_log(
         WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
         weather_desc = "알 수 없음"
         if WEATHER_API_KEY:
-            res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Seoul&appid={WEATHER_API_KEY}&lang=kr")
+            res = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Gwangju,KR&appid={WEATHER_API_KEY}&lang=kr")
             if res.status_code == 200: weather_desc = res.json()['weather'][0]['description']
 
         reverse_emoji_map = {"😊": "행복", "🙂": "안정", "🥰": "설렘", "😐": "중립", "😟": "불안", "😫": "피로", "😔": "우울", "😡": "화남"}
