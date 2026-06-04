@@ -13,3 +13,4 @@ backend/__pycache__/
 backend/.env
 __pycache__/
 *.pyc
+System_Architecture/

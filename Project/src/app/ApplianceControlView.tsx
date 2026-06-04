@@ -1,12 +1,18 @@
 ﻿import { API_BASE_URL } from "./api";
 import { useEffect, useState } from "react";
-import { ExternalLink, ShoppingBag, X } from "lucide-react";
+import { ExternalLink, RefreshCw, ShoppingBag, Usb, X } from "lucide-react";
 import { AppUser, Screen } from "./types";
 import { BottomNav } from "./App";
 
 type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier";
 type ApplianceState = Record<ApplianceKey, boolean>;
 type ApplianceSettingsState = Record<ApplianceKey, any>;
+type ArduinoSerialStatus = {
+  connected: boolean;
+  port: string | null;
+  last_command: string | null;
+  last_error: string | null;
+};
 
 const DEFAULT_APPLIANCE_POWER: ApplianceState = {
   moodLight: false,
@@ -33,6 +39,17 @@ const APPLIANCE_LIST: Array<{ key: ApplianceKey; name: string; icon: string }> =
 ];
 
 const getUserId = (user?: AppUser | null) => (user as any)?.id || user?.user_id;
+
+const buildAppliancePayload = (
+  userId: number | undefined,
+  power: ApplianceState,
+  settings: ApplianceSettingsState,
+) => Object.keys(settings).map((key) => ({
+  user_id: userId,
+  appliance_name: key,
+  control_command: JSON.stringify({ ...settings[key as ApplianceKey], power: power[key as ApplianceKey] }),
+  execution_status: power[key as ApplianceKey] ? "ON" : "OFF",
+}));
 
 const hydrateAppliances = (rows: any[]) => {
   const power = { ...DEFAULT_APPLIANCE_POWER };
@@ -86,14 +103,26 @@ const saveApplianceSettings = async (
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       user_id: userId,
-      settings: Object.keys(settings).map((key) => ({
-        user_id: userId,
-        appliance_name: key,
-        control_command: JSON.stringify({ ...settings[key as ApplianceKey], power: power[key as ApplianceKey] }),
-        execution_status: power[key as ApplianceKey] ? "ON" : "OFF",
-      })),
+      settings: buildAppliancePayload(userId, power, settings),
     }),
   });
+};
+
+const syncArduinoSettings = async (
+  userId: number | undefined,
+  power: ApplianceState,
+  settings: ApplianceSettingsState,
+) => {
+  const res = await fetch(`${API_BASE_URL}/api/appliances/arduino/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings: buildAppliancePayload(userId, power, settings) }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.status !== "Success") {
+    throw new Error(data.detail || data.message || "Arduino 설정 전송에 실패했습니다.");
+  }
+  return data.serial as ArduinoSerialStatus;
 };
 
 export default function ApplianceControlView({
@@ -107,6 +136,14 @@ export default function ApplianceControlView({
   const [appliances, setAppliances] = useState<ApplianceState>({ ...DEFAULT_APPLIANCE_POWER });
   const [applianceSettings, setApplianceSettings] = useState<ApplianceSettingsState>({ ...DEFAULT_APPLIANCE_SETTINGS });
   const [selectedAppliance, setSelectedAppliance] = useState<ApplianceKey | null>(null);
+  const [arduinoStatus, setArduinoStatus] = useState<ArduinoSerialStatus>({
+    connected: false,
+    port: null,
+    last_command: null,
+    last_error: null,
+  });
+  const [arduinoMessage, setArduinoMessage] = useState("로컬 시연 시 USB로 Arduino를 연결하세요.");
+  const [arduinoBusy, setArduinoBusy] = useState(false);
 
   useEffect(() => {
     fetchApplianceSettings(userId)
@@ -116,6 +153,17 @@ export default function ApplianceControlView({
       })
       .catch((error) => console.error("가전 설정 조회 실패:", error));
   }, [userId]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/appliances/arduino/status`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.serial) setArduinoStatus(data.serial);
+      })
+      .catch(() => {
+        // Render 배포 환경에서는 로컬 USB를 조회할 수 없습니다.
+      });
+  }, []);
 
   const persistAppliances = (nextPower = appliances, nextSettings = applianceSettings) => {
     saveApplianceSettings(userId, nextPower, nextSettings).catch((error) => {
@@ -139,6 +187,48 @@ export default function ApplianceControlView({
     setAppliances(nextPower);
     setApplianceSettings(nextSettings);
     persistAppliances(nextPower, nextSettings);
+    if (arduinoStatus.connected) {
+      syncArduinoSettings(userId, nextPower, nextSettings)
+        .then((status) => setArduinoStatus(status))
+        .catch((error) => setArduinoMessage(error.message));
+    }
+  };
+
+  const connectArduino = async () => {
+    setArduinoBusy(true);
+    setArduinoMessage("Arduino USB 포트를 찾는 중입니다.");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/appliances/arduino/connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baudrate: 9600 }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status !== "Success") {
+        throw new Error(data.detail || data.message || "Arduino 연결에 실패했습니다.");
+      }
+      setArduinoStatus(data.serial);
+      setArduinoMessage(`${data.serial.port} 포트에 연결되었습니다.`);
+    } catch (error) {
+      setArduinoMessage(error instanceof Error ? error.message : "Arduino 연결에 실패했습니다.");
+    } finally {
+      setArduinoBusy(false);
+    }
+  };
+
+  const sendCurrentSettings = async () => {
+    setArduinoBusy(true);
+    setArduinoMessage("현재 가전 설정을 Arduino로 전송하는 중입니다.");
+    try {
+      await saveApplianceSettings(userId, appliances, applianceSettings);
+      const status = await syncArduinoSettings(userId, appliances, applianceSettings);
+      setArduinoStatus(status);
+      setArduinoMessage("현재 가전 설정을 Arduino 시연 장치에 전송했습니다.");
+    } catch (error) {
+      setArduinoMessage(error instanceof Error ? error.message : "Arduino 설정 전송에 실패했습니다.");
+    } finally {
+      setArduinoBusy(false);
+    }
   };
 
   const getApplianceStatus = (key: ApplianceKey) => {
@@ -170,6 +260,51 @@ export default function ApplianceControlView({
       </div>
 
       <div className="px-5 py-5 flex-1 overflow-y-auto pb-20">
+        <div className="mb-4 rounded-2xl p-4 border border-border bg-card">
+          <div className="flex items-start gap-3">
+            <div
+              className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: arduinoStatus.connected ? "rgba(46,157,98,0.12)" : "rgba(77,138,240,0.1)" }}
+            >
+              <Usb size={20} style={{ color: arduinoStatus.connected ? "#2E9D62" : "#4D8AF0" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-foreground">Arduino 로컬 시연 장치</p>
+                <span
+                  className="text-[11px] px-2 py-1 rounded-full font-semibold"
+                  style={{
+                    background: arduinoStatus.connected ? "rgba(46,157,98,0.12)" : "var(--secondary)",
+                    color: arduinoStatus.connected ? "#2E9D62" : "var(--muted-foreground)",
+                  }}
+                >
+                  {arduinoStatus.connected ? `연결됨 ${arduinoStatus.port || ""}` : "연결 안 됨"}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{arduinoMessage}</p>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button
+                  onClick={connectArduino}
+                  disabled={arduinoBusy}
+                  className="inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold border border-border disabled:opacity-50"
+                >
+                  <Usb size={14} />
+                  USB 연결
+                </button>
+                <button
+                  onClick={sendCurrentSettings}
+                  disabled={arduinoBusy || !arduinoStatus.connected}
+                  className="inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+                  style={{ background: "#4D8AF0" }}
+                >
+                  <RefreshCw size={14} className={arduinoBusy ? "animate-spin" : ""} />
+                  현재 설정 전송
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           {APPLIANCE_LIST.map((app) => (
             <div key={app.key} className="bg-card rounded-2xl p-4 border border-border">
@@ -405,6 +540,14 @@ export default function ApplianceControlView({
             <button
               onClick={() => {
                 persistAppliances();
+                if (arduinoStatus.connected) {
+                  syncArduinoSettings(userId, appliances, applianceSettings)
+                    .then((status) => {
+                      setArduinoStatus(status);
+                      setArduinoMessage("상세 설정을 Arduino 시연 장치에 전송했습니다.");
+                    })
+                    .catch((error) => setArduinoMessage(error.message));
+                }
                 setSelectedAppliance(null);
               }}
               className="w-full mt-4 py-3 rounded-2xl font-semibold text-white"

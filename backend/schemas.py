@@ -76,6 +76,13 @@ class ApplianceSettingsBulkUpsert(BaseModel):
     user_id: int
     settings: list[ApplianceSettingUpsert]
 
+class ArduinoConnectRequest(BaseModel):
+    port: Optional[str] = None
+    baudrate: int = 9600
+
+class ArduinoSyncRequest(BaseModel):
+    settings: list[ApplianceSettingUpsert]
+
 
 # =====================================================================
 # 🛡️ 6. Guardian (보호자 미션 및 상태 체크)

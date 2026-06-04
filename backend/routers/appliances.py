@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 import database
+from arduino_serial import arduino_bridge, build_sync_command
 
 router = APIRouter(tags=["Appliances & Smart Home"])
 
@@ -80,6 +81,42 @@ def get_family_master_id(user_id: int, db: Session):
     if user and user.role.upper() == "GUARDIAN" and user.parent_user_id:
         return user.parent_user_id
     return user_id
+
+
+@router.get("/api/appliances/arduino/status")
+def get_arduino_status():
+    try:
+        return {
+            "status": "Success",
+            "serial": arduino_bridge.status(),
+            "ports": arduino_bridge.available_ports(),
+        }
+    except Exception as e:
+        return {"status": "Error", "message": str(e), "serial": arduino_bridge.status(), "ports": []}
+
+
+@router.post("/api/appliances/arduino/connect")
+def connect_arduino(payload: schemas.ArduinoConnectRequest):
+    try:
+        serial_status = arduino_bridge.connect(payload.port, payload.baudrate)
+        return {"status": "Success", "serial": serial_status}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/api/appliances/arduino/disconnect")
+def disconnect_arduino():
+    return {"status": "Success", "serial": arduino_bridge.disconnect()}
+
+
+@router.post("/api/appliances/arduino/sync")
+def sync_arduino(payload: schemas.ArduinoSyncRequest):
+    try:
+        command = build_sync_command(payload.settings)
+        serial_status = arduino_bridge.send_line(command)
+        return {"status": "Success", "command": command, "serial": serial_status}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/api/appliances/bulk")
 def update_appliances_bulk(payload: schemas.ApplianceSettingsBulkUpsert, db: Session = Depends(database.get_db)):
