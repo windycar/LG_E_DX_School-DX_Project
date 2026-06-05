@@ -14,3 +14,4 @@ backend/.env
 __pycache__/
 *.pyc
 System_Architecture/
+MOMent 서비스 흐름도/

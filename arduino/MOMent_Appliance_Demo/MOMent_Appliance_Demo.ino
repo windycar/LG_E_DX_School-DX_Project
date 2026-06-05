@@ -9,19 +9,25 @@ const int HUMIDIFIER_PIN = 4;
 const int RGB_G_PIN = 5;
 const int RGB_B_PIN = 6;
 const int DEHUMIDIFIER_LED_PIN = 7;
-const int STEPPER_IN1 = 8;
-const int STEPPER_IN2 = 9;
-const int STEPPER_IN3 = 10;
-const int STEPPER_IN4 = 11;
+const int AIRCON_STEPPER_IN1 = 8;
+const int AIRCON_STEPPER_IN2 = 9;
+const int AIRCON_STEPPER_IN3 = 10;
+const int AIRCON_STEPPER_IN4 = 11;
 const int AIR_PURIFIER_LED_PIN = 12;
 const int CONNECTION_LED_PIN = 13;
+const int PURIFIER_STEPPER_IN1 = A0;
+const int PURIFIER_STEPPER_IN2 = A1;
+const int PURIFIER_STEPPER_IN3 = A2;
+const int PURIFIER_STEPPER_IN4 = A3;
 
 const int STEPS_PER_REVOLUTION = 2048;
-Stepper modeStepper(STEPS_PER_REVOLUTION, STEPPER_IN1, STEPPER_IN3, STEPPER_IN2, STEPPER_IN4);
+Stepper airconStepper(STEPS_PER_REVOLUTION, AIRCON_STEPPER_IN1, AIRCON_STEPPER_IN3, AIRCON_STEPPER_IN2, AIRCON_STEPPER_IN4);
+Stepper purifierStepper(STEPS_PER_REVOLUTION, PURIFIER_STEPPER_IN1, PURIFIER_STEPPER_IN3, PURIFIER_STEPPER_IN2, PURIFIER_STEPPER_IN4);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 String serialLine = "";
-int currentModePosition = 0;
+int currentAirconPosition = 0;
+int currentPurifierPosition = 0;
 
 struct ApplianceState {
   int moodPower = 0;
@@ -53,7 +59,8 @@ void setup() {
   pinMode(AIR_PURIFIER_LED_PIN, OUTPUT);
   pinMode(CONNECTION_LED_PIN, OUTPUT);
 
-  modeStepper.setSpeed(10);
+  airconStepper.setSpeed(10);
+  purifierStepper.setSpeed(10);
   lcd.init();
   lcd.backlight();
   lcd.setCursor(0, 0);
@@ -73,7 +80,7 @@ void loop() {
     }
   }
 
-  // 현장에서 앱 연결이 어려울 때 버튼으로 시연 모드를 순환합니다.
+  // 앱 연결이 어려울 때 버튼으로 시연 모드를 순환합니다.
   static bool previousButton = HIGH;
   bool currentButton = digitalRead(BUTTON_PIN);
   if (previousButton == HIGH && currentButton == LOW) {
@@ -121,7 +128,8 @@ void applyOutputs() {
   digitalWrite(HUMIDIFIER_PIN, state.humidifierPower ? HIGH : LOW);
   digitalWrite(DEHUMIDIFIER_LED_PIN, state.dehumidifierPower ? HIGH : LOW);
   digitalWrite(AIR_PURIFIER_LED_PIN, state.purifierPower ? HIGH : LOW);
-  applyModeStepper();
+  applyAirconStepper();
+  applyPurifierStepper();
   updateDisplay();
 }
 
@@ -149,17 +157,30 @@ void setRgb(int red, int green, int blue) {
   analogWrite(RGB_B_PIN, constrain(blue, 0, 255));
 }
 
-void applyModeStepper() {
-  int target = 0;
-  if (state.airconPower) target = 1;
-  if (state.purifierPower) target = 2;
-  if (state.humidifierPower) target = 3;
-  if (state.dehumidifierPower) target = 4;
-
-  int delta = target - currentModePosition;
+void applyAirconStepper() {
+  int target = state.airconPower ? constrain(state.airconFan, 1, 3) : 0;
+  int delta = target - currentAirconPosition;
   if (delta != 0) {
-    modeStepper.step(delta * 256);
-    currentModePosition = target;
+    airconStepper.step(delta * 256);
+    currentAirconPosition = target;
+  }
+}
+
+void applyPurifierStepper() {
+  int target = 0;
+  if (state.purifierPower) {
+    target = constrain(state.purifierSpeed, 1, 3);
+    if (state.purifierMode == 2) {
+      target = 4;
+    }
+  }
+
+  int delta = target - currentPurifierPosition;
+  if (delta != 0) {
+    purifierStepper.step(delta * 256);
+    currentPurifierPosition = target;
+  } else if (state.purifierPower) {
+    purifierStepper.step(64 * max(1, state.purifierSpeed));
   }
 }
 
