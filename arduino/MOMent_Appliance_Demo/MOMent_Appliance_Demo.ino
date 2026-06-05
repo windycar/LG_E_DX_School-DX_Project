@@ -28,6 +28,9 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 String serialLine = "";
 int currentAirconPosition = 0;
 int currentPurifierPosition = 0;
+int displayIndex = 0;
+unsigned long lastDisplayUpdate = 0;
+const unsigned long DISPLAY_INTERVAL_MS = 2500;
 
 struct ApplianceState {
   int moodPower = 0;
@@ -49,6 +52,7 @@ struct ApplianceState {
 
 void setup() {
   Serial.begin(9600);
+  Wire.begin();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(RGB_R_PIN, OUTPUT);
@@ -61,8 +65,10 @@ void setup() {
 
   airconStepper.setSpeed(10);
   purifierStepper.setSpeed(10);
+
   lcd.init();
   lcd.backlight();
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("MOMent Ready");
   lcd.setCursor(0, 1);
@@ -88,6 +94,8 @@ void loop() {
     delay(250);
   }
   previousButton = currentButton;
+
+  refreshDisplayCycle();
 }
 
 void handleCommand(String command) {
@@ -130,6 +138,8 @@ void applyOutputs() {
   digitalWrite(AIR_PURIFIER_LED_PIN, state.purifierPower ? HIGH : LOW);
   applyAirconStepper();
   applyPurifierStepper();
+  displayIndex = 0;
+  lastDisplayUpdate = 0;
   updateDisplay();
 }
 
@@ -184,29 +194,107 @@ void applyPurifierStepper() {
   }
 }
 
-void updateDisplay() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  if (state.humidifierPower) {
-    lcd.print("HUMIDIFIER ON");
-  } else if (state.dehumidifierPower) {
-    lcd.print("DRY MODE ON");
-  } else if (state.airconPower) {
-    lcd.print("AIRCON ON ");
-    lcd.print(state.airconTemp);
-    lcd.print("C");
-  } else if (state.purifierPower) {
-    lcd.print("AIR CLEAN ON");
-  } else if (state.moodPower) {
-    lcd.print("MOOD LIGHT ON");
-  } else {
-    lcd.print("ALL DEVICES OFF");
+int activeDeviceCount() {
+  int count = 0;
+  if (state.moodPower) count++;
+  if (state.airconPower) count++;
+  if (state.humidifierPower) count++;
+  if (state.dehumidifierPower) count++;
+  if (state.purifierPower) count++;
+  return count;
+}
+
+void printPadded(const String &text) {
+  lcd.print(text);
+  for (int i = text.length(); i < 16; i++) {
+    lcd.print(" ");
+  }
+}
+
+void printActiveDeviceByIndex(int index) {
+  int current = 0;
+
+  if (state.moodPower) {
+    if (current == index) {
+      printPadded("MOOD LIGHT ON");
+      lcd.setCursor(0, 1);
+      printPadded("Bright " + String(state.moodBrightness) + "%");
+      return;
+    }
+    current++;
   }
 
-  lcd.setCursor(0, 1);
-  lcd.print("Target H:");
-  lcd.print(state.humidifierPower ? state.humidifierHumidity : state.dehumidifierHumidity);
-  lcd.print("%");
+  if (state.airconPower) {
+    if (current == index) {
+      printPadded("AIRCON ON");
+      lcd.setCursor(0, 1);
+      printPadded("Temp " + String(state.airconTemp) + "C Fan " + String(state.airconFan));
+      return;
+    }
+    current++;
+  }
+
+  if (state.humidifierPower) {
+    if (current == index) {
+      printPadded("HUMIDIFIER ON");
+      lcd.setCursor(0, 1);
+      printPadded("Target " + String(state.humidifierHumidity) + "% Lv" + String(state.humidifierIntensity));
+      return;
+    }
+    current++;
+  }
+
+  if (state.dehumidifierPower) {
+    if (current == index) {
+      printPadded("DEHUMIDIFY ON");
+      lcd.setCursor(0, 1);
+      printPadded("Target " + String(state.dehumidifierHumidity) + "% Lv" + String(state.dehumidifierIntensity));
+      return;
+    }
+    current++;
+  }
+
+  if (state.purifierPower) {
+    if (current == index) {
+      printPadded("AIR CLEAN ON");
+      lcd.setCursor(0, 1);
+      printPadded("Speed " + String(state.purifierSpeed) + " Mode " + String(state.purifierMode));
+      return;
+    }
+  }
+}
+
+void refreshDisplayCycle() {
+  if (millis() - lastDisplayUpdate < DISPLAY_INTERVAL_MS) {
+    return;
+  }
+
+  int count = activeDeviceCount();
+  if (count > 0) {
+    displayIndex = (displayIndex + 1) % count;
+  } else {
+    displayIndex = 0;
+  }
+  lastDisplayUpdate = millis();
+  updateDisplay();
+}
+
+void updateDisplay() {
+  int count = activeDeviceCount();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  if (count == 0) {
+    printPadded("ALL DEVICES OFF");
+    lcd.setCursor(0, 1);
+    printPadded("");
+    return;
+  }
+
+  if (displayIndex >= count) {
+    displayIndex = 0;
+  }
+  printActiveDeviceByIndex(displayIndex);
 }
 
 void runManualDemo() {

@@ -151,10 +151,14 @@ class WeeklyAiRecommendation(Base):
     __tablename__ = "WEEKLY_AI_RECOMMENDATIONS"
 
     recommendation_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=True, index=True)
+    diary_id = Column(BigInteger, ForeignKey("DIARY_LOGS.diary_id"), nullable=True, index=True)
     pregnancy_week = Column(Integer, nullable=False, index=True)
     recommendation_type = Column(String(50), nullable=False, index=True)
     title = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
+    personalized_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
 
 
 class TrustedPregnancyInfo(Base):

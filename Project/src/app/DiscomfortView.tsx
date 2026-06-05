@@ -27,6 +27,38 @@ const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
 
 const getUserId = (user?: AppUser | null) => (user as any)?.id || user?.user_id;
 
+const buildAppliancePayload = (
+  userId: number | undefined,
+  power: ApplianceState,
+  settings: ApplianceSettingsState,
+) => Object.keys(settings).map((key) => ({
+  user_id: userId,
+  appliance_name: key,
+  control_command: JSON.stringify({ ...settings[key as ApplianceKey], power: power[key as ApplianceKey] }),
+  execution_status: power[key as ApplianceKey] ? "ON" : "OFF",
+}));
+
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 6000,
+  timeoutMessage = "요청 시간이 초과되었습니다. 서버 상태를 확인하세요.",
+) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 const hydrateAppliances = (rows: any[]) => {
   const power = { ...DEFAULT_APPLIANCE_POWER };
   const settings: ApplianceSettingsState = {
@@ -59,17 +91,43 @@ const fetchApplianceSettings = async (userId?: number | null) => {
 
 const saveApplianceSettings = async (userId: number | undefined, power: ApplianceState, settings: ApplianceSettingsState) => {
   if (!userId) return;
-  await fetch(`${API_BASE_URL}/api/appliances/bulk`, {
+  await fetchWithTimeout(`${API_BASE_URL}/api/appliances/bulk`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       user_id: userId,
-      settings: Object.keys(settings).map((key) => ({
-        user_id: userId, appliance_name: key,
-        control_command: JSON.stringify({ ...settings[key as ApplianceKey], power: power[key as ApplianceKey] }),
-        execution_status: power[key as ApplianceKey] ? "ON" : "OFF",
-      })),
+      settings: buildAppliancePayload(userId, power, settings),
     }),
-  });
+  }, 6000, "가전 설정 저장 시간이 초과되었습니다. 데이터베이스 연결 상태를 확인하세요.");
+};
+
+const connectArduino = async () => {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/appliances/arduino/connect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ baudrate: 9600 }),
+  }, 7000, "Arduino 연결 시간이 초과되었습니다. COM 포트 점유 상태를 확인하세요.");
+  const data = await res.json();
+  if (!res.ok || data.status !== "Success") {
+    throw new Error(data.detail || data.message || "Arduino 연결에 실패했습니다.");
+  }
+  return data.serial;
+};
+
+const syncArduinoSettings = async (
+  userId: number | undefined,
+  power: ApplianceState,
+  settings: ApplianceSettingsState,
+) => {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/appliances/arduino/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings: buildAppliancePayload(userId, power, settings) }),
+  }, 6000, "Arduino 응답 시간이 초과되었습니다. 보드 연결 상태와 업로드된 스케치를 확인하세요.");
+  const data = await res.json();
+  if (!res.ok || data.status !== "Success") {
+    throw new Error(data.detail || data.message || "Arduino 설정 전송에 실패했습니다.");
+  }
+  return data.serial;
 };
 
 function PageHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -100,6 +158,8 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
   const [appliances, setAppliances] = useState<ApplianceState>({ ...DEFAULT_APPLIANCE_POWER });
   const [applianceSettings, setApplianceSettings] = useState<ApplianceSettingsState>({ ...DEFAULT_APPLIANCE_SETTINGS });
   const [selectedAppliance, setSelectedAppliance] = useState<string | null>(null);
+  const [recommendApplyBusy, setRecommendApplyBusy] = useState(false);
+  const [recommendApplyMessage, setRecommendApplyMessage] = useState("");
 
   const [aiEnvData, setAiEnvData] = useState<any>(null);
   const [aiEnvRecs, setAiEnvRecs] = useState<any[]>([]);
@@ -159,20 +219,112 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     return Object.values(map);
   };
 
-  const handleSubmit = async () => {
-    const next = { ...appliances };
+  const getRecommendedSettingPatch = (recommendation: any) => {
+    const key = recommendation.key as ApplianceKey;
+    if (recommendation.settings) {
+      return { ...recommendation.settings, power: true };
+    }
+
+    const action = String(recommendation.action || "");
+    switch (key) {
+      case "aircon":
+        return {
+          power: true,
+          mode: action.includes("난방") ? "난방" : "냉방",
+          temp: action.includes("18") ? 20 : applianceSettings.aircon.temp,
+          fan: action.includes("강") ? 3 : 2,
+        };
+      case "humidifier":
+        return {
+          power: true,
+          humidity: action.includes("55") || action.includes("60") ? 58 : 55,
+          intensity: 2,
+        };
+      case "dehumidifier":
+        return {
+          power: true,
+          humidity: action.includes("45") || action.includes("50") ? 48 : 50,
+          intensity: 2,
+        };
+      case "airPurifier":
+        return {
+          power: true,
+          mode: "자동",
+          speed: action.includes("강") ? 3 : 2,
+        };
+      case "moodLight":
+        return {
+          power: true,
+          brightness: action.includes("수면") ? 30 : 45,
+          color: action.includes("수면") ? "수면 모드" : "이완 모드",
+        };
+      default:
+        return { power: true };
+    }
+  };
+
+  const buildRecommendedApplianceState = () => {
+    const nextPower: ApplianceState = {
+      moodLight: false,
+      aircon: false,
+      humidifier: false,
+      dehumidifier: false,
+      airPurifier: false,
+    };
     const nextSettings = { ...applianceSettings };
-    
-    getRecs().forEach((r) => { 
-      next[r.key as ApplianceKey] = true; 
-      if (r.settings) {
-        nextSettings[r.key as ApplianceKey] = { ...nextSettings[r.key as ApplianceKey], ...r.settings };
-      }
+    const recs = getRecs();
+
+    recs.forEach((r) => {
+      const key = r.key as ApplianceKey;
+      if (!nextSettings[key]) return;
+      nextPower[key] = true;
+      nextSettings[key] = { ...nextSettings[key], ...getRecommendedSettingPatch(r), power: true };
     });
 
-    Object.keys(next).forEach((key) => {
-      nextSettings[key as ApplianceKey] = { ...nextSettings[key as ApplianceKey], power: next[key as ApplianceKey] };
+    const hasHumidifier = recs.some((r) => r.key === "humidifier");
+    const hasDehumidifier = recs.some((r) => r.key === "dehumidifier");
+    if (hasHumidifier && hasDehumidifier) {
+      const humidityRecommendation = aiEnvRecs.find((r) => r.key === "humidifier" || r.key === "dehumidifier");
+      if (humidityRecommendation?.key === "dehumidifier") {
+        nextPower.humidifier = false;
+        nextSettings.humidifier = { ...nextSettings.humidifier, power: false };
+      } else {
+        nextPower.dehumidifier = false;
+        nextSettings.dehumidifier = { ...nextSettings.dehumidifier, power: false };
+      }
+    }
+
+    Object.keys(nextSettings).forEach((key) => {
+      nextSettings[key as ApplianceKey] = {
+        ...nextSettings[key as ApplianceKey],
+        power: nextPower[key as ApplianceKey],
+      };
     });
+
+    return { nextPower, nextSettings };
+  };
+
+  const applyRecommendedApplianceMode = async () => {
+    const { nextPower, nextSettings } = buildRecommendedApplianceState();
+    setRecommendApplyBusy(true);
+    setRecommendApplyMessage("추천 가전모드를 저장하고 Arduino로 전송하는 중입니다.");
+
+    try {
+      setAppliances(nextPower);
+      setApplianceSettings(nextSettings);
+      await saveApplianceSettings(userId, nextPower, nextSettings);
+      await connectArduino();
+      await syncArduinoSettings(userId, nextPower, nextSettings);
+      setRecommendApplyMessage("추천 가전모드를 Arduino 시연 장치에 전송했습니다.");
+    } catch (error) {
+      setRecommendApplyMessage(error instanceof Error ? error.message : "추천 가전모드 전송에 실패했습니다.");
+    } finally {
+      setRecommendApplyBusy(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    const { nextPower: next, nextSettings } = buildRecommendedApplianceState();
     
     setAppliances(next);
     setApplianceSettings(nextSettings);
@@ -337,6 +489,18 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
                     </div>
                   ))}
                 </div>
+                <button
+                  onClick={applyRecommendedApplianceMode}
+                  disabled={recommendApplyBusy}
+                  className="w-full mt-3 py-3 rounded-2xl font-semibold text-white shadow-sm transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                  style={{ background: "linear-gradient(135deg, #7B68B5, #4D8AF0)" }}
+                >
+                  <Sparkles size={17} />
+                  {recommendApplyBusy ? "추천 가전모드 전송 중..." : "추천 가전모드로 제어"}
+                </button>
+                {recommendApplyMessage && (
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{recommendApplyMessage}</p>
+                )}
               </div>
             )}
 

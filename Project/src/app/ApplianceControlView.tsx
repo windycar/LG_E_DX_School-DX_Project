@@ -38,6 +38,30 @@ const APPLIANCE_LIST: Array<{ key: ApplianceKey; name: string; icon: string }> =
   { key: "airPurifier", name: "공기청정기", icon: "💨" },
 ];
 
+const fetchWithTimeout = async (
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 5000,
+  timeoutMessage = "요청 시간이 초과되었습니다. 서버 상태를 확인하세요.",
+) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 const getUserId = (user?: AppUser | null) => (user as any)?.id || user?.user_id;
 
 const buildAppliancePayload = (
@@ -98,14 +122,19 @@ const saveApplianceSettings = async (
 ) => {
   if (!userId) return;
 
-  await fetch(`${API_BASE_URL}/api/appliances/bulk`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_id: userId,
-      settings: buildAppliancePayload(userId, power, settings),
-    }),
-  });
+  await fetchWithTimeout(
+    `${API_BASE_URL}/api/appliances/bulk`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        settings: buildAppliancePayload(userId, power, settings),
+      }),
+    },
+    5000,
+    "가전 설정 저장 시간이 초과되었습니다. 데이터베이스 연결 상태를 확인하세요.",
+  );
 };
 
 const syncArduinoSettings = async (
@@ -113,11 +142,16 @@ const syncArduinoSettings = async (
   power: ApplianceState,
   settings: ApplianceSettingsState,
 ) => {
-  const res = await fetch(`${API_BASE_URL}/api/appliances/arduino/sync`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ settings: buildAppliancePayload(userId, power, settings) }),
-  });
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/api/appliances/arduino/sync`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: buildAppliancePayload(userId, power, settings) }),
+    },
+    5000,
+    "Arduino 응답 시간이 초과되었습니다. 보드 연결 상태와 업로드된 스케치를 확인하세요.",
+  );
   const data = await res.json();
   if (!res.ok || data.status !== "Success") {
     throw new Error(data.detail || data.message || "Arduino 설정 전송에 실패했습니다.");
@@ -155,7 +189,12 @@ export default function ApplianceControlView({
   }, [userId]);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/appliances/arduino/status`)
+    fetchWithTimeout(
+      `${API_BASE_URL}/api/appliances/arduino/status`,
+      {},
+      3000,
+      "Arduino 상태 조회 시간이 초과되었습니다.",
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data.serial) setArduinoStatus(data.serial);
@@ -198,11 +237,16 @@ export default function ApplianceControlView({
     setArduinoBusy(true);
     setArduinoMessage("Arduino USB 포트를 찾는 중입니다.");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/appliances/arduino/connect`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baudrate: 9600 }),
-      });
+      const res = await fetchWithTimeout(
+        `${API_BASE_URL}/api/appliances/arduino/connect`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ baudrate: 9600 }),
+        },
+        6000,
+        "Arduino 연결 시간이 초과되었습니다. COM 포트가 다른 프로그램에서 사용 중인지 확인하세요.",
+      );
       const data = await res.json();
       if (!res.ok || data.status !== "Success") {
         throw new Error(data.detail || data.message || "Arduino 연결에 실패했습니다.");
@@ -220,10 +264,12 @@ export default function ApplianceControlView({
     setArduinoBusy(true);
     setArduinoMessage("현재 가전 설정을 Arduino로 전송하는 중입니다.");
     try {
-      await saveApplianceSettings(userId, appliances, applianceSettings);
       const status = await syncArduinoSettings(userId, appliances, applianceSettings);
       setArduinoStatus(status);
       setArduinoMessage("현재 가전 설정을 Arduino 시연 장치에 전송했습니다.");
+      saveApplianceSettings(userId, appliances, applianceSettings).catch((error) => {
+        console.error("가전 설정 저장 실패:", error);
+      });
     } catch (error) {
       setArduinoMessage(error instanceof Error ? error.message : "Arduino 설정 전송에 실패했습니다.");
     } finally {

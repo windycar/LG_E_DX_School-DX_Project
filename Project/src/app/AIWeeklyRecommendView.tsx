@@ -11,6 +11,14 @@ export type WeeklyGuide = {
   activities: string[];
   warnings: string[];
   sourceNote: string;
+  savedRecommendationCount?: number;
+  personalization?: {
+    applied: boolean;
+    basisCount: number;
+    recentEmotion: string | null;
+    keywords: string[];
+    summary: string;
+  };
 };
 
 export type ApiWeeklyGuide = WeeklyGuide;
@@ -107,6 +115,33 @@ export default function AIWeeklyRecommendView({ week, user, guide }: { week: num
           <span className="font-semibold" style={{ color: "#C94E70" }}>{data.range}</span>에 맞춘 공식 자료 기반 추천입니다
         </p>
       </div>
+
+      {data.personalization && (
+        <div className="rounded-xl p-4 text-sm space-y-2" style={{ background: "rgba(255,171,118,0.08)", border: "1px solid rgba(255,171,118,0.2)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-semibold text-foreground">최근 다이어리 반영</p>
+            <span className="text-xs px-2 py-1 rounded-full" style={{ background: "#FFF0E6", color: "#D96B2B" }}>
+              {data.personalization.basisCount}개 기록
+            </span>
+          </div>
+          <p className="text-muted-foreground">{data.personalization.summary}</p>
+          {typeof data.savedRecommendationCount === "number" && data.savedRecommendationCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              DB 맞춤 추천 {data.savedRecommendationCount}건이 `WEEKLY_AI_RECOMMENDATIONS`에 저장되었습니다.
+            </p>
+          )}
+          {(data.personalization.keywords.length > 0 || data.personalization.recentEmotion) && (
+            <div className="flex flex-wrap gap-2">
+              {data.personalization.recentEmotion && (
+                <span className="text-xs px-2 py-1 rounded-full bg-card border border-border">감정: {data.personalization.recentEmotion}</span>
+              )}
+              {data.personalization.keywords.map((keyword) => (
+                <span key={keyword} className="text-xs px-2 py-1 rounded-full bg-card border border-border">#{keyword}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {[
         { icon: "🍎", title: "추천 식품", items: data.foods, indicator: <CheckCircle size={16} style={{ color: "#69C99A", flexShrink: 0 }} />, grid: true },

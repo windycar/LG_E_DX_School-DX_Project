@@ -6,7 +6,7 @@ import requests
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 import models
 import schemas
@@ -14,6 +14,7 @@ import database
 
 router = APIRouter(tags=["Diary & AI Recommendation"])
 API_PUBLIC_BASE_URL = os.getenv("API_PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+_weekly_recommendation_schema_checked = False
 
 def calculate_pregnancy_week(start_date):
     if not start_date: return 0
@@ -84,15 +85,17 @@ def get_recommendation_profile(week: int):
 
 def ensure_ai_recommendation_seed():
     with database.SessionLocal() as db:
+        ensure_weekly_recommendation_schema(db)
         def add_if_missing(week, recommendation_type, title, content):
             existing = db.query(models.WeeklyAiRecommendation).filter(
+                models.WeeklyAiRecommendation.user_id.is_(None),
                 models.WeeklyAiRecommendation.pregnancy_week == week,
                 models.WeeklyAiRecommendation.recommendation_type == recommendation_type,
                 models.WeeklyAiRecommendation.title == title,
             ).first()
             if not existing:
                 db.add(models.WeeklyAiRecommendation(
-                    pregnancy_week=week, recommendation_type=recommendation_type, title=title, content=content
+                    user_id=None, diary_id=None, pregnancy_week=week, recommendation_type=recommendation_type, title=title, content=content
                 ))
 
         for week in range(1, 41):
@@ -105,6 +108,26 @@ def ensure_ai_recommendation_seed():
             for title, subtitle, emoji, source, bullets in profile["checklists"]: add_if_missing(week, "CONTENT_CHECKLIST", title, json.dumps({"subtitle": subtitle, "emoji": emoji, "source": source, "bullets": bullets}, ensure_ascii=False))
             for title, subtitle, emoji, source, bullets in profile["risk_contents"]: add_if_missing(week, "CONTENT_WARNING", title, json.dumps({"subtitle": subtitle, "emoji": emoji, "source": source, "bullets": bullets}, ensure_ascii=False))
         db.commit()
+
+def ensure_weekly_recommendation_schema(db: Session):
+    global _weekly_recommendation_schema_checked
+    if _weekly_recommendation_schema_checked:
+        return
+    required_columns = {
+        "user_id": "ADD COLUMN user_id BIGINT NULL",
+        "diary_id": "ADD COLUMN diary_id BIGINT NULL",
+        "personalized_reason": "ADD COLUMN personalized_reason TEXT NULL",
+        "created_at": "ADD COLUMN created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP",
+    }
+    existing = {
+        row[0]
+        for row in db.execute(text("SHOW COLUMNS FROM WEEKLY_AI_RECOMMENDATIONS")).fetchall()
+    }
+    for column, ddl in required_columns.items():
+        if column not in existing:
+            db.execute(text(f"ALTER TABLE WEEKLY_AI_RECOMMENDATIONS {ddl}"))
+    db.commit()
+    _weekly_recommendation_schema_checked = True
 
 # Helper 함수들 복구
 def parse_recommendation_content(content: str):
@@ -153,8 +176,159 @@ def content_group_from_rows(rows, expected_items, content_type, source_note=None
     if len(filtered) >= len(expected_items): return [format_content_recommendation(row, content_type) for row in filtered]
     return profile_content_items(expected_items, content_type, source_note, id_offset)
 
+def unique_ordered(items):
+    result, seen = [], set()
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def analyze_recent_diary_context(db: Session, user_id: int):
+    logs = (
+        db.query(models.DiaryLog)
+        .filter(models.DiaryLog.user_id == user_id)
+        .order_by(models.DiaryLog.recorded_at.desc())
+        .limit(5)
+        .all()
+    )
+    if not logs:
+        return {
+            "applied": False,
+            "basisCount": 0,
+            "recentEmotion": None,
+            "keywords": [],
+            "summary": "최근 다이어리 기록이 없어 주차 기준 추천만 제공합니다.",
+            "foods": [],
+            "activities": [],
+            "warnings": [],
+        }
+
+    diary_ids = [log.diary_id for log in logs]
+    analysis_rows = db.query(models.AiAnalysisResult).filter(models.AiAnalysisResult.diary_id.in_(diary_ids)).all()
+    analysis_by_diary_id = {row.diary_id: row.detected_emotion for row in analysis_rows}
+
+    text = " ".join([f"{log.selected_emotion or ''} {log.diary_content or ''} {analysis_by_diary_id.get(log.diary_id, '')}" for log in logs]).lower()
+    emotions = [analysis_by_diary_id.get(log.diary_id) or log.selected_emotion for log in logs if analysis_by_diary_id.get(log.diary_id) or log.selected_emotion]
+    emotion_counts = {}
+    for emotion in emotions:
+        emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+    recent_emotion = max(emotion_counts.items(), key=lambda item: item[1])[0] if emotion_counts else None
+
+    rules = [
+        {
+            "keyword": "입덧",
+            "terms": ["입덧", "울렁", "메스꺼", "구토", "토했", "토할"],
+            "foods": ["입덧 시: 크래커·토스트처럼 부담 적은 음식", "수분: 물을 조금씩 자주"],
+            "activities": ["피로하면 휴식 우선"],
+            "warnings": ["물도 못 마시거나 계속 토하면 병원 문의"],
+        },
+        {
+            "keyword": "피로",
+            "terms": ["피곤", "피로", "지침", "기운", "무기력", "힘들"],
+            "foods": ["단백질 식품 매끼 조금씩", "철분과 단백질 식품"],
+            "activities": ["피로하면 휴식 우선", "짧은 산책"],
+            "warnings": ["지속 피로·어지러움이 있으면 빈혈 여부 확인"],
+        },
+        {
+            "keyword": "수면",
+            "terms": ["잠", "수면", "불면", "못잤", "뒤척", "새벽"],
+            "foods": ["오후 늦은 카페인 줄이기"],
+            "activities": ["옆으로 누워 쉬는 습관", "호흡 이완"],
+            "warnings": ["수면 방해가 심하면 정기검진 때 상담"],
+        },
+        {
+            "keyword": "붓기",
+            "terms": ["붓", "부종", "다리", "발이", "손이"],
+            "foods": ["저염식으로 붓기 부담 줄이기", "수분은 낮부터 나누어 섭취"],
+            "activities": ["다리 올리고 쉬기", "오래 앉아 있으면 중간중간 자세 바꾸기"],
+            "warnings": ["갑작스러운 심한 부종·두통 주의"],
+        },
+        {
+            "keyword": "허리통증",
+            "terms": ["허리", "골반", "통증", "아파", "아픔", "뻐근"],
+            "foods": ["단백질 식품 매끼 조금씩"],
+            "activities": ["골반 주변 가벼운 스트레칭", "가벼운 산전 스트레칭"],
+            "warnings": ["심한 통증·출혈·규칙적 배뭉침이 있으면 병원 문의"],
+        },
+        {
+            "keyword": "불안",
+            "terms": ["불안", "걱정", "무섭", "두렵", "초조", "화가", "우울", "속상"],
+            "foods": ["수분 충분히", "소화 잘 되는 식사"],
+            "activities": ["가벼운 호흡 운동", "호흡 이완", "짧은 산책"],
+            "warnings": ["불안이 지속되거나 일상생활이 어려우면 의료진 상담"],
+        },
+    ]
+
+    matched_keywords, foods, activities, warnings = [], [], [], []
+    for rule in rules:
+        if any(term in text for term in rule["terms"]):
+            matched_keywords.append(rule["keyword"])
+            foods.extend(rule["foods"])
+            activities.extend(rule["activities"])
+            warnings.extend(rule["warnings"])
+
+    if recent_emotion in ["불안", "우울", "화남", "피로"]:
+        if "불안" not in matched_keywords:
+            matched_keywords.append(recent_emotion)
+        activities.extend(["가벼운 호흡 운동", "피로하면 휴식 우선"])
+        warnings.extend(["감정 기복이 오래 지속되면 의료진 또는 상담 전문가에게 문의"])
+
+    applied = bool(matched_keywords)
+    summary = (
+        f"최근 다이어리 {len(logs)}개에서 {', '.join(unique_ordered(matched_keywords))} 흐름이 보여 관련 항목을 앞에 배치했습니다."
+        if applied else
+        f"최근 다이어리 {len(logs)}개를 확인했지만 특정 불편 키워드가 뚜렷하지 않아 주차 기준 추천을 유지했습니다."
+    )
+    return {
+        "applied": applied,
+        "basisCount": len(logs),
+        "basisDiaryId": logs[0].diary_id if logs else None,
+        "recentEmotion": recent_emotion,
+        "keywords": unique_ordered(matched_keywords),
+        "summary": summary,
+        "foods": unique_ordered(foods),
+        "activities": unique_ordered(activities),
+        "warnings": unique_ordered(warnings),
+    }
+
+def upsert_personalized_weekly_recommendations(db: Session, user_id: int, pregnancy_week: int, diary_context: dict, foods: list[str], activities: list[str], warnings: list[str]):
+    if not diary_context.get("applied"):
+        return
+    basis_diary_id = diary_context.get("basisDiaryId")
+    reason = diary_context.get("summary")
+    rows_to_save = [
+        ("FOOD", foods[:3]),
+        ("ACTIVITY", activities[:3]),
+        ("WARNING", warnings[:3]),
+    ]
+    for recommendation_type, titles in rows_to_save:
+        for title in titles:
+            existing = db.query(models.WeeklyAiRecommendation).filter(
+                models.WeeklyAiRecommendation.user_id == user_id,
+                models.WeeklyAiRecommendation.pregnancy_week == pregnancy_week,
+                models.WeeklyAiRecommendation.recommendation_type == recommendation_type,
+                models.WeeklyAiRecommendation.title == title,
+            ).first()
+            if existing:
+                existing.diary_id = basis_diary_id
+                existing.content = title
+                existing.personalized_reason = reason
+            else:
+                db.add(models.WeeklyAiRecommendation(
+                    user_id=user_id,
+                    diary_id=basis_diary_id,
+                    pregnancy_week=pregnancy_week,
+                    recommendation_type=recommendation_type,
+                    title=title,
+                    content=title,
+                    personalized_reason=reason,
+                ))
+    db.commit()
+
 @router.get("/api/ai/weekly-recommendations/{identifier}")
 def get_weekly_ai_recommendations(identifier: str, db: Session = Depends(database.get_db)):
+    ensure_weekly_recommendation_schema(db)
     if identifier.isdigit():
         user = db.query(models.User).filter(models.User.id == int(identifier)).first()
     else:
@@ -169,11 +343,17 @@ def get_weekly_ai_recommendations(identifier: str, db: Session = Depends(databas
     pregnancy_week = calculate_pregnancy_week(target_user.pregnancy_start_date)
     query_week = min(max(pregnancy_week, 1), 40)
     profile = get_recommendation_profile(query_week)
-    rows = db.query(models.WeeklyAiRecommendation).filter(models.WeeklyAiRecommendation.pregnancy_week == query_week).all()
+    rows = db.query(models.WeeklyAiRecommendation).filter(
+        models.WeeklyAiRecommendation.user_id.is_(None),
+        models.WeeklyAiRecommendation.pregnancy_week == query_week,
+    ).all()
 
     if not rows:
         ensure_ai_recommendation_seed()
-        rows = db.query(models.WeeklyAiRecommendation).filter(models.WeeklyAiRecommendation.pregnancy_week == query_week).all()
+        rows = db.query(models.WeeklyAiRecommendation).filter(
+            models.WeeklyAiRecommendation.user_id.is_(None),
+            models.WeeklyAiRecommendation.pregnancy_week == query_week,
+        ).all()
 
     grouped = {}
     for row in rows: grouped.setdefault(row.recommendation_type, []).append(row)
@@ -181,6 +361,15 @@ def get_weekly_ai_recommendations(identifier: str, db: Session = Depends(databas
     meta_rows = filter_rows_by_titles(grouped.get("META", []), [profile["range"]])
     meta_row = meta_rows[0] if meta_rows else None
     meta = parse_recommendation_content(meta_row.content) if meta_row else {"range": profile["range"], "fetalSize": profile["fetal_size"], "fetalWeight": profile["fetal_weight"], "highlight": profile["highlight"], "sourceNote": profile["source_note"]}
+    diary_context = analyze_recent_diary_context(db, target_user.id)
+    foods = unique_ordered(diary_context["foods"] + unique_titles(filter_rows_by_titles(grouped.get("FOOD", []), profile["foods"]), profile["foods"]))
+    activities = unique_ordered(diary_context["activities"] + unique_titles(filter_rows_by_titles(grouped.get("ACTIVITY", []), profile["activities"]), profile["activities"]))
+    warnings = unique_ordered(diary_context["warnings"] + unique_titles(filter_rows_by_titles(grouped.get("WARNING", []), profile["warnings"]), profile["warnings"]))
+    upsert_personalized_weekly_recommendations(db, target_user.id, query_week, diary_context, foods, activities, warnings)
+    personalized_rows = db.query(models.WeeklyAiRecommendation).filter(
+        models.WeeklyAiRecommendation.user_id == target_user.id,
+        models.WeeklyAiRecommendation.pregnancy_week == query_week,
+    ).order_by(models.WeeklyAiRecommendation.created_at.desc()).all()
     
     return {
         "status": "Success",
@@ -189,10 +378,12 @@ def get_weekly_ai_recommendations(identifier: str, db: Session = Depends(databas
         "pregnancy_week": pregnancy_week, "query_week": query_week,
         "guide": {
             "range": meta.get("range"), "fetalSize": meta.get("fetalSize"), "fetalWeight": meta.get("fetalWeight"),
-            "highlight": meta.get("highlight"), "foods": unique_titles(filter_rows_by_titles(grouped.get("FOOD", []), profile["foods"]), profile["foods"]),
-            "activities": unique_titles(filter_rows_by_titles(grouped.get("ACTIVITY", []), profile["activities"]), profile["activities"]),
-            "warnings": unique_titles(filter_rows_by_titles(grouped.get("WARNING", []), profile["warnings"]), profile["warnings"]),
+            "highlight": meta.get("highlight"), "foods": foods[:6],
+            "activities": activities[:6],
+            "warnings": warnings[:6],
             "sourceNote": meta.get("sourceNote"),
+            "personalization": diary_context,
+            "savedRecommendationCount": len(personalized_rows),
         },
         "contents": {
             "weekly": content_group_from_rows(grouped.get("CONTENT_WEEKLY", []), profile["contents"], "이번 주", profile["source_note"], 1000),

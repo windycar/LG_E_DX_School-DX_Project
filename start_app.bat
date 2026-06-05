@@ -1,16 +1,93 @@
 @echo off
 chcp 65001 > nul
-echo 🚀 프로젝트의 모든 서버(FastAPI, AI Chat, React)를 실행합니다...
+setlocal
 
-echo ⚙️ 1. 백엔드(FastAPI) 서버를 시작합니다...
-start "Backend Server" cmd /k "cd backend & call venv\Scripts\activate & uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+set "ROOT=%~dp0"
+set "PYTHON_EXE=%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"
+set "ARDUINO_PORT=COM3"
+set "ARDUINO_FQBN=arduino:avr:uno"
+set "ARDUINO_SKETCH=%ROOT%arduino\MOMent_Appliance_Demo"
 
-echo 🤖 2. AI 채팅 API 서버를 시작합니다...
-:: 기존에 index.js를 실행해주던 명령어입니다.
-start "AI Chat Server" cmd /k "cd Project & npm run dev"
+if not exist "%PYTHON_EXE%" (
+  set "PYTHON_EXE=python"
+)
 
-echo 🖥️ 3. 프론트엔드(React/Vite) 웹 화면을 시작합니다...
-:: 채팅 서버와 겹치지 않게 강제로 Vite 웹 화면을 띄워주는 명령어입니다.
-start "Frontend Server" cmd /k "cd Project & npx vite"
+echo Starting MOMent local demo servers.
+echo.
+echo [1/5] Releasing local demo ports and Arduino COM port holders.
+echo Closing Arduino IDE if it is using %ARDUINO_PORT%.
+taskkill /F /T /IM "Arduino IDE.exe" > nul 2> nul
+taskkill /F /T /IM "arduino-ide.exe" > nul 2> nul
 
-echo ✅ 3개의 서버 실행이 모두 완료되었습니다!
+echo Closing existing backend processes on port 8000.
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000" ^| findstr "LISTENING"') do (
+  taskkill /F /PID %%P > nul 2> nul
+)
+
+echo Closing stale Python/Uvicorn demo processes that may still hold %ARDUINO_PORT%.
+taskkill /F /T /IM "uvicorn.exe" > nul 2> nul
+taskkill /F /T /IM "python.exe" > nul 2> nul
+
+echo Waiting for Windows to release %ARDUINO_PORT%.
+timeout /t 2 /nobreak > nul
+
+echo.
+echo [2/5] Checking backend Python packages. pyserial is installed here too.
+cd /d "%ROOT%backend"
+"%PYTHON_EXE%" -m pip install -r requirements.txt
+if errorlevel 1 (
+  echo.
+  echo [ERROR] Backend package install failed.
+  echo Python path: %PYTHON_EXE%
+  pause
+  exit /b 1
+)
+
+"%PYTHON_EXE%" -m pip install pyserial
+if errorlevel 1 (
+  echo.
+  echo [ERROR] pyserial install failed.
+  echo Python path: %PYTHON_EXE%
+  pause
+  exit /b 1
+)
+
+echo.
+echo [3/5] Uploading Arduino demo sketch if arduino-cli is installed.
+where arduino-cli > nul 2> nul
+if errorlevel 1 (
+  echo arduino-cli was not found. Skipping Arduino upload.
+  echo If the sketch is not uploaded yet, upload it once from Arduino IDE:
+  echo %ARDUINO_SKETCH%\MOMent_Appliance_Demo.ino
+) else (
+  echo Board: %ARDUINO_FQBN%
+  echo Port : %ARDUINO_PORT%
+  arduino-cli compile --fqbn %ARDUINO_FQBN% "%ARDUINO_SKETCH%"
+  if errorlevel 1 (
+    echo [WARN] Arduino compile failed. Continuing without upload.
+  ) else (
+    arduino-cli upload -p %ARDUINO_PORT% --fqbn %ARDUINO_FQBN% "%ARDUINO_SKETCH%"
+    if errorlevel 1 (
+      echo [WARN] Arduino upload failed. Close Arduino IDE or Serial Monitor if it is using %ARDUINO_PORT%.
+      echo Continuing with backend and frontend startup.
+    ) else (
+      echo Arduino sketch uploaded successfully.
+    )
+  )
+)
+
+echo.
+echo [4/5] Starting FastAPI backend. Arduino USB control runs through this server.
+start "MOMent Backend API" cmd /k "cd /d ""%ROOT%backend"" && ""%PYTHON_EXE%"" -m uvicorn main:app --host 127.0.0.1 --port 8000"
+
+echo.
+echo [5/5] Starting React frontend and local AI Chat server.
+cd /d "%ROOT%Project"
+start "MOMent Frontend + AI Chat" cmd /k "npm run dev -- --host 127.0.0.1"
+
+echo.
+echo Done.
+echo Use the Vite Local URL shown in the frontend terminal, for example http://localhost:5173 or http://localhost:5174
+echo Backend Arduino status URL: http://127.0.0.1:8000/api/appliances/arduino/status
+echo.
+pause

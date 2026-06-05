@@ -15,3 +15,5 @@ __pycache__/
 *.pyc
 System_Architecture/
 MOMent 서비스 흐름도/
+*.docx
+*.pdf
