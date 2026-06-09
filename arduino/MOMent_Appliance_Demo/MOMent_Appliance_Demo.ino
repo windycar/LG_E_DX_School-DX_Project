@@ -26,11 +26,11 @@ Stepper purifierStepper(STEPS_PER_REVOLUTION, PURIFIER_STEPPER_IN1, PURIFIER_STE
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 String serialLine = "";
-int currentAirconPosition = 0;
-int currentPurifierPosition = 0;
 int displayIndex = 0;
 unsigned long lastDisplayUpdate = 0;
 const unsigned long DISPLAY_INTERVAL_MS = 2500;
+unsigned long lastAirconStep = 0;
+unsigned long lastPurifierStep = 0;
 
 struct ApplianceState {
   int moodPower = 0;
@@ -63,8 +63,8 @@ void setup() {
   pinMode(AIR_PURIFIER_LED_PIN, OUTPUT);
   pinMode(CONNECTION_LED_PIN, OUTPUT);
 
-  airconStepper.setSpeed(10);
-  purifierStepper.setSpeed(10);
+  airconStepper.setSpeed(15);
+  purifierStepper.setSpeed(15);
 
   lcd.init();
   lcd.backlight();
@@ -95,6 +95,7 @@ void loop() {
   }
   previousButton = currentButton;
 
+  runContinuousSteppers();
   refreshDisplayCycle();
 }
 
@@ -136,8 +137,6 @@ void applyOutputs() {
   digitalWrite(HUMIDIFIER_PIN, state.humidifierPower ? HIGH : LOW);
   digitalWrite(DEHUMIDIFIER_LED_PIN, state.dehumidifierPower ? HIGH : LOW);
   digitalWrite(AIR_PURIFIER_LED_PIN, state.purifierPower ? HIGH : LOW);
-  applyAirconStepper();
-  applyPurifierStepper();
   displayIndex = 0;
   lastDisplayUpdate = 0;
   updateDisplay();
@@ -167,30 +166,34 @@ void setRgb(int red, int green, int blue) {
   analogWrite(RGB_B_PIN, constrain(blue, 0, 255));
 }
 
-void applyAirconStepper() {
-  int target = state.airconPower ? constrain(state.airconFan, 1, 3) : 0;
-  int delta = target - currentAirconPosition;
-  if (delta != 0) {
-    airconStepper.step(delta * 256);
-    currentAirconPosition = target;
-  }
+int stepIntervalMs(int speedLevel) {
+  int level = constrain(speedLevel, 1, 3);
+  if (level == 1) return 7;
+  if (level == 2) return 4;
+  return 2;
 }
 
-void applyPurifierStepper() {
-  int target = 0;
-  if (state.purifierPower) {
-    target = constrain(state.purifierSpeed, 1, 3);
-    if (state.purifierMode == 2) {
-      target = 4;
+void runContinuousSteppers() {
+  unsigned long now = millis();
+
+  if (state.airconPower) {
+    int fanLevel = constrain(state.airconFan, 1, 3);
+    if (now - lastAirconStep >= (unsigned long)stepIntervalMs(fanLevel)) {
+      airconStepper.step(1);
+      lastAirconStep = now;
     }
   }
 
-  int delta = target - currentPurifierPosition;
-  if (delta != 0) {
-    purifierStepper.step(delta * 256);
-    currentPurifierPosition = target;
-  } else if (state.purifierPower) {
-    purifierStepper.step(64 * max(1, state.purifierSpeed));
+  if (state.purifierPower) {
+    int purifierLevel = constrain(state.purifierSpeed, 1, 3);
+    if (state.purifierMode == 2) {
+      purifierLevel = 3;
+    }
+    
+    if (now - lastPurifierStep >= (unsigned long)stepIntervalMs(purifierLevel)) {
+      purifierStepper.step(1);
+      lastPurifierStep = now;
+    }
   }
 }
 
@@ -282,7 +285,6 @@ void refreshDisplayCycle() {
 void updateDisplay() {
   int count = activeDeviceCount();
 
-  lcd.clear();
   lcd.setCursor(0, 0);
   if (count == 0) {
     printPadded("ALL DEVICES OFF");
