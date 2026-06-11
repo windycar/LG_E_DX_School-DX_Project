@@ -144,6 +144,10 @@ def build_sync_command(settings):
             values[name]["speed"] = _int_value(command.get("speed"), 1)
             values[name]["mode"] = _mode_code(command.get("mode"))
 
+    # 상반되는 습도 제어 장치가 동시에 동작하지 않도록 제습기를 우선합니다.
+    if values["dehumidifier"]["power"]:
+        values["humidifier"]["power"] = 0
+
     return (
         "SYNC"
         f";ML={values['moodLight']['power']},{values['moodLight']['brightness']},{values['moodLight']['color']}"

@@ -194,6 +194,13 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
   const toggleDiscomfortAppliance = (key: ApplianceKey) => {
     const nextPower = { ...appliances, [key]: !appliances[key] };
     const nextSettings = { ...applianceSettings, [key]: { ...applianceSettings[key], power: nextPower[key] } };
+    if (nextPower[key] && key === "humidifier") {
+      nextPower.dehumidifier = false;
+      nextSettings.dehumidifier = { ...nextSettings.dehumidifier, power: false };
+    } else if (nextPower[key] && key === "dehumidifier") {
+      nextPower.humidifier = false;
+      nextSettings.humidifier = { ...nextSettings.humidifier, power: false };
+    }
     setAppliances(nextPower); setApplianceSettings(nextSettings); persistDiscomfortAppliances(nextPower, nextSettings);
   };
 
@@ -369,7 +376,7 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     { key: "dehumidifier", name: "제습기", icon: "🌊" },
     { key: "airPurifier", name: "공기청정기", icon: "💨" },
     { key: "washingMachine", name: "세탁기", icon: "🧺" },
-    { key: "dryer", name: "건조기", icon: "♨️" },
+    { key: "dryer", name: "건조기", icon: "👕" },
   ];
 
   const getApplianceStatus = (key: ApplianceKey) => {
