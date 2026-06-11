@@ -4,7 +4,7 @@ import { ExternalLink, RefreshCw, ShoppingBag, Usb, X } from "lucide-react";
 import { AppUser, Screen } from "./types";
 import { BottomNav } from "./App";
 
-type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier";
+type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier" | "washingMachine" | "dryer";
 type ApplianceState = Record<ApplianceKey, boolean>;
 type ApplianceSettingsState = Record<ApplianceKey, any>;
 type ArduinoSerialStatus = {
@@ -20,6 +20,8 @@ const DEFAULT_APPLIANCE_POWER: ApplianceState = {
   humidifier: false,
   dehumidifier: false,
   airPurifier: true,
+  washingMachine: false,
+  dryer: false,
 };
 
 const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
@@ -28,6 +30,8 @@ const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
   humidifier: { humidity: 55, intensity: 2, power: false },
   dehumidifier: { humidity: 50, intensity: 2, power: false },
   airPurifier: { speed: 2, mode: "자동", power: true },
+  washingMachine: { power: false },
+  dryer: { power: false },
 };
 
 const APPLIANCE_LIST: Array<{ key: ApplianceKey; name: string; icon: string }> = [
@@ -36,6 +40,8 @@ const APPLIANCE_LIST: Array<{ key: ApplianceKey; name: string; icon: string }> =
   { key: "humidifier", name: "가습기", icon: "💧" },
   { key: "dehumidifier", name: "제습기", icon: "🌊" },
   { key: "airPurifier", name: "공기청정기", icon: "💨" },
+  { key: "washingMachine", name: "세탁기", icon: "🧺" },
+  { key: "dryer", name: "건조기", icon: "♨️" },
 ];
 
 const fetchWithTimeout = async (
@@ -83,6 +89,8 @@ const hydrateAppliances = (rows: any[]) => {
     humidifier: { ...DEFAULT_APPLIANCE_SETTINGS.humidifier },
     dehumidifier: { ...DEFAULT_APPLIANCE_SETTINGS.dehumidifier },
     airPurifier: { ...DEFAULT_APPLIANCE_SETTINGS.airPurifier },
+    washingMachine: { ...DEFAULT_APPLIANCE_SETTINGS.washingMachine },
+    dryer: { ...DEFAULT_APPLIANCE_SETTINGS.dryer },
   };
 
   rows.forEach((row) => {
@@ -291,6 +299,10 @@ export default function ApplianceControlView({
         return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
       case "airPurifier":
         return `${settings.mode} • 풍량 ${settings.speed}`;
+      case "washingMachine":
+        return appliances.washingMachine ? "작동 중" : "전원 꺼짐";
+      case "dryer":
+        return appliances.dryer ? "건조 중" : "전원 꺼짐";
       default:
         return "설정 없음";
     }
@@ -373,7 +385,7 @@ export default function ApplianceControlView({
                   />
                 </button>
               </div>
-              {appliances[app.key] && (
+              {appliances[app.key] && app.key !== "washingMachine" && app.key !== "dryer" && (
                 <button
                   onClick={() => setSelectedAppliance(app.key)}
                   className="w-full mt-2 py-2 rounded-xl text-xs font-medium border border-border text-muted-foreground hover:bg-secondary/50 transition-colors"

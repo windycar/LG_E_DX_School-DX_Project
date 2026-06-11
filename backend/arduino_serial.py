@@ -117,6 +117,8 @@ def build_sync_command(settings):
         "humidifier": {"power": 0, "humidity": 55, "intensity": 1},
         "dehumidifier": {"power": 0, "humidity": 50, "intensity": 1},
         "airPurifier": {"power": 0, "speed": 1, "mode": 0},
+        "washingMachine": {"power": 0},
+        "dryer": {"power": 0},
     }
 
     for item in settings:
@@ -149,6 +151,8 @@ def build_sync_command(settings):
         f";HU={values['humidifier']['power']},{values['humidifier']['humidity']},{values['humidifier']['intensity']}"
         f";DH={values['dehumidifier']['power']},{values['dehumidifier']['humidity']},{values['dehumidifier']['intensity']}"
         f";AP={values['airPurifier']['power']},{values['airPurifier']['speed']},{values['airPurifier']['mode']}"
+        f";WM={values['washingMachine']['power']}"
+        f";DR={values['dryer']['power']}"
     )
 
 

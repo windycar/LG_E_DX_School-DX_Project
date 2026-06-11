@@ -5,7 +5,7 @@ import { AppUser, PartnerStatus, Screen } from "./types";
 // @ts-ignore
 import { BottomNav } from "./App";
 
-type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier";
+type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "airPurifier" | "washingMachine" | "dryer";
 type ApplianceState = Record<ApplianceKey, boolean>;
 type ApplianceSettingsState = Record<ApplianceKey, any>;
 
@@ -15,6 +15,8 @@ const DEFAULT_APPLIANCE_POWER: ApplianceState = {
   humidifier: false,
   dehumidifier: false,
   airPurifier: true,
+  washingMachine: false,
+  dryer: false,
 };
 
 const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
@@ -23,6 +25,8 @@ const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
   humidifier: { humidity: 55, intensity: 2, power: false },
   dehumidifier: { humidity: 50, intensity: 2, power: false },
   airPurifier: { speed: 2, mode: "자동", power: true },
+  washingMachine: { power: false },
+  dryer: { power: false },
 };
 
 const getUserId = (user?: AppUser | null) => (user as any)?.id || user?.user_id;
@@ -67,6 +71,8 @@ const hydrateAppliances = (rows: any[]) => {
     humidifier: { ...DEFAULT_APPLIANCE_SETTINGS.humidifier },
     dehumidifier: { ...DEFAULT_APPLIANCE_SETTINGS.dehumidifier },
     airPurifier: { ...DEFAULT_APPLIANCE_SETTINGS.airPurifier },
+    washingMachine: { ...DEFAULT_APPLIANCE_SETTINGS.washingMachine },
+    dryer: { ...DEFAULT_APPLIANCE_SETTINGS.dryer },
   };
 
   rows.forEach((row) => {
@@ -270,6 +276,8 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
       humidifier: false,
       dehumidifier: false,
       airPurifier: false,
+      washingMachine: false,
+      dryer: false,
     };
     const nextSettings = { ...applianceSettings };
     const recs = getRecs();
@@ -360,6 +368,8 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     { key: "humidifier", name: "가습기", icon: "💧" },
     { key: "dehumidifier", name: "제습기", icon: "🌊" },
     { key: "airPurifier", name: "공기청정기", icon: "💨" },
+    { key: "washingMachine", name: "세탁기", icon: "🧺" },
+    { key: "dryer", name: "건조기", icon: "♨️" },
   ];
 
   const getApplianceStatus = (key: ApplianceKey) => {
@@ -371,6 +381,8 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
       case "aircon": return `목표 온도 ${settings.temp}℃ • 풍량 ${settings.fan}`;
       case "humidifier": return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
       case "dehumidifier": return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
+      case "washingMachine": return appliances.washingMachine ? "작동 중" : "전원 꺼짐";
+      case "dryer": return appliances.dryer ? "건조 중" : "전원 꺼짐";
       default: return "설정됨";
     }
   };
@@ -525,7 +537,7 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
                         <span className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" style={{ transform: appliances[app.key] ? "translateX(24px)" : "translateX(0)" }} />
                       </button>
                     </div>
-                    {appliances[app.key] && (
+                    {appliances[app.key] && app.key !== "washingMachine" && app.key !== "dryer" && (
                       <button onClick={() => setSelectedAppliance(app.key)} className="w-full mt-2 py-2 rounded-xl text-xs font-medium border border-border text-muted-foreground hover:bg-secondary/50 transition-colors">
                         상세 설정 변경
                       </button>
