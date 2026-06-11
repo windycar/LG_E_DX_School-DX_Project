@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     email: str
     password: str
     name: str
+    nickname: Optional[str] = None
     role: str
     baby_nickname: Optional[str] = None
     start_date: Optional[str] = None
@@ -20,6 +21,7 @@ class LoginRequest(BaseModel):
 
 class ProfileUpdate(BaseModel):
     name: str
+    nickname: Optional[str] = None
     baby_nickname: Optional[str] = None
 
 class PasswordUpdate(BaseModel):

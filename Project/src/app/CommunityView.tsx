@@ -93,11 +93,18 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   };
 
   const deletePost = async (postId: number) => {
+    if (!userId) {
+      alert("로그인 사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
     if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
     try {
-      const res = await fetch(apiUrl(`/api/community/posts/${postId}`), { method: "DELETE" });
+      const res = await fetch(apiUrl(`/api/community/posts/${postId}?user_id=${userId}`), { method: "DELETE" });
       if (res.ok) fetchPosts();
-      else alert("게시글 삭제에 실패했습니다.");
+      else {
+        const error = await res.json().catch(() => ({}));
+        alert(error.detail || "게시글 삭제에 실패했습니다.");
+      }
     } catch (e) { alert("서버와 통신 오류가 발생했습니다."); }
   };
 
@@ -161,8 +168,12 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
 
   const submitComment = async (postId: number) => {
     if (!newComment.trim()) return;
+    const currentUserId = (user as any).id || (user as any).user_id;
+    if (!currentUserId) {
+      alert("로그인 사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
     try {
-      const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(apiUrl(`/api/posts/${postId}/comments`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,9 +188,13 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   };
 
   const deleteComment = async (commentId: number, postId: number) => {
+    const currentUserId = (user as any).id || (user as any).user_id;
+    if (!currentUserId) {
+      alert("로그인 사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
     if (!window.confirm("댓글을 삭제하시겠습니까?")) return;
     try {
-      const currentUserId = (user as any).id || (user as any).user_id || 1;
       const res = await fetch(apiUrl(`/api/comments/${commentId}?user_id=${currentUserId}`), { method: "DELETE" });
       if (res.ok) {
         fetchComments(postId);
@@ -207,7 +222,11 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
       return;
     }
     
-    const currentUserId = (user as any).id || (user as any).user_id || 1;
+    const currentUserId = (user as any).id || (user as any).user_id;
+    if (!currentUserId) {
+      alert("로그인 사용자 정보를 확인할 수 없습니다.");
+      return;
+    }
     
     const payload = {
       user_id: currentUserId, 
@@ -223,7 +242,8 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        alert("글 작성 실패! 백엔드 설정을 다시 확인하세요.");
+        const error = await res.json().catch(() => ({}));
+        alert(error.detail || "글 작성에 실패했습니다.");
         return;
       }
       
@@ -297,7 +317,7 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
             filtered.map((post) => {
               const postId = post.id || post.post_id;
               const isExpanded = expandedPostId === postId;
-              const currentUserId = (user as any).id || (user as any).user_id || 1;
+              const currentUserId = (user as any).id || (user as any).user_id;
 
               return (
                 <div key={postId} className="bg-white rounded-2xl p-5 border border-border shadow-sm transition-all">

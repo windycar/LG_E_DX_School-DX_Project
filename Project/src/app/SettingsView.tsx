@@ -48,11 +48,15 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   // 🚀 즉시 반영되는 프로필 업데이트 함수
   // 🚀 로그아웃을 막고 메인 화면까지 즉시 동기화하는 프로필 업데이트 함수
   const handleProfileUpdate = async () => {
+    if (!editName.trim()) {
+      alert("이름을 입력해주세요.");
+      return;
+    }
     try {
       const res = await fetch(apiUrl(`/api/user/profile/${userId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName, baby_nickname: editBabyNickname }),
+        body: JSON.stringify({ name: editName.trim(), nickname: user.nickname, baby_nickname: editBabyNickname.trim() }),
       });
       if (res.ok) {
         alert("프로필이 성공적으로 수정되었습니다!");
@@ -81,6 +85,14 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   };
 
   const handlePasswordUpdate = async () => {
+    if (!currentPassword || !newPassword) {
+      alert("현재 비밀번호와 새 비밀번호를 모두 입력해주세요.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert("새 비밀번호는 6자 이상 입력해주세요.");
+      return;
+    }
     if (newPassword !== newPasswordConfirm) {
       alert("새 비밀번호가 일치하지 않습니다.");
       return;

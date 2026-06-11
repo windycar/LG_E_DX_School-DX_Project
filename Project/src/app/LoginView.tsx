@@ -16,6 +16,11 @@ export default function LoginView({
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      setError("이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -26,11 +31,11 @@ export default function LoginView({
       const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
         signal: controller.signal,
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.status === "Success") {
         const userInfo = data.user;
@@ -52,9 +57,9 @@ export default function LoginView({
         
         onSuccess({
           name: userInfo.name,
-          nickname: userInfo.name, 
+          nickname: userInfo.nickname || userInfo.name,
           babyNickname: userInfo.baby_nickname || "아기", 
-          email: email,
+          email: userInfo.email || normalizedEmail,
           role: isAdmin ? "admin" : normalizedRole === "PREGNANT" ? "pregnant" : "guardian",
           pregnancyWeek: calcWeek, 
           user_id: userInfo.user_id,
@@ -96,11 +101,11 @@ export default function LoginView({
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
+            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
           </div>
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">비밀번호</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" onKeyDown={(e) => e.key === "Enter" && handleLogin()} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
+            <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호를 입력하세요" onKeyDown={(e) => e.key === "Enter" && !loading && handleLogin()} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
           </div>
 
           {error && <p className="text-sm text-red-500 text-center">{error}</p>}

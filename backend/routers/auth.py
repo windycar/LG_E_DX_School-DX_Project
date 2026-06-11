@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func, text
 from datetime import datetime, date, timedelta
 import random
 import string
@@ -9,6 +10,14 @@ import schemas
 import database
 
 router = APIRouter(tags=["Auth & Profile"])
+
+def ensure_user_schema():
+    with database.engine.begin() as conn:
+        nickname_column = conn.execute(
+            text("SHOW COLUMNS FROM USERS LIKE 'nickname'")
+        ).first()
+        if not nickname_column:
+            conn.execute(text("ALTER TABLE USERS ADD COLUMN nickname VARCHAR(50) NULL AFTER name"))
 
 def ensure_admin_user():
     with database.SessionLocal() as db:
@@ -34,10 +43,37 @@ def ensure_admin_user():
 
 @router.post("/api/auth/register")
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+    normalized_email = user.email.strip().lower()
+    normalized_name = user.name.strip()
+    normalized_nickname = (user.nickname or "").strip()
+    normalized_role = user.role.strip().upper()
+
+    if normalized_role not in {"PREGNANT", "GUARDIAN"}:
+        raise HTTPException(status_code=400, detail="올바른 회원 유형을 선택해 주세요.")
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="이름을 입력해 주세요.")
+    if not normalized_nickname:
+        raise HTTPException(status_code=400, detail="커뮤니티 닉네임을 입력해 주세요.")
+    if "@" not in normalized_email or normalized_email.startswith("@") or normalized_email.endswith("@"):
+        raise HTTPException(status_code=400, detail="올바른 이메일 형식을 입력해 주세요.")
+    if len(user.password) < 6:
+        raise HTTPException(status_code=400, detail="비밀번호는 6자 이상 입력해 주세요.")
+
+    existing_user = (
+        db.query(models.User)
+        .filter(func.lower(models.User.email) == normalized_email)
+        .first()
+    )
+    if existing_user:
+        raise HTTPException(
+            status_code=409,
+            detail="이미 사용 중인 이메일입니다. 다른 이메일을 입력해 주세요.",
+        )
+
     parent_user_id = None
     pregnancy_start_date = None
 
-    if user.role == "PREGNANT":
+    if normalized_role == "PREGNANT":
         if not user.start_date:
             raise HTTPException(status_code=400, detail="임신 시작일을 입력해 주세요.")
         try:
@@ -50,25 +86,29 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         if pregnancy_start_date < min_start_date or pregnancy_start_date > today:
             raise HTTPException(status_code=400, detail="임신 시작일은 오늘 기준 280일 전부터 오늘까지만 선택할 수 있습니다.")
 
-    if user.role == "PREGNANT":
+    if normalized_role == "PREGNANT":
         while True:
             new_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
             if not db.query(models.User).filter(models.User.connection_code == new_code).first():
                 connection_code = new_code
                 break
-    else: 
+    else:
         connection_code = None
-        pregnant_user = db.query(models.User).filter(models.User.connection_code == user.input_connection_code).first()
+        normalized_code = (user.input_connection_code or "").strip().upper()
+        pregnant_user = db.query(models.User).filter(models.User.connection_code == normalized_code).first()
         if not pregnant_user:
             raise HTTPException(status_code=400, detail="유효하지 않은 인증코드입니다.")
+        if pregnant_user.parent_user_id:
+            raise HTTPException(status_code=409, detail="이미 보호자 계정과 연결된 인증코드입니다.")
         parent_user_id = pregnant_user.id
 
     new_user = models.User(
-        email=user.email,
+        email=normalized_email,
         password=user.password,
-        name=user.name,
-        role=user.role,
-        baby_nickname=user.baby_nickname,
+        name=normalized_name,
+        nickname=normalized_nickname,
+        role=normalized_role,
+        baby_nickname=(user.baby_nickname or "").strip() or None,
         pregnancy_start_date=pregnancy_start_date,
         connection_code=connection_code,
         parent_user_id=parent_user_id
@@ -76,7 +116,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
     db.add(new_user)
     db.flush() 
     
-    if user.role == "GUARDIAN" and parent_user_id:
+    if normalized_role == "GUARDIAN" and parent_user_id:
         pregnant_user = db.query(models.User).filter(models.User.id == parent_user_id).first()
         if pregnant_user:
             pregnant_user.parent_user_id = new_user.id
@@ -86,7 +126,8 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
 
 @router.post("/api/auth/login")
 def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.email == request.email).first()
+    normalized_email = request.email.strip().lower()
+    user = db.query(models.User).filter(func.lower(models.User.email) == normalized_email).first()
     if not user or user.password != request.password:
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
@@ -116,6 +157,7 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             "user_id": user.id,
             "email": user.email,
             "name": user.name,
+            "nickname": user.nickname or user.name,
             "role": user.role,
             "baby_nickname": user.baby_nickname,
             "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
@@ -131,7 +173,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
     if identifier.isdigit():
         user = db.query(models.User).filter(models.User.id == int(identifier)).first()
     else:
-        user = db.query(models.User).filter(models.User.email == identifier).first()
+        user = db.query(models.User).filter(func.lower(models.User.email) == identifier.strip().lower()).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -158,6 +200,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         "status": "Success",
         "user_id": user.id,
         "name": user.name,
+        "nickname": user.nickname or user.name,
         "baby_nickname": user.baby_nickname,
         "connection_code": user.connection_code,
         "partner_code": partner_code,
@@ -171,7 +214,11 @@ def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = D
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    user.name = profile.name
+    normalized_name = profile.name.strip()
+    if not normalized_name:
+        raise HTTPException(status_code=400, detail="이름을 입력해 주세요.")
+    user.name = normalized_name
+    user.nickname = (profile.nickname or "").strip() or user.nickname
     user.baby_nickname = profile.baby_nickname
     db.commit()
     return {"status": "Success", "message": "프로필이 수정되었습니다."}
@@ -183,6 +230,8 @@ def update_password(user_id: int, passwords: schemas.PasswordUpdate, db: Session
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     if user.password != passwords.current_password:
         raise HTTPException(status_code=400, detail="현재 비밀번호가 일치하지 않습니다.")
+    if len(passwords.new_password) < 6:
+        raise HTTPException(status_code=400, detail="새 비밀번호는 6자 이상 입력해 주세요.")
     user.password = passwords.new_password
     db.commit()
     return {"status": "Success", "message": "비밀번호가 변경되었습니다."}

@@ -56,9 +56,12 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   // 🚀 게시글 삭제 로직
   const deletePost = async (postId: number) => {
     if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
-    const res = await fetch(apiUrl(`/api/community/posts/${postId}`), { method: "DELETE" });
+    const res = await fetch(apiUrl(`/api/community/posts/${postId}?user_id=${userId}`), { method: "DELETE" });
     if (res.ok) fetchData();
-    else alert("게시글 삭제에 실패했습니다.");
+    else {
+      const error = await res.json().catch(() => ({}));
+      alert(error.detail || "게시글 삭제에 실패했습니다.");
+    }
   };
 
   // 🚀 댓글 전개 및 조회 로직

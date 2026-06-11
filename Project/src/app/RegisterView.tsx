@@ -5,10 +5,18 @@ import { ArrowLeft } from "lucide-react";
 import { apiUrl } from "./api";
 import { AppUser } from "./types";
 
-const toDateInputValue = (date: Date) => date.toISOString().split("T")[0];
+const toDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const todayDate = new Date();
 const pregnancyDateMax = toDateInputValue(todayDate);
-const pregnancyDateMin = toDateInputValue(new Date(todayDate.getTime() - 280 * 24 * 60 * 60 * 1000));
+const pregnancyMinDate = new Date(todayDate);
+pregnancyMinDate.setDate(pregnancyMinDate.getDate() - 280);
+const pregnancyDateMin = toDateInputValue(pregnancyMinDate);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
   const [name, setName] = useState("");
@@ -16,6 +24,7 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
   const [babyNickname, setBabyNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [role, setRole] = useState<"pregnant" | "guardian">("pregnant");
   const [startDate, setStartDate] = useState(pregnancyDateMax);
   const [inviteCode, setInviteCode] = useState("");
@@ -23,11 +32,32 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
   const [error, setError] = useState("");
 
   const handleRegister = async () => {
-    // 🚀 필수값 검증 로직 (태명은 임산부일 때만 필수)
-    if (!name || !nickname || !email || !password || 
-        (role === "pregnant" && !babyNickname) || 
-        (role === "guardian" && !inviteCode)) {
+    const normalizedName = name.trim();
+    const normalizedNickname = nickname.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedBabyNickname = babyNickname.trim();
+    const normalizedInviteCode = inviteCode.trim().toUpperCase();
+
+    if (!normalizedName || !normalizedNickname || !normalizedEmail || !password ||
+        (role === "pregnant" && !normalizedBabyNickname) ||
+        (role === "guardian" && !normalizedInviteCode)) {
       setError("모든 필수 항목을 입력해주세요.");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setError("올바른 이메일 형식을 입력해주세요.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("비밀번호는 6자 이상 입력해주세요.");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+      return;
+    }
+    if (normalizedName.length > 50 || normalizedNickname.length > 50 || normalizedBabyNickname.length > 50) {
+      setError("이름, 닉네임, 태명은 각각 50자 이하로 입력해주세요.");
       return;
     }
 
@@ -38,37 +68,45 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
 
     setLoading(true);
     setError("");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
 
     try {
-      // 🚀 로컬 백엔드 주소로 명확히 연결
       const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email,
+          email: normalizedEmail,
           password: password,
-          name: name,
+          name: normalizedName,
+          nickname: normalizedNickname,
           role: role === "pregnant" ? "PREGNANT" : "GUARDIAN",
           start_date: startDate,
-          baby_nickname: babyNickname, 
-          input_connection_code: inviteCode
+          baby_nickname: normalizedBabyNickname,
+          input_connection_code: normalizedInviteCode,
         }),
+        signal: controller.signal,
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
       
-      if (result.status === "Success") {
+      if (response.ok && result.status === "Success") {
         const msg = result.connection_code 
           ? `회원가입 완료! 인증코드: ${result.connection_code}\n(남편분께 이 코드를 공유해주세요!)` 
           : "회원가입 완료!";
         alert(msg);
-        onSuccess({ name, email, role, pregnancyWeek: 0 });
+        onSuccess({ name: normalizedName, nickname: normalizedNickname, email: normalizedEmail, role, pregnancyWeek: 0 });
       } else {
-        setError(result.error || result.detail || "가입 실패");
+        setError(result.error || result.detail || "회원가입에 실패했습니다. 입력 내용을 확인해주세요.");
       }
-    } catch (e) {
-      setError("서버와 통신할 수 없습니다.");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setError("서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        setError("서버와 통신할 수 없습니다.");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -95,7 +133,10 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
               return (
                 <button 
                   key={roleKey} 
-                  onClick={() => setRole(roleKey as any)} 
+                  onClick={() => {
+                    setRole(roleKey as "pregnant" | "guardian");
+                    setError("");
+                  }}
                   className="py-4 rounded-2xl border-2 flex flex-col items-center gap-1 transition-all" 
                   style={{ 
                     borderColor: role === roleKey ? "#C94E70" : "var(--border)", 
@@ -110,15 +151,16 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
           </div>
 
           {/* 공통 입력 정보 */}
-          <input placeholder="이름" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
-          <input placeholder="닉네임 (커뮤니티에 쓰여요)" value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input placeholder="이름" maxLength={50} value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input placeholder="닉네임 (커뮤니티에 표시됩니다)" maxLength={50} value={nickname} onChange={e => setNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
           
           {role === "pregnant" && (
-            <input placeholder="우리아기 태명" value={babyNickname} onChange={e => setBabyNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+            <input placeholder="우리아기 태명" maxLength={50} value={babyNickname} onChange={e => setBabyNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
           )}
 
-          <input type="email" placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
-          <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input type="email" placeholder="이메일" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input type="password" placeholder="비밀번호 (6자 이상)" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input type="password" placeholder="비밀번호 확인" autoComplete="new-password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
 
           {/* 🚀 마이 로드의 기획 반영: 친절한 임신 날짜 입력 안내 박스 */}
           {role === "pregnant" ? (
@@ -151,7 +193,8 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
               <input 
                 placeholder="임산부 인증코드 입력" 
                 value={inviteCode} 
-                onChange={e => setInviteCode(e.target.value)} 
+                maxLength={6}
+                onChange={e => setInviteCode(e.target.value.toUpperCase())}
                 className="w-full px-4 py-3 rounded-xl border border-blue-200 bg-white text-sm focus:border-blue-400 outline-none shadow-sm" 
               />
             </div>

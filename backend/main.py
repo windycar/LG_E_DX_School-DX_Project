@@ -44,6 +44,11 @@ except Exception as e:
     print(f"appliance schema check skipped: {e}")
 
 try:
+    auth.ensure_user_schema()
+except Exception as e:
+    print(f"user schema check skipped: {e}")
+
+try:
     auth.ensure_admin_user()
 except Exception as e:
     print(f"admin user seed skipped: {e}")

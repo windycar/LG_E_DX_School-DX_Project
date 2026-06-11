@@ -9,6 +9,7 @@ class User(Base):
     email = Column(String(100), unique=True, index=True)
     password = Column(String(255))
     name = Column(String(50))
+    nickname = Column(String(50), nullable=True)
     role = Column(String(20))
     baby_nickname = Column(String(50), nullable=True)
     pregnancy_start_date = Column(Date, nullable=True)
