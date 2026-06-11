@@ -1,13 +1,13 @@
 {
-  "name": "맘케어 임산부 맞춤 케어",
+  "name": "맘케어 - 임산부 맞춤 케어",
   "short_name": "맘케어",
-  "description": "임산부 상태 체크, 맞춤 추천, 보호자 미션, 신뢰 정보, 커뮤니티를 제공하는 모바일 웹앱입니다.",
+  "description": "임산부 상태 체크, 맞춤 추천, 보호자 미션, 신뢰 정보와 커뮤니티를 제공하는 모바일 웹앱입니다.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "theme_color": "#f4729a",
   "icons": [
     {
       "src": "/app-icon.svg",

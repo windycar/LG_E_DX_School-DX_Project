@@ -79,7 +79,7 @@ function HomeView({ onLogin, onRegister }: { onLogin: () => void; onRegister: ()
           >
             MOMent
           </h1>
-          <p className="text-xs tracking-[0.3em] font-medium text-muted-foreground uppercase">MomDal Care</p>
+          <p className="text-xs tracking-[0.3em] font-medium text-muted-foreground uppercase"></p>
         </motion.div>
 
         <motion.p

@@ -11,6 +11,7 @@ from sqlalchemy import func, text
 import models
 import schemas
 import database
+from ai_service import analyze_emotion as analyze_trained_emotion
 
 router = APIRouter(tags=["Diary & AI Recommendation"])
 API_PUBLIC_BASE_URL = os.getenv("API_PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
@@ -448,6 +449,91 @@ def analyze_diary_emotion(req: schemas.EmotionRequest, request: Request):
         return {"status": "Success", "emotion_label": prediction, "emoji": emoji_map.get(prediction, "😐")}
     except Exception as e:
         return {"status": "Error", "message": "AI 오류가 발생했습니다."}
+
+@router.post("/api/ai/emotion-v2")
+def analyze_diary_emotion_v2(req: schemas.EmotionRequest):
+    text = req.text.strip().lower()
+    if not text:
+        return {"status": "Error", "message": "분석할 일기 내용이 없습니다."}
+
+    trained_label_map = {
+        "기쁨": ("행복", "😊"),
+        "슬픔": ("우울", "😔"),
+        "분노": ("화남", "😡"),
+        "불안": ("불안", "😟"),
+        "상처": ("우울", "😔"),
+        "당황": ("불안", "😟"),
+        "중립": ("보통", "😐"),
+    }
+
+    try:
+        trained_result = analyze_trained_emotion(req.text)
+        trained_label = trained_result["main_emotion"]
+        display_label, emoji = trained_label_map.get(trained_label, ("보통", "😐"))
+        return {
+            "status": "Success",
+            "emotion_label": display_label,
+            "model_label": trained_label,
+            "emoji": emoji,
+            "method": "trained_naive_bayes",
+            "confidence": trained_result["confidence"],
+            "score": round(float(trained_result["confidence"]) * 100, 1),
+            "description": trained_result.get("description", ""),
+        }
+    except Exception as exc:
+        print(f"trained diary emotion model failed; using weighted fallback: {exc}")
+
+    scores = {
+        "화남": {"emoji": "😡", "score": 0.0},
+        "우울": {"emoji": "😔", "score": 0.0},
+        "힘듦": {"emoji": "😫", "score": 0.0},
+        "불안": {"emoji": "😟", "score": 0.0},
+        "보통": {"emoji": "😐", "score": 0.4},
+        "괜찮음": {"emoji": "🙂", "score": 0.0},
+        "설렘": {"emoji": "🥰", "score": 0.0},
+        "행복": {"emoji": "😊", "score": 0.0},
+    }
+    lexicon = [
+        ("화남", 2.2, ["화가", "화남", "짜증", "분노", "열받", "억울", "싫다", "미워"]),
+        ("우울", 2.0, ["우울", "슬프", "눈물", "외롭", "속상", "무기력", "서럽"]),
+        ("힘듦", 1.8, ["힘들", "지침", "피곤", "아픔", "통증", "입덧", "못 자", "버겁"]),
+        ("불안", 2.0, ["불안", "걱정", "무섭", "두렵", "초조", "긴장", "혹시"]),
+        ("괜찮음", 1.8, ["괜찮", "풀렸", "나아졌", "안정", "차분", "버틸 만"]),
+        ("행복", 2.0, ["행복", "좋았", "기쁘", "웃", "편안", "고마", "다행"]),
+        ("설렘", 2.0, ["사랑", "태동", "아기", "설렘", "소중", "귀여"]),
+    ]
+    sentences = [
+        part.strip()
+        for part in text.replace("!", ".").replace("?", ".").replace("\n", ".").split(".")
+        if part.strip()
+    ] or [text]
+
+    for index, sentence in enumerate(sentences):
+        multiplier = 1.4 if index == len(sentences) - 1 else 1.0
+        if any(token in sentence for token in ["하지만", "그래도", "근데", "그런데", "결국", "다행히", "그래서"]):
+            multiplier += 0.8
+        if any(token in sentence for token in ["아니", "않", "안 ", "못 ", "없"]):
+            multiplier = max(0.4, multiplier - 0.25)
+
+        for label, weight, keywords in lexicon:
+            hit_count = sum(1 for keyword in keywords if keyword in sentence)
+            scores[label]["score"] += weight * hit_count * multiplier
+
+    if any(token in text for token in ["마음이 풀", "괜찮아졌", "나아졌", "고마웠", "다행"]):
+        scores["화남"]["score"] *= 0.45
+        scores["불안"]["score"] *= 0.7
+        scores["괜찮음"]["score"] += 1.5
+        scores["행복"]["score"] += 0.8
+
+    best_label, best = max(scores.items(), key=lambda item: item[1]["score"])
+    return {
+        "status": "Success",
+        "emotion_label": best_label,
+        "emoji": best["emoji"],
+        "method": "weighted_context",
+        "score": round(best["score"], 1),
+    }
+
 
 @router.post("/api/diary/logs")
 def create_diary_log(

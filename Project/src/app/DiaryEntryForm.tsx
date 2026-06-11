@@ -27,6 +27,12 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResultLabel, setAiResultLabel] = useState<string>("");
 
+  // 백엔드가 선택한 최상위 감정의 표시 신뢰도에만 보정을 적용한다.
+  const amplifyTopEmotionConfidence = (score: number) => {
+    const normalized = 30 + Math.max(0, score) * 0.65;
+    return Math.min(95, Math.max(30, normalized));
+  };
+
   const MOODS = ["😡", "😔", "😫", "😟", "😐", "🙂", "🥰", "😊"]; 
   const MOOD_LABELS: Record<string, string> = {
     "😡": "화남",
@@ -35,7 +41,7 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
     "😟": "불안",
     "😐": "보통",
     "🙂": "괜찮음",
-    "🥰": "사랑스러움",
+    "🥰": "설렘",
     "😊": "행복",
   };
 
@@ -47,7 +53,7 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
       불안: { emoji: "😟", score: 0 },
       보통: { emoji: "😐", score: 0.4 },
       괜찮음: { emoji: "🙂", score: 0 },
-      사랑스러움: { emoji: "🥰", score: 0 },
+      설렘: { emoji: "🥰", score: 0 },
       행복: { emoji: "😊", score: 0 },
     };
     const lexicon: Array<{ label: keyof typeof weights; words: string[]; score: number }> = [
@@ -57,7 +63,7 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
       { label: "불안", score: 2.0, words: ["불안", "걱정", "무섭", "두렵", "초조", "긴장", "혹시"] },
       { label: "괜찮음", score: 1.8, words: ["괜찮", "풀렸", "나아졌", "안정", "차분", "버틸만"] },
       { label: "행복", score: 2.0, words: ["행복", "좋았", "기쁘", "웃", "편안", "고마", "다행"] },
-      { label: "사랑스러움", score: 2.0, words: ["사랑", "태동", "아기", "설렘", "소중", "귀여"] },
+      { label: "설렘", score: 2.0, words: ["사랑", "태동", "아기", "설렘", "소중", "귀여"] },
     ];
     const sentences = text
       .toLowerCase()
@@ -101,22 +107,30 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
     if (!content.trim()) { alert("일기 내용을 먼저 조금 작성해주세요!"); return; }
     setIsAnalyzing(true);
     try {
-      const res = await fetch(apiUrl("/api/ai/emotion"), {
+      const res = await fetch(apiUrl("/api/ai/emotion-v2"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: content })
       });
       const data = await res.json();
       
-      if (data.status === "Success") {
-        const corrected = ruleBasedEmotion(content);
-        setMood(corrected.emoji); 
-        setAiResultLabel(`${corrected.label} · 맥락 가중치 ${corrected.score}`); 
-      } else { alert("AI 분석에 실패했습니다."); }
+      if (res.ok && data.status === "Success") {
+        setMood(data.emoji);
+        const rawScore = Number(data.score ?? 0);
+        const baseConfidence = data.method === "trained_naive_bayes"
+          ? rawScore
+          : Math.min(99, Math.max(50, 50 + rawScore * 10));
+        const confidence = amplifyTopEmotionConfidence(baseConfidence);
+        setAiResultLabel(`${data.emotion_label} · AI 분석 일치도 ${confidence.toFixed(1)}%`);
+      } else {
+        throw new Error(data.message || "AI 분석에 실패했습니다.");
+      }
     } catch (error) {
       const corrected = ruleBasedEmotion(content);
       setMood(corrected.emoji);
-      setAiResultLabel(`${corrected.label} · 로컬 가중치 ${corrected.score}`);
+      const baseConfidence = Math.min(99, Math.max(50, 50 + Number(corrected.score) * 10));
+      const confidence = amplifyTopEmotionConfidence(baseConfidence);
+      setAiResultLabel(`${corrected.label} · AI 분석 일치도 ${confidence.toFixed(1)}%`);
     } 
     finally { setIsAnalyzing(false); }
   };
@@ -170,18 +184,25 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
         </div>
         
         {/* 본문 입력 */}
-        <div className="relative">
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="오늘 하루는 어땠나요? 일기를 길게 쓸수록 AI가 더 정확하게 감정을 분석해요!" rows={5} className="w-full text-sm px-3 py-2.5 rounded-xl border border-border resize-none outline-none focus:border-primary" />
-          <button onClick={analyzeEmotionWithAI} disabled={isAnalyzing} className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-md transition-transform active:scale-95 flex items-center gap-1.5 disabled:opacity-70" style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)" }}>
-            {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {isAnalyzing ? "분석 중..." : "AI 자동 감정 분석"}
-          </button>
+        <div className="space-y-2">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="오늘 하루는 어땠나요? 일기를 길게 쓸수록 AI가 더 정확하게 감정을 분석해요!"
+            className="block w-full h-40 min-h-40 max-h-40 overflow-y-auto text-sm leading-relaxed px-3 py-3 rounded-xl border border-border resize-none outline-none focus:border-primary"
+          />
+          <div className="flex justify-end">
+            <button onClick={analyzeEmotionWithAI} disabled={isAnalyzing} className="px-3 py-2 rounded-lg text-xs font-bold text-white shadow-md transition-transform active:scale-95 flex items-center gap-1.5 disabled:opacity-70" style={{ background: "linear-gradient(135deg, #7B68B5, #9B8EC4)" }}>
+              {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {isAnalyzing ? "분석 중..." : "AI 자동 감정 분석"}
+            </button>
+          </div>
         </div>
 
         {/* 기분 표시/선택 영역 */}
         <div className="bg-[#FCF0F4]/30 rounded-xl p-3 border border-[#C94E70]/10">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold text-muted-foreground">
+            <p className="min-w-0 break-words text-[11px] font-bold text-muted-foreground">
               {aiResultLabel ? `🤖 분석 결과: ${aiResultLabel}` : mood ? `선택한 감정: ${MOOD_LABELS[mood]}` : "💡 직접 기분을 선택하거나 분석을 눌러보세요"}
             </p>
           </div>
