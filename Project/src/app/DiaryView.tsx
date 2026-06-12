@@ -88,6 +88,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false); 
   const [expandedSmallTalkIds, setExpandedSmallTalkIds] = useState<Record<number, boolean>>({});
+  const [deletingDiaryIds, setDeletingDiaryIds] = useState<Set<number>>(new Set());
 
   const [showEventForm, setShowEventForm] = useState(false); 
   const [newEventDate, setNewEventDate] = useState("");
@@ -141,6 +142,39 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
       const res = await fetch(apiUrl(`/api/calendar/events/${eventId}`), { method: "DELETE" });
       if (res.ok) { fetchEvents(); setSelectedEvent(null); } else { alert("일정 삭제 실패"); }
     } catch (e) { alert("서버 통신 오류"); }
+  };
+
+  const deleteDiary = async (diaryId: number) => {
+    if (!userId || deletingDiaryIds.has(diaryId)) return;
+    if (!window.confirm("이 다이어리 내역을 삭제하시겠습니까?\n삭제한 내용은 복구할 수 없습니다.")) return;
+
+    setDeletingDiaryIds((prev) => new Set(prev).add(diaryId));
+    try {
+      const res = await fetch(apiUrl(`/api/diary/logs/${diaryId}?user_id=${userId}`), {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.status !== "Success") {
+        alert(data.detail || data.message || "다이어리 삭제에 실패했습니다.");
+        return;
+      }
+
+      setEntries((prev) => prev.filter((entry) => entry.id !== diaryId));
+      setExpandedSmallTalkIds((prev) => {
+        const next = { ...prev };
+        delete next[diaryId];
+        return next;
+      });
+    } catch (e) {
+      alert("서버와 연결할 수 없습니다.");
+    } finally {
+      setDeletingDiaryIds((prev) => {
+        const next = new Set(prev);
+        next.delete(diaryId);
+        return next;
+      });
+    }
   };
 
   const getDaysInMonth = () => {
@@ -387,9 +421,21 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
               <div key={`entry-${entry.id}`} className="space-y-3">
                 {/* 일반 다이어리 카드 */}
                 <div className="bg-white rounded-2xl p-4 border border-border shadow-sm">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl">{entry.mood}</span>
-                    <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{entry.mood}</span>
+                      <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteDiary(entry.id)}
+                      disabled={deletingDiaryIds.has(entry.id)}
+                      className="p-2 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      aria-label="다이어리 삭제"
+                      title="다이어리 삭제"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                   
                   {/* 📸 사진 뿌려주기! */}

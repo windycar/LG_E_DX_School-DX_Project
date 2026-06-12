@@ -576,6 +576,54 @@ def create_diary_log(
         db.rollback() 
         return {"status": "Error", "message": str(e)}
 
+
+@router.delete("/api/diary/logs/{diary_id}")
+def delete_diary_log(
+    diary_id: int,
+    user_id: int,
+    db: Session = Depends(database.get_db),
+):
+    diary = db.query(models.DiaryLog).filter(models.DiaryLog.diary_id == diary_id).first()
+    if not diary:
+        raise HTTPException(status_code=404, detail="삭제할 다이어리를 찾을 수 없습니다.")
+    if diary.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 다이어리만 삭제할 수 있습니다.")
+
+    image_path = diary.image_path
+    image_is_shared = bool(
+        image_path
+        and db.query(models.DiaryLog).filter(
+            models.DiaryLog.image_path == image_path,
+            models.DiaryLog.diary_id != diary_id,
+        ).first()
+    )
+
+    try:
+        # This foreign key has no ON DELETE action in the current MySQL schema.
+        db.query(models.WeeklyAiRecommendation).filter(
+            models.WeeklyAiRecommendation.diary_id == diary_id
+        ).update(
+            {models.WeeklyAiRecommendation.diary_id: None},
+            synchronize_session=False,
+        )
+        db.delete(diary)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"다이어리 삭제에 실패했습니다: {exc}")
+
+    if image_path and not image_is_shared:
+        uploads_root = os.path.abspath("uploads")
+        stored_image = os.path.abspath(image_path)
+        if os.path.commonpath([uploads_root, stored_image]) == uploads_root and os.path.isfile(stored_image):
+            try:
+                os.remove(stored_image)
+            except OSError:
+                pass
+
+    return {"status": "Success", "message": "다이어리가 삭제되었습니다."}
+
+
 @router.get("/api/diary/logs/{user_id}")
 def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
     try:
@@ -586,11 +634,68 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
         
         partner_id = None
         if user:
-            if user.role == "PREGNANT":
-                guardian = db.query(models.User).filter(models.User.parent_user_id == user.id).first()
-                partner_id = guardian.id if guardian else user.parent_user_id
+            if str(user.role).upper() == "PREGNANT":
+                guardian = db.query(models.User).filter(
+                    models.User.parent_user_id == user.id,
+                    func.upper(models.User.role) == "GUARDIAN",
+                ).first()
+                partner_id = user.parent_user_id or (guardian.id if guardian else None)
             else:
                 partner_id = user.parent_user_id
+
+        my_answers = (
+            db.query(models.SmallTalkAnswer)
+            .filter(models.SmallTalkAnswer.user_id == user_id)
+            .order_by(models.SmallTalkAnswer.created_at.desc())
+            .all()
+        )
+        topic_ids = {answer.topic_id for answer in my_answers}
+        topics_by_id = {
+            topic.topic_id: topic
+            for topic in db.query(models.SmallTalkTopic)
+            .filter(models.SmallTalkTopic.topic_id.in_(topic_ids))
+            .all()
+        } if topic_ids else {}
+
+        partner_answers_by_topic = {}
+        if partner_id and topic_ids:
+            partner_answers = (
+                db.query(models.SmallTalkAnswer)
+                .filter(
+                    models.SmallTalkAnswer.user_id == partner_id,
+                    models.SmallTalkAnswer.topic_id.in_(topic_ids),
+                )
+                .order_by(models.SmallTalkAnswer.created_at.desc())
+                .all()
+            )
+            for answer in partner_answers:
+                partner_answers_by_topic.setdefault(answer.topic_id, answer)
+
+        smalltalk_by_date = {}
+        for my_answer in my_answers:
+            topic = topics_by_id.get(my_answer.topic_id)
+            if not topic:
+                continue
+
+            date_str = (
+                str(my_answer.created_at).split(" ")[0]
+                if my_answer.created_at
+                else "2026-05-26"
+            )
+            partner_answer = partner_answers_by_topic.get(my_answer.topic_id)
+            item = {
+                "id": my_answer.answer_id,
+                "date": date_str,
+                "topic": topic.question_text,
+                "my_answer": my_answer.answer_content,
+                "partner_answer": (
+                    partner_answer.answer_content
+                    if partner_answer
+                    else "아직 답변하지 않았습니다."
+                ),
+            }
+            smalltalk_result.append(item)
+            smalltalk_by_date.setdefault(date_str, item)
         
         for log in logs:
             date_str = str(log.recorded_at).split(" ")[0] if log.recorded_at else "2026-05-26"
@@ -598,40 +703,14 @@ def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
                 "id": log.diary_id, "date": date_str, "mood": keyword_to_emoji.get(log.selected_emotion, "😐"),
                 "content": log.diary_content, "images": [f"{API_PUBLIC_BASE_URL}/{log.image_path}"] if log.image_path else [], "type": "daily"
             }
-            try:
-                from datetime import datetime as dt
-                date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
-                my_smalltalk = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id, func.date(models.SmallTalkAnswer.created_at) == date_obj).first()
-                
-                if my_smalltalk and partner_id:
-                    partner_ans_content = "아직 답변하지 않았습니다."
-                    if partner_id:
-                        partner_smalltalk = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == partner_id, models.SmallTalkAnswer.topic_id == my_smalltalk.topic_id).first()
-                        if partner_smalltalk: partner_ans_content = partner_smalltalk.answer_content
-                    
-                    topic = db.query(models.SmallTalkTopic).filter(models.SmallTalkTopic.topic_id == my_smalltalk.topic_id).first()
-                    if topic and partner_smalltalk:
-                        entry["smalltalk"] = {"topic": topic.question_text, "my_answer": my_smalltalk.answer_content, "partner_answer": partner_smalltalk.answer_content}
-            except Exception: pass
+            if date_str in smalltalk_by_date:
+                smalltalk = smalltalk_by_date[date_str]
+                entry["smalltalk"] = {
+                    "topic": smalltalk["topic"],
+                    "my_answer": smalltalk["my_answer"],
+                    "partner_answer": smalltalk["partner_answer"],
+                }
             diary_result.append(entry)
-        
-        try:
-            my_answers = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == user_id).order_by(models.SmallTalkAnswer.created_at.desc()).all()
-            for my_ans in my_answers:
-                if not partner_id:
-                    continue
-                partner_ans_content = "아직 답변하지 않았습니다."
-                if partner_id:
-                    partner_ans = db.query(models.SmallTalkAnswer).filter(models.SmallTalkAnswer.user_id == partner_id, models.SmallTalkAnswer.topic_id == my_ans.topic_id).first()
-                    if partner_ans: partner_ans_content = partner_ans.answer_content
-                if not partner_ans:
-                    continue
-                        
-                topic = db.query(models.SmallTalkTopic).filter(models.SmallTalkTopic.topic_id == my_ans.topic_id).first()
-                if topic:
-                    date_str = str(my_ans.created_at).split(" ")[0] if my_ans.created_at else "2026-05-26"
-                    smalltalk_result.append({"id": my_ans.answer_id, "date": date_str, "topic": topic.question_text, "my_answer": my_ans.answer_content, "partner_answer": partner_ans_content})
-        except Exception: pass
-        
+
         return {"status": "Success", "diary_entries": diary_result, "smalltalk_entries": smalltalk_result}
     except Exception as e: return {"status": "Error", "message": str(e)}
