@@ -86,10 +86,8 @@ def health_check():
 if os.getenv("ENABLE_LOCAL_DIARY_AI", "false").lower() == "true":
     # Optional only. Render Free can exceed 512MB when loading local model data.
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(base_dir)
     possible_paths = [
-        os.path.join(root_dir, "Project", "diary_emotion_ai", "scripts"),
-        os.path.join(root_dir, "diary_emotion_ai", "scripts"),
+        os.path.join(base_dir, "diary_emotion_ai", "scripts"),
     ]
     ai_scripts_path = next((path for path in possible_paths if os.path.exists(path)), None)
     if ai_scripts_path:

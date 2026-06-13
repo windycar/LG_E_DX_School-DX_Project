@@ -7,21 +7,28 @@ import { X, Sparkles, Loader2, ImagePlus } from "lucide-react";
 interface DiaryEntryFormProps {
   onClose: () => void;
   onSave: (data: any) => void;
+  initialEntry?: {
+    date: string;
+    mood: string;
+    content: string;
+    images?: string[];
+  } | null;
 }
 
-export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps) {
+export default function DiaryEntryForm({ onClose, onSave, initialEntry = null }: DiaryEntryFormProps) {
   // 오늘 날짜를 YYYY-MM-DD 형태로 예쁘게 뽑아내는 함수
   const getTodayDate = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  const [entryDate, setEntryDate] = useState(getTodayDate()); // 🗓️ 날짜 상태 추가!
-  const [content, setContent] = useState("");
-  const [mood, setMood] = useState<string | null>(null);
+  const [entryDate, setEntryDate] = useState(initialEntry?.date || getTodayDate()); // 🗓️ 날짜 상태 추가!
+  const [content, setContent] = useState(initialEntry?.content || "");
+  const [mood, setMood] = useState<string | null>(initialEntry?.mood || null);
   
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialEntry?.images?.[0] || null);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -99,7 +106,8 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      setImagePreview(URL.createObjectURL(file)); 
+      setImagePreview(URL.createObjectURL(file));
+      setRemoveExistingImage(false);
     }
   };
 
@@ -142,7 +150,8 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
       mood: mood || "😊",
       content: content,
       analyzedEmotion: aiResultLabel,
-      image: imageFile 
+      image: imageFile,
+      removeImage: removeExistingImage,
     });
   };
 
@@ -151,7 +160,7 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
       <div className="bg-card rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl p-5 border border-border space-y-4 scrollbar-hide">
         <div className="flex items-center justify-between border-b border-border/50 pb-2">
           <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
-            ✍️ 오늘의 감정 일기
+            ✍️ {initialEntry ? "감정 일기 수정" : "오늘의 감정 일기"}
           </p>
           <button onClick={onClose}><X size={18} className="text-muted-foreground hover:text-red-400" /></button>
         </div>
@@ -173,7 +182,16 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
           {imagePreview ? (
             <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border group">
               <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-              <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full backdrop-blur-sm"><X size={16} /></button>
+              <button
+                onClick={() => {
+                  setImageFile(null);
+                  setImagePreview(null);
+                  setRemoveExistingImage(Boolean(initialEntry?.images?.[0]));
+                }}
+                className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full backdrop-blur-sm"
+              >
+                <X size={16} />
+              </button>
             </div>
           ) : (
             <button onClick={() => fileInputRef.current?.click()} className="w-full py-4 border-2 border-dashed border-border rounded-xl text-muted-foreground flex flex-col items-center justify-center gap-2 hover:bg-secondary/50 transition-colors">
@@ -219,7 +237,9 @@ export default function DiaryEntryForm({ onClose, onSave }: DiaryEntryFormProps)
         {/* 하단 버튼 */}
         <div className="flex gap-2 pt-2 border-t border-border/50">
           <button onClick={onClose} className="flex-1 py-3 rounded-xl text-sm font-bold bg-secondary text-muted-foreground hover:bg-secondary/80">취소</button>
-          <button onClick={handleSave} className="flex-[2] py-3 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 shadow-md" style={{ background: "#C94E70" }}>일기 저장하기</button>
+          <button onClick={handleSave} className="flex-[2] py-3 rounded-xl text-sm font-bold text-white transition-colors hover:opacity-90 shadow-md" style={{ background: "#C94E70" }}>
+            {initialEntry ? "수정 완료" : "일기 저장하기"}
+          </button>
         </div>
       </div>
     </div>

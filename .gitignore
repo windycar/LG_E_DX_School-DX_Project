@@ -1,18 +1,20 @@
-# 머신러닝 데이터 및 모델 파일 제외
+# Local dependencies, build outputs, secrets, and generated artifacts
 .vscode/
 .pnpm-store/
-Project/node_modules
-Project/dist
+Project/node_modules/
+Project/dist/
 Project/.env
 Project/.env.local
 Project/.env.production
-Project/AI_Chat/node_modules
-Project/AI_Chat/.npm-cache
+Project/AI_Chat/node_modules/
+Project/AI_Chat/.npm-cache/
 Project/AI_Chat/.env
+backend/venv/
 backend/__pycache__/
 backend/.env
 __pycache__/
 *.pyc
+docx_render_*/
 System_Architecture/
 MOMent 서비스 흐름도/
 *.docx

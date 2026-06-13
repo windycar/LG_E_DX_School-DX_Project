@@ -87,6 +87,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false); 
+  const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [expandedSmallTalkIds, setExpandedSmallTalkIds] = useState<Record<number, boolean>>({});
   const [deletingDiaryIds, setDeletingDiaryIds] = useState<Set<number>>(new Set());
 
@@ -177,6 +178,45 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
     }
   };
 
+  const saveDiary = async (data: any) => {
+    if (!userId) return;
+
+    const formData = new FormData();
+    formData.append("user_id", userId.toString());
+    formData.append("selected_emotion", data.mood);
+    formData.append("diary_content", data.content);
+    formData.append("date", data.date);
+    formData.append("remove_image", String(Boolean(data.removeImage)));
+
+    if (data.analyzedEmotion) formData.append("detected_emotion", data.analyzedEmotion);
+    if (data.image) formData.append("image", data.image);
+
+    const isEditingDiary = Boolean(editingEntry);
+    const endpoint = isEditingDiary
+      ? `/api/diary/logs/${editingEntry.id}`
+      : "/api/diary/logs";
+
+    try {
+      const res = await fetch(apiUrl(endpoint), {
+        method: isEditingDiary ? "PUT" : "POST",
+        body: formData,
+      });
+      const responseData = await res.json().catch(() => ({}));
+
+      if (!res.ok || responseData.status !== "Success") {
+        alert(responseData.detail || responseData.message || `일기 ${isEditingDiary ? "수정" : "저장"}에 실패했습니다.`);
+        return;
+      }
+
+      alert(isEditingDiary ? "일기가 수정되었습니다." : "일기가 성공적으로 저장되었습니다!");
+      setShowForm(false);
+      setEditingEntry(null);
+      fetchEntries();
+    } catch (e) {
+      alert("서버와 연결할 수 없습니다.");
+    }
+  };
+
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -216,7 +256,7 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
               다이어리
             </h2>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
+          <button onClick={() => { setEditingEntry(null); setShowForm(true); }} className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg" style={{ background: "linear-gradient(135deg, #C94E70, #E8789A)" }}>
             <Plus size={20} />
           </button>
         </div>
@@ -370,30 +410,9 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
         {/* 🚀 분할된 일기 쓰기 폼 모달 */}
         {showForm && (
           <DiaryEntryForm 
-            onClose={() => setShowForm(false)}
-            onSave={async (data) => {
-              const formData = new FormData();
-              formData.append("user_id", userId.toString());
-              formData.append("selected_emotion", data.mood);
-              formData.append("diary_content", data.content);
-              
-              if (data.analyzedEmotion) formData.append("detected_emotion", data.analyzedEmotion);
-              if (data.image) formData.append("image", data.image);
-
-              try {
-                const res = await fetch(apiUrl("/api/diary/logs"), {
-                  method: "POST", body: formData 
-                });
-                
-                if (res.ok) {
-                  alert("일기와 사진이 성공적으로 저장되었습니다!");
-                  setShowForm(false);
-                  
-                  // 🚀 DB 저장이 끝났으니 목록을 다시 긁어와서 최신 상태로 새로고침!
-                  fetchEntries(); 
-                } else { alert("DB 저장에 실패했습니다."); }
-              } catch (e) { alert("서버 연결 실패!"); }
-            }}
+            initialEntry={editingEntry}
+            onClose={() => { setShowForm(false); setEditingEntry(null); }}
+            onSave={saveDiary}
           />
         )}
 
@@ -426,16 +445,27 @@ export default function DiaryView({ user, onNavigate }: { user: AppUser; onNavig
                       <span className="text-2xl">{entry.mood}</span>
                       <p className="text-xs font-bold text-muted-foreground">{new Date(entry.date).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteDiary(entry.id)}
-                      disabled={deletingDiaryIds.has(entry.id)}
-                      className="p-2 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
-                      aria-label="다이어리 삭제"
-                      title="다이어리 삭제"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { setEditingEntry(entry); setShowForm(true); }}
+                        className="p-2 rounded-full text-muted-foreground hover:text-[#C94E70] hover:bg-[#FCF0F4] transition-colors"
+                        aria-label="다이어리 수정"
+                        title="다이어리 수정"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteDiary(entry.id)}
+                        disabled={deletingDiaryIds.has(entry.id)}
+                        className="p-2 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                        aria-label="다이어리 삭제"
+                        title="다이어리 삭제"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* 📸 사진 뿌려주기! */}

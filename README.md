@@ -27,7 +27,7 @@ MOMent는 임산부와 보호자가 함께 사용하는 임신 케어 웹앱입�
 - Database: MySQL
 - AI/Data: 일기 감정 분석, Kiwi 형태소 분석, 커뮤니티 워드클라우드
 - Deploy: Vercel(frontend), Render(backend, AI chat)
-- Device Demo: Arduino 기반 가전 제어 시연 예정
+- Device Demo: Arduino UNO, ULN2003, DC 모터, RGB LED, 가습기 모듈, I2C LCD
 
 ## 로컬 실행 방법
 
@@ -141,4 +141,14 @@ DB의 `USERS` 테이블에서 다음 중 하나를 만족하면 관리자 화면
 - 현재 오늘 접속자는 별도 로그인 로그 테이블이 없어서 게시글, 댓글, 일기, 스몰토크, 상태체크를 남긴 오늘 활동자 기준입니다.
 - 실제 로그인 접속자 수가 필요하면 `LOGIN_LOGS` 테이블을 추가하는 것이 맞습니다.
 - 챗봇은 API 키를 환경변수에 넣으면 LangChain 또는 OpenAI API 기반 생성형 응답으로 확장할 수 있게 준비하는 방향입니다.
-- Arduino 가전 제어는 실제 제품 제어가 아니라 DX 시연용으로 LED, 팬, 서보모터, 릴레이 모듈 등을 이용해 상태 변화를 보여주는 구조가 적합합니다.
+- Arduino 가전 제어는 `arduino/final/final.ino`와 `아두이노_가전제어_연동가이드.md`를 최종 기준으로 사용합니다.
+
+## 최종 파일 기준
+
+- 프론트엔드: `Project`
+- 백엔드: `backend`
+- Arduino 최종 스케치: `arduino/final/final.ino`
+- Arduino 배선 및 실행 가이드: `아두이노_가전제어_연동가이드.md`
+- 커뮤니티 시연 데이터: `tools/seed_demo_community.sql`
+- 스몰토크 시연 데이터: `tools/seed_demo_smalltalk_20260612_20260625.sql`
+- 데이터베이스 구조: `ERD.png`, `데이터베이스_요구사항_분석서.md`

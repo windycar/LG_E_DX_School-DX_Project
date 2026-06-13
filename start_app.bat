@@ -4,9 +4,8 @@ setlocal
 
 set "ROOT=%~dp0"
 set "PYTHON_EXE=%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"
-set "ARDUINO_PORT=COM3"
 set "ARDUINO_FQBN=arduino:avr:uno"
-set "ARDUINO_SKETCH=%ROOT%arduino\MOMent_Appliance_Demo"
+set "ARDUINO_SKETCH=%ROOT%arduino\final"
 
 if not exist "%PYTHON_EXE%" (
   set "PYTHON_EXE=python"
@@ -14,8 +13,8 @@ if not exist "%PYTHON_EXE%" (
 
 echo Starting MOMent local demo servers.
 echo.
-echo [1/5] Releasing local demo ports and Arduino COM port holders.
-echo Closing Arduino IDE if it is using %ARDUINO_PORT%.
+echo [1/5] Releasing local demo ports and Arduino serial port holders.
+echo Closing Arduino IDE if it is using the board serial port.
 taskkill /F /T /IM "Arduino IDE.exe" > nul 2> nul
 taskkill /F /T /IM "arduino-ide.exe" > nul 2> nul
 
@@ -24,11 +23,11 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000" ^| findstr "LISTENING
   taskkill /F /PID %%P > nul 2> nul
 )
 
-echo Closing stale Python/Uvicorn demo processes that may still hold %ARDUINO_PORT%.
+echo Closing stale Python/Uvicorn demo processes that may still hold the serial port.
 taskkill /F /T /IM "uvicorn.exe" > nul 2> nul
 taskkill /F /T /IM "python.exe" > nul 2> nul
 
-echo Waiting for Windows to release %ARDUINO_PORT%.
+echo Waiting for Windows to release the serial port.
 timeout /t 2 /nobreak > nul
 
 echo.
@@ -53,26 +52,20 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/5] Uploading Arduino demo sketch if arduino-cli is installed.
+echo [3/5] Checking the final Arduino sketch.
 where arduino-cli > nul 2> nul
 if errorlevel 1 (
-  echo arduino-cli was not found. Skipping Arduino upload.
-  echo If the sketch is not uploaded yet, upload it once from Arduino IDE:
-  echo %ARDUINO_SKETCH%\MOMent_Appliance_Demo.ino
+  echo arduino-cli was not found. Skipping the compile check.
+  echo Upload this final sketch once from Arduino IDE:
+  echo %ARDUINO_SKETCH%\final.ino
 ) else (
   echo Board: %ARDUINO_FQBN%
-  echo Port : %ARDUINO_PORT%
   arduino-cli compile --fqbn %ARDUINO_FQBN% "%ARDUINO_SKETCH%"
   if errorlevel 1 (
-    echo [WARN] Arduino compile failed. Continuing without upload.
+    echo [WARN] Final Arduino sketch compile failed. Continuing without upload.
   ) else (
-    arduino-cli upload -p %ARDUINO_PORT% --fqbn %ARDUINO_FQBN% "%ARDUINO_SKETCH%"
-    if errorlevel 1 (
-      echo [WARN] Arduino upload failed. Close Arduino IDE or Serial Monitor if it is using %ARDUINO_PORT%.
-      echo Continuing with backend and frontend startup.
-    ) else (
-      echo Arduino sketch uploaded successfully.
-    )
+    echo Final Arduino sketch compile succeeded.
+    echo Upload is intentionally manual because the COM port can change.
   )
 )
 

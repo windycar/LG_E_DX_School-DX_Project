@@ -60,7 +60,11 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
     // 3. 활동 통계 가져오기
     fetch(apiUrl(`/api/diary/logs/${identifier}`))
       .then(res => res.json())
-      .then(data => { if (data.status === "Success" && data.entries) setStats(prev => ({ ...prev, diary: data.entries.length })); });
+      .then(data => {
+        if (data.status === "Success" && Array.isArray(data.diary_entries)) {
+          setStats(prev => ({ ...prev, diary: data.diary_entries.length }));
+        }
+      });
 
     fetch(apiUrl(`/api/community/posts/count/${identifier}`))
       .then(res => res.json())

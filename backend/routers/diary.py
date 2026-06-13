@@ -624,6 +624,95 @@ def delete_diary_log(
     return {"status": "Success", "message": "다이어리가 삭제되었습니다."}
 
 
+@router.put("/api/diary/logs/{diary_id}")
+def update_diary_log(
+    diary_id: int,
+    user_id: int = Form(...),
+    selected_emotion: str = Form(...),
+    diary_content: str = Form(...),
+    detected_emotion: str = Form(None),
+    image: UploadFile = File(None),
+    date: str = Form(None),
+    remove_image: bool = Form(False),
+    db: Session = Depends(database.get_db),
+):
+    diary = db.query(models.DiaryLog).filter(models.DiaryLog.diary_id == diary_id).first()
+    if not diary:
+        raise HTTPException(status_code=404, detail="수정할 다이어리를 찾을 수 없습니다.")
+    if diary.user_id != user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 다이어리만 수정할 수 있습니다.")
+
+    old_image_path = diary.image_path
+    new_image_path = old_image_path
+
+    try:
+        if image:
+            new_image_path = f"uploads/{image.filename}"
+            with open(new_image_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+        elif remove_image:
+            new_image_path = None
+
+        reverse_emoji_map = {
+            "😊": "행복",
+            "🙂": "안정",
+            "🥰": "설렘",
+            "😐": "중립",
+            "😟": "불안",
+            "😫": "피로",
+            "😔": "우울",
+            "😡": "화남",
+        }
+        diary.selected_emotion = reverse_emoji_map.get(selected_emotion, selected_emotion)
+        diary.diary_content = diary_content
+        diary.image_path = new_image_path
+        if date:
+            diary.recorded_at = datetime.strptime(date, "%Y-%m-%d")
+
+        analysis = (
+            db.query(models.AiAnalysisResult)
+            .filter(models.AiAnalysisResult.diary_id == diary_id)
+            .first()
+        )
+        if detected_emotion:
+            if analysis:
+                analysis.detected_emotion = detected_emotion
+            else:
+                db.add(models.AiAnalysisResult(
+                    diary_id=diary_id,
+                    detected_emotion=detected_emotion,
+                ))
+
+        db.commit()
+    except ValueError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다.")
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"다이어리 수정에 실패했습니다: {exc}")
+
+    if old_image_path and old_image_path != new_image_path:
+        image_is_shared = bool(
+            db.query(models.DiaryLog).filter(
+                models.DiaryLog.image_path == old_image_path,
+                models.DiaryLog.diary_id != diary_id,
+            ).first()
+        )
+        uploads_root = os.path.abspath("uploads")
+        stored_image = os.path.abspath(old_image_path)
+        if (
+            not image_is_shared
+            and os.path.commonpath([uploads_root, stored_image]) == uploads_root
+            and os.path.isfile(stored_image)
+        ):
+            try:
+                os.remove(stored_image)
+            except OSError:
+                pass
+
+    return {"status": "Success", "message": "다이어리가 수정되었습니다."}
+
+
 @router.get("/api/diary/logs/{user_id}")
 def get_diary_logs(user_id: int, db: Session = Depends(database.get_db)):
     try:
