@@ -10,6 +10,7 @@ Project/AI_Chat/node_modules/
 Project/AI_Chat/.npm-cache/
 Project/AI_Chat/.env
 backend/venv/
+backend/.venv/
 backend/__pycache__/
 backend/.env
 __pycache__/

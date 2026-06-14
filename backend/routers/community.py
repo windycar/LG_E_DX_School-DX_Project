@@ -113,6 +113,24 @@ def delete_community_post(post_id: int, user_id: int, db: Session = Depends(data
     db.delete(post); db.commit()
     return {"status": "Success"}
 
+@router.put("/api/community/posts/{post_id}")
+def update_community_post(post_id: int, post_data: schemas.PostUpdate, db: Session = Depends(database.get_db)):
+    post = db.query(models.CommunityPost).filter(models.CommunityPost.post_id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    if post.user_id != post_data.user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 게시글만 수정할 수 있습니다.")
+
+    title = post_data.title.strip()
+    content = post_data.content.strip()
+    if not title or not content:
+        raise HTTPException(status_code=400, detail="제목과 내용을 모두 입력해 주세요.")
+
+    post.title = title
+    post.content = content
+    db.commit()
+    return {"status": "Success"}
+
 
 @router.post("/api/community/posts/{post_id}/like")
 def toggle_community_post_like(post_id: int, user_id: int, db: Session = Depends(database.get_db)):
@@ -169,6 +187,22 @@ def delete_comment(comment_id: int, user_id: int, db: Session = Depends(database
     if not comment: raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
     if comment.user_id != user_id: raise HTTPException(status_code=403, detail="본인이 작성한 댓글만 삭제할 수 있습니다.")
     db.delete(comment); db.commit()
+    return {"status": "Success"}
+
+@router.put("/api/comments/{comment_id}")
+def update_comment(comment_id: int, comment_data: schemas.CommentUpdate, db: Session = Depends(database.get_db)):
+    comment = db.query(models.CommunityComment).filter(models.CommunityComment.comment_id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    if comment.user_id != comment_data.user_id:
+        raise HTTPException(status_code=403, detail="본인이 작성한 댓글만 수정할 수 있습니다.")
+
+    content = comment_data.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="댓글 내용을 입력해 주세요.")
+
+    comment.content = content
+    db.commit()
     return {"status": "Success"}
 
 @router.get("/api/community/posts/count/{user_id}")

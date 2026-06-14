@@ -38,7 +38,16 @@ class PostCreate(BaseModel):
     title: str
     content: str
 
+class PostUpdate(BaseModel):
+    user_id: int
+    title: str
+    content: str
+
 class CommentCreate(BaseModel):
+    user_id: int
+    content: str
+
+class CommentUpdate(BaseModel):
     user_id: int
     content: str
 

@@ -1,6 +1,6 @@
 ﻿import { apiUrl } from "./api";
 import React, { useState, useEffect } from "react";
-import { X, MessageCircle, Trash2, Send } from "lucide-react";
+import { X, MessageCircle, Pencil, Trash2, Send } from "lucide-react";
 
 interface MyCommunityViewProps {
   userId: number;
@@ -38,6 +38,11 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
   const [postComments, setPostComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editPostTitle, setEditPostTitle] = useState("");
+  const [editPostContent, setEditPostContent] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState("");
 
   const fetchData = () => {
     setIsLoading(true);
@@ -61,6 +66,22 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
     else {
       const error = await res.json().catch(() => ({}));
       alert(error.detail || "게시글 삭제에 실패했습니다.");
+    }
+  };
+
+  const updatePost = async (postId: number) => {
+    if (!editPostTitle.trim() || !editPostContent.trim()) return;
+    const res = await fetch(apiUrl(`/api/community/posts/${postId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, title: editPostTitle, content: editPostContent }),
+    });
+    if (res.ok) {
+      setEditingPostId(null);
+      fetchData();
+    } else {
+      const error = await res.json().catch(() => ({}));
+      alert(error.detail || "게시글 수정에 실패했습니다.");
     }
   };
 
@@ -107,6 +128,23 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
     } catch (e) { alert("서버 오류"); }
   };
 
+  const updatePostComment = async (commentId: number, postId: number) => {
+    if (!editCommentContent.trim()) return;
+    const res = await fetch(apiUrl(`/api/comments/${commentId}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, content: editCommentContent }),
+    });
+    if (res.ok) {
+      setEditingCommentId(null);
+      fetchComments(postId);
+      fetchData();
+    } else {
+      const error = await res.json().catch(() => ({}));
+      alert(error.detail || "댓글 수정에 실패했습니다.");
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-background z-[150] flex flex-col animate-in slide-in-from-right duration-300">
       <div className="flex items-center justify-between px-5 py-4 bg-card/90 backdrop-blur-sm sticky top-0 z-10 border-b border-border">
@@ -150,14 +188,28 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
                   </div>
                   {/* 🚀 게시글 삭제 버튼 (게시글의 작성자 == 로그인한 유저일 때만 뜸) */}
                   {userId === item.user_id && (
-                    <button onClick={() => deletePost(postId)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors">
-                      <Trash2 size={14} /> 삭제
-                    </button>
+                    <div className="flex gap-1">
+                      <button onClick={() => { setEditingPostId(postId); setEditPostTitle(item.title || ""); setEditPostContent(item.content || ""); }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-[#69B98D] hover:bg-green-50"><Pencil size={14} /> 수정</button>
+                      <button onClick={() => deletePost(postId)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 size={14} /> 삭제</button>
+                    </div>
                   )}
                 </div>
                 
-                {item.title && <p className="text-[15px] font-bold text-[#333] mb-1">{item.title}</p>}
-                <p className="text-[14px] text-[#555] leading-relaxed mb-4">{item.content}</p>
+                {editingPostId === postId ? (
+                  <div className="space-y-2 mb-4">
+                    <input value={editPostTitle} onChange={(e) => setEditPostTitle(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-[#78C9A0]" />
+                    <textarea value={editPostContent} onChange={(e) => setEditPostContent(e.target.value)} rows={4} className="w-full text-sm px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-[#78C9A0] resize-none" />
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setEditingPostId(null)} className="px-3 py-1.5 text-xs rounded-lg border border-border">취소</button>
+                      <button onClick={() => updatePost(postId)} className="px-3 py-1.5 text-xs rounded-lg text-white bg-[#78C9A0]">저장</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {item.title && <p className="text-[15px] font-bold text-[#333] mb-1">{item.title}</p>}
+                    <p className="text-[14px] text-[#555] leading-relaxed mb-4">{item.content}</p>
+                  </>
+                )}
 
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between">
                   <button 
@@ -193,11 +245,21 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
                                   <span className="text-xs font-bold text-foreground">{c.author_name}</span>
                                   <span className="text-[10px] text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
                                 </div>
-                                <p className="text-[13px] text-[#444] leading-snug">{c.content}</p>
+                                {editingCommentId === c.id ? (
+                                  <div className="flex gap-1 mt-1">
+                                    <input value={editCommentContent} onChange={(e) => setEditCommentContent(e.target.value)} onKeyDown={(e) => e.key === "Enter" && updatePostComment(c.id, postId)} className="flex-1 text-xs px-2 py-1.5 rounded border border-border focus:outline-none focus:border-[#78C9A0]" />
+                                    <button onClick={() => updatePostComment(c.id, postId)} className="px-2 text-xs rounded bg-[#78C9A0] text-white">저장</button>
+                                  </div>
+                                ) : (
+                                  <p className="text-[13px] text-[#444] leading-snug">{c.content}</p>
+                                )}
                               </div>
                               {/* 🚀 댓글 삭제 버튼 (댓글의 작성자 == 로그인한 유저일 때만 뜸) */}
                               {userId === c.user_id && (
-                                <button onClick={() => deletePostComment(c.id, postId)} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                                <div className="flex">
+                                  <button onClick={() => { setEditingCommentId(c.id); setEditCommentContent(c.content); }} className="p-1.5 text-muted-foreground hover:text-[#69B98D] hover:bg-green-50 rounded-lg"><Pencil size={14} /></button>
+                                  <button onClick={() => deletePostComment(c.id, postId)} className="p-1.5 text-muted-foreground hover:text-red-400 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                                </div>
                               )}
                             </div>
                           );
