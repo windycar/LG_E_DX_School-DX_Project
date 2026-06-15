@@ -101,4 +101,4 @@ try {
 }
 
 spawnChecked(nodeCommand, ["--watch", "index.js"], { cwd: aiChatDir });
-spawnChecked(nodeCommand, [viteBin], { cwd: projectRoot });
+spawnChecked(nodeCommand, [viteBin, "--host", "127.0.0.1", "--port", "5173", "--strictPort"], { cwd: projectRoot });

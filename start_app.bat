@@ -3,125 +3,56 @@ chcp 65001 > nul
 setlocal
 
 set "ROOT=%~dp0"
-set "VENV_PYTHON=%ROOT%backend\.venv\Scripts\python.exe"
-set "ARDUINO_FQBN=arduino:avr:uno"
-set "ARDUINO_SKETCH=%ROOT%arduino\final"
+set "PYTHON_EXE=%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"
+set "FRONTEND_URL=http://127.0.0.1:5173"
 
-echo Starting MOMent local demo servers.
+if not exist "%PYTHON_EXE%" (
+  if exist "%ROOT%backend\venv\Scripts\python.exe" (
+    set "PYTHON_EXE=%ROOT%backend\venv\Scripts\python.exe"
+  ) else (
+    set "PYTHON_EXE=python"
+  )
+)
+
+echo ========================================
+echo MOMent local demo startup
+echo ========================================
+echo Python: %PYTHON_EXE%
+echo Frontend: %FRONTEND_URL%
 echo.
-echo [1/6] Checking required programs and local environment files.
-where node > nul 2> nul
-if errorlevel 1 (
-  echo [ERROR] Node.js is not installed or is not in PATH.
-  pause
-  exit /b 1
-)
-where npm > nul 2> nul
-if errorlevel 1 (
-  echo [ERROR] npm is not installed or is not in PATH.
+
+if not exist "%ROOT%Project\node_modules\vite\bin\vite.js" (
+  echo [ERROR] Project\node_modules is missing.
+  echo Run npm install once in the Project folder.
   pause
   exit /b 1
 )
 
-if not exist "%ROOT%backend\.env" (
-  echo [ERROR] backend\.env is missing.
-  echo Copy backend\.env.example to backend\.env and enter the real MySQL password.
-  pause
-  exit /b 1
+echo [1/3] Closing existing local servers.
+for %%P in (8000 5173) do (
+  for /f "tokens=5" %%I in ('netstat -ano ^| findstr ":%%P" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%I > nul 2> nul
+  )
 )
-if not exist "%ROOT%Project\.env" (
-  copy /Y "%ROOT%Project\.env.example" "%ROOT%Project\.env" > nul
-  echo Created Project\.env from Project\.env.example.
-)
-
-echo.
-echo [2/6] Releasing local demo ports and Arduino serial port holders.
-echo Closing Arduino IDE if it is using the board serial port.
 taskkill /F /T /IM "Arduino IDE.exe" > nul 2> nul
 taskkill /F /T /IM "arduino-ide.exe" > nul 2> nul
+timeout /t 1 /nobreak > nul
 
-echo Closing existing backend processes on port 8000.
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000" ^| findstr "LISTENING"') do (
-  taskkill /F /PID %%P > nul 2> nul
-)
+echo [2/3] Starting FastAPI backend.
+start "MOMent Backend API" cmd /k "cd /d ""%ROOT%backend"" && ""%PYTHON_EXE%"" -m uvicorn main:app --host 127.0.0.1 --port 8000"
 
-echo Waiting for Windows to release the serial port.
-timeout /t 2 /nobreak > nul
-
-echo.
-echo [3/6] Preparing a local Python virtual environment.
-if not exist "%VENV_PYTHON%" (
-  where py > nul 2> nul
-  if not errorlevel 1 (
-    py -3 -m venv "%ROOT%backend\.venv"
-  ) else (
-    where python > nul 2> nul
-    if errorlevel 1 (
-      echo [ERROR] Python 3 is not installed or is not in PATH.
-      pause
-      exit /b 1
-    )
-    python -m venv "%ROOT%backend\.venv"
-  )
-)
-if not exist "%VENV_PYTHON%" (
-  echo [ERROR] Failed to create backend\.venv.
-  pause
-  exit /b 1
-)
-
-cd /d "%ROOT%backend"
-"%VENV_PYTHON%" -m pip install -r requirements.txt
-if errorlevel 1 (
-  echo.
-  echo [ERROR] Backend package install failed.
-  echo Python path: %VENV_PYTHON%
-  pause
-  exit /b 1
-)
+echo [3/3] Starting React frontend and AI Chat.
+start "MOMent Frontend + AI Chat" cmd /k "cd /d ""%ROOT%Project"" && npm run dev"
 
 echo.
-echo [4/6] Installing frontend packages when needed.
-cd /d "%ROOT%Project"
-if not exist "%ROOT%Project\node_modules" (
-  call npm install
-  if errorlevel 1 (
-    echo [ERROR] Frontend package install failed.
-    pause
-    exit /b 1
-  )
-)
+echo Waiting for the frontend server...
+timeout /t 5 /nobreak > nul
+start "" "%FRONTEND_URL%"
 
 echo.
-echo [5/6] Checking the final Arduino sketch.
-where arduino-cli > nul 2> nul
-if errorlevel 1 (
-  echo arduino-cli was not found. Skipping the compile check.
-  echo Upload this final sketch once from Arduino IDE:
-  echo %ARDUINO_SKETCH%\final.ino
-) else (
-  echo Board: %ARDUINO_FQBN%
-  arduino-cli compile --fqbn %ARDUINO_FQBN% "%ARDUINO_SKETCH%"
-  if errorlevel 1 (
-    echo [WARN] Final Arduino sketch compile failed. Continuing without upload.
-  ) else (
-    echo Final Arduino sketch compile succeeded.
-    echo Upload is intentionally manual because the COM port can change.
-  )
-)
-
-echo.
-echo [6/6] Starting FastAPI backend and React frontend.
-start "MOMent Backend API" cmd /k "cd /d ""%ROOT%backend"" && ""%VENV_PYTHON%"" -m uvicorn main:app --host 127.0.0.1 --port 8000"
-
-echo.
-echo Starting React frontend and local AI Chat server.
-cd /d "%ROOT%Project"
-start "MOMent Frontend + AI Chat" cmd /k "npm run dev -- --host 127.0.0.1"
-
-echo.
-echo Done.
-echo Use the Vite Local URL shown in the frontend terminal, for example http://localhost:5173 or http://localhost:5174
-echo Backend Arduino status URL: http://127.0.0.1:8000/api/appliances/arduino/status
+echo Open this address:
+echo %FRONTEND_URL%
+echo Backend:
+echo http://127.0.0.1:8000
 echo.
 pause

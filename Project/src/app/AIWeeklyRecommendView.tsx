@@ -125,11 +125,6 @@ export default function AIWeeklyRecommendView({ week, user, guide }: { week: num
             </span>
           </div>
           <p className="text-muted-foreground">{data.personalization.summary}</p>
-          {typeof data.savedRecommendationCount === "number" && data.savedRecommendationCount > 0 && (
-            <p className="text-xs text-muted-foreground">
-              DB 맞춤 추천 {data.savedRecommendationCount}건이 `WEEKLY_AI_RECOMMENDATIONS`에 저장되었습니다.
-            </p>
-          )}
           {(data.personalization.keywords.length > 0 || data.personalization.recentEmotion) && (
             <div className="flex flex-wrap gap-2">
               {data.personalization.recentEmotion && (

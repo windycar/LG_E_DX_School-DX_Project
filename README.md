@@ -39,10 +39,14 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-백엔드 환경변수는 `backend/.env`에 둡니다.
+로컬 실행은 `backend/database.py`의 기본 MySQL 접속값을 사용하므로 `backend/.env`가 없어도 됩니다. 접속정보를 바꿀 때만 아래 값을 작성합니다.
 
 ```env
-DATABASE_URL=mysql+pymysql://아이디:비밀번호@호스트:포트/DB명
+DB_USERNAME=아이디
+DB_PASSWORD=비밀번호
+DB_HOST=호스트
+DB_PORT=포트
+DB_NAME=DB명
 BACKEND_ALLOWED_ORIGINS=http://localhost:5173
 API_PUBLIC_BASE_URL=http://localhost:8000
 WEATHER_API_KEY=나중에_입력
@@ -57,7 +61,7 @@ npm install
 npm run dev
 ```
 
-프론트 환경변수는 `Project/.env`에 둡니다.
+프론트는 로컬 API 주소를 기본값으로 가지고 있으므로 `Project/.env`가 없어도 됩니다. 주소를 바꿀 때만 작성합니다.
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
@@ -78,7 +82,7 @@ npm run build
 - Root Directory: `backend`
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Environment Variables: `DATABASE_URL`, `BACKEND_ALLOWED_ORIGINS`, `API_PUBLIC_BASE_URL`, 필요한 API 키
+- Environment Variables: `DB_USERNAME`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `BACKEND_ALLOWED_ORIGINS`, `API_PUBLIC_BASE_URL`, 필요한 API 키
 
 ### Vercel 프론트엔드
 
