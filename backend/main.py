@@ -2,11 +2,13 @@ import os
 import json
 import importlib
 import sys
+import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
 
 import database
 import models
@@ -14,7 +16,24 @@ from routers import admin, appliances, auth, calendar, community, diary, guardia
 
 load_dotenv()
 
-models.Base.metadata.create_all(bind=database.engine)
+
+def initialize_database(max_attempts: int = 6, retry_delay_seconds: int = 3) -> None:
+    for attempt in range(1, max_attempts + 1):
+        try:
+            models.Base.metadata.create_all(bind=database.engine)
+            return
+        except OperationalError:
+            if attempt == max_attempts:
+                raise
+            print(
+                "DB 연결에 실패했습니다. "
+                f"네트워크/DNS 안정화를 기다린 뒤 재시도합니다. "
+                f"({attempt}/{max_attempts})"
+            )
+            time.sleep(retry_delay_seconds)
+
+
+initialize_database()
 
 API_PUBLIC_BASE_URL = os.getenv("API_PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 BACKEND_ALLOWED_ORIGINS = [

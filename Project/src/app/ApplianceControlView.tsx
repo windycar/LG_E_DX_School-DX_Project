@@ -14,6 +14,19 @@ type ArduinoSerialStatus = {
   last_error: string | null;
 };
 
+const MOOD_LIGHT_PRESETS = [
+  { name: "따뜻한 화이트", rgb: { red: 255, green: 128, blue: 64 }, swatch: "#FFB06A" },
+  { name: "차가운 화이트", rgb: { red: 128, green: 128, blue: 255 }, swatch: "#B9C7FF" },
+  { name: "자연광", rgb: { red: 255, green: 255, blue: 128 }, swatch: "#FFF2A3" },
+  { name: "수면 모드", rgb: { red: 85, green: 0, blue: 128 }, swatch: "#76439A" },
+  { name: "독서 모드", rgb: { red: 255, green: 190, blue: 100 }, swatch: "#FFC678" },
+  { name: "휴식 모드", rgb: { red: 120, green: 180, blue: 255 }, swatch: "#78B4FF" },
+  { name: "집중 모드", rgb: { red: 180, green: 220, blue: 255 }, swatch: "#B4DCFF" },
+  { name: "명상 모드", rgb: { red: 150, green: 100, blue: 220 }, swatch: "#9664DC" },
+  { name: "새벽 수유", rgb: { red: 255, green: 70, blue: 15 }, swatch: "#FF561F" },
+  { name: "로맨틱 모드", rgb: { red: 255, green: 45, blue: 100 }, swatch: "#FF2D64" },
+];
+
 const DEFAULT_APPLIANCE_POWER: ApplianceState = {
   moodLight: false,
   aircon: true,
@@ -25,7 +38,7 @@ const DEFAULT_APPLIANCE_POWER: ApplianceState = {
 };
 
 const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
-  moodLight: { brightness: 50, color: "따뜻한 화이트", power: false },
+  moodLight: { brightness: 50, color: "따뜻한 화이트", red: 255, green: 128, blue: 64, power: false },
   aircon: { temp: 24, mode: "냉방", fan: 2, power: true },
   humidifier: { humidity: 55, intensity: 2, power: false },
   dehumidifier: { humidity: 50, intensity: 2, power: false },
@@ -298,7 +311,9 @@ export default function ApplianceControlView({
 
     switch (key) {
       case "moodLight":
-        return `${settings.color} • 밝기 ${settings.brightness}%`;
+        return settings.color === "사용자 RGB"
+          ? `수동 RGB · ${settings.red}, ${settings.green}, ${settings.blue} · 밝기 ${settings.brightness}%`
+          : `${settings.color} · 밝기 ${settings.brightness}%`;
       case "aircon":
         return `목표 온도 ${settings.temp}℃ • 풍량 ${settings.fan}`;
       case "humidifier":
@@ -458,21 +473,60 @@ export default function ApplianceControlView({
                 <div>
                   <p className="text-sm font-medium text-foreground mb-2">색상</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {["따뜻한 화이트", "차가운 화이트", "자연광", "수면 모드"].map((color) => (
+                    {MOOD_LIGHT_PRESETS.map((preset) => (
                       <button
-                        key={color}
-                        onClick={() => updateSetting("moodLight", { color })}
-                        className="py-2 rounded-xl text-sm font-medium transition-all"
+                        key={preset.name}
+                        onClick={() => updateSetting("moodLight", { color: preset.name, ...preset.rgb })}
+                        className="py-2 px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
                         style={{
-                          background: applianceSettings.moodLight.color === color ? "rgba(201,78,112,0.1)" : "var(--secondary)",
-                          border: `1.5px solid ${applianceSettings.moodLight.color === color ? "#C94E70" : "transparent"}`,
-                          color: applianceSettings.moodLight.color === color ? "#C94E70" : "var(--muted-foreground)",
+                          background: applianceSettings.moodLight.color === preset.name ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.moodLight.color === preset.name ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.moodLight.color === preset.name ? "#C94E70" : "var(--muted-foreground)",
                         }}
                       >
-                        {color}
+                        <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: preset.swatch }} />
+                        {preset.name}
                       </button>
                     ))}
                   </div>
+                </div>
+                <div className="rounded-2xl border border-border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">RGB 직접 설정</p>
+                    <span
+                      className="w-8 h-8 rounded-full border border-border shadow-inner"
+                      style={{ background: `rgb(${applianceSettings.moodLight.red}, ${applianceSettings.moodLight.green}, ${applianceSettings.moodLight.blue})` }}
+                    />
+                  </div>
+                  {[
+                    { key: "red", label: "R", color: "#EF4444" },
+                    { key: "green", label: "G", color: "#22C55E" },
+                    { key: "blue", label: "B", color: "#3B82F6" },
+                  ].map((channel) => (
+                    <div key={channel.key} className="grid grid-cols-[20px_1fr_64px] items-center gap-2">
+                      <span className="text-sm font-bold" style={{ color: channel.color }}>{channel.label}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="255"
+                        value={applianceSettings.moodLight[channel.key]}
+                        onChange={(e) => updateSetting("moodLight", { color: "사용자 RGB", [channel.key]: Number(e.target.value) })}
+                        className="w-full"
+                        style={{ accentColor: channel.color }}
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="255"
+                        value={applianceSettings.moodLight[channel.key]}
+                        onChange={(e) => updateSetting("moodLight", {
+                          color: "사용자 RGB",
+                          [channel.key]: Math.max(0, Math.min(255, Number(e.target.value) || 0)),
+                        })}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border text-sm text-center bg-background"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

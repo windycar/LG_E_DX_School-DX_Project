@@ -10,6 +10,7 @@ class ArduinoSerialBridge:
         self._port = None
         self._lock = threading.Lock()
         self._last_command = None
+        self._last_response = None
         self._last_error = None
 
     def _load_serial(self):
@@ -49,10 +50,13 @@ class ArduinoSerialBridge:
         with self._lock:
             if self._serial and self._serial.is_open:
                 self._serial.close()
-            self._serial = serial.Serial(target_port, baudrate=baudrate, timeout=1)
+            self._serial = serial.Serial(target_port, baudrate=baudrate, timeout=0.25)
             self._port = target_port
+            self._last_response = None
             self._last_error = None
-            time.sleep(2)
+            # Arduino Uno opens the bootloader when the serial port toggles DTR.
+            # Wait until setup(), including the I2C LCD initialization, has finished.
+            time.sleep(4)
         return self.status()
 
     def disconnect(self):
@@ -69,6 +73,7 @@ class ArduinoSerialBridge:
             "connected": connected,
             "port": self._port if connected else None,
             "last_command": self._last_command,
+            "last_response": self._last_response,
             "last_error": self._last_error,
         }
 
@@ -77,9 +82,21 @@ class ArduinoSerialBridge:
             if not self._serial or not self._serial.is_open:
                 raise RuntimeError("Arduino가 연결되어 있지 않습니다.")
             try:
+                self._serial.reset_input_buffer()
                 self._serial.write(f"{command}\n".encode("utf-8"))
                 self._serial.flush()
+                response = ""
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    response = self._serial.readline().decode("utf-8", errors="replace").strip()
+                    if response:
+                        break
+                if response != "OK":
+                    raise RuntimeError(
+                        f"Arduino 적용 확인 응답이 없습니다. 수신값: {response or '없음'}"
+                    )
                 self._last_command = command
+                self._last_response = response
                 self._last_error = None
             except Exception as exc:
                 self._last_error = str(exc)
@@ -101,7 +118,19 @@ def _power_value(status: str | None, command: dict[str, Any]):
 
 
 def _color_code(color: str | None):
-    colors = {"따뜻한 화이트": 0, "차가운 화이트": 1, "자연광": 2, "수면 모드": 3}
+    colors = {
+        "따뜻한 화이트": 0,
+        "차가운 화이트": 1,
+        "자연광": 2,
+        "수면 모드": 3,
+        "독서 모드": 4,
+        "휴식 모드": 5,
+        "집중 모드": 6,
+        "명상 모드": 7,
+        "새벽 수유": 8,
+        "로맨틱 모드": 9,
+        "사용자 RGB": 10,
+    }
     return colors.get(color or "", 0)
 
 
@@ -112,7 +141,7 @@ def _mode_code(mode: str | None):
 
 def build_sync_command(settings):
     values = {
-        "moodLight": {"power": 0, "brightness": 50, "color": 0},
+        "moodLight": {"power": 0, "brightness": 50, "color": 0, "red": 255, "green": 128, "blue": 64},
         "aircon": {"power": 0, "temp": 24, "fan": 1},
         "humidifier": {"power": 0, "humidity": 55, "intensity": 1},
         "dehumidifier": {"power": 0, "humidity": 50, "intensity": 1},
@@ -134,6 +163,9 @@ def build_sync_command(settings):
         if name == "moodLight":
             values[name]["brightness"] = _int_value(command.get("brightness"), 50)
             values[name]["color"] = _color_code(command.get("color"))
+            values[name]["red"] = max(0, min(255, _int_value(command.get("red"), 255)))
+            values[name]["green"] = max(0, min(255, _int_value(command.get("green"), 128)))
+            values[name]["blue"] = max(0, min(255, _int_value(command.get("blue"), 64)))
         elif name == "aircon":
             values[name]["temp"] = _int_value(command.get("temp"), 24)
             values[name]["fan"] = _int_value(command.get("fan"), 1)
@@ -151,6 +183,7 @@ def build_sync_command(settings):
     return (
         "SYNC"
         f";ML={values['moodLight']['power']},{values['moodLight']['brightness']},{values['moodLight']['color']}"
+        f";RGB={values['moodLight']['red']},{values['moodLight']['green']},{values['moodLight']['blue']}"
         f";AC={values['aircon']['power']},{values['aircon']['temp']},{values['aircon']['fan']}"
         f";HU={values['humidifier']['power']},{values['humidifier']['humidity']},{values['humidifier']['intensity']}"
         f";DH={values['dehumidifier']['power']},{values['dehumidifier']['humidity']},{values['dehumidifier']['intensity']}"

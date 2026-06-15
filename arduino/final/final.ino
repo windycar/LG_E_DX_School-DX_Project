@@ -33,6 +33,9 @@ struct ApplianceState {
   int moodPower = 0;
   int moodBrightness = 50;
   int moodColor = 0;
+  int moodRed = 255;
+  int moodGreen = 128;
+  int moodBlue = 64;
   int airconPower = 0;
   int airconTemp = 24;
   int airconFan = 1;
@@ -104,6 +107,7 @@ void handleCommand(String command) {
   if (!command.startsWith("SYNC;")) return;
 
   parseTriple(command, "ML=", state.moodPower, state.moodBrightness, state.moodColor);
+  parseTriple(command, "RGB=", state.moodRed, state.moodGreen, state.moodBlue);
   parseTriple(command, "AC=", state.airconPower, state.airconTemp, state.airconFan);
   parseTriple(command, "HU=", state.humidifierPower, state.humidifierHumidity, state.humidifierIntensity);
   parseTriple(command, "DH=", state.dehumidifierPower, state.dehumidifierHumidity, state.dehumidifierIntensity);
@@ -217,12 +221,36 @@ void applyMoodLight() {
   }
 
   int brightness = map(constrain(state.moodBrightness, 0, 100), 0, 100, 0, 255);
-  if (state.moodColor == 1) {
+  if (state.moodColor == 10) {
+    setRgb(
+      map(constrain(state.moodRed, 0, 255), 0, 255, 0, brightness),
+      map(constrain(state.moodGreen, 0, 255), 0, 255, 0, brightness),
+      map(constrain(state.moodBlue, 0, 255), 0, 255, 0, brightness)
+    );
+  } else if (state.moodColor == 1) {
     setRgb(brightness / 2, brightness / 2, brightness);
   } else if (state.moodColor == 2) {
     setRgb(brightness, brightness, brightness / 2);
   } else if (state.moodColor == 3) {
     setRgb(brightness / 3, 0, brightness / 2);
+  } else if (state.moodColor == 4) {
+    // 독서 모드: 눈의 피로를 줄이는 따뜻하고 밝은 조명
+    setRgb(brightness, brightness * 3 / 4, brightness * 2 / 5);
+  } else if (state.moodColor == 5) {
+    // 휴식 모드: 차분한 하늘빛
+    setRgb(brightness / 2, brightness * 3 / 4, brightness);
+  } else if (state.moodColor == 6) {
+    // 집중 모드: 선명한 주광색
+    setRgb(brightness * 3 / 4, brightness * 7 / 8, brightness);
+  } else if (state.moodColor == 7) {
+    // 명상 모드: 낮은 채도의 보라빛
+    setRgb(brightness * 3 / 5, brightness * 2 / 5, brightness * 7 / 8);
+  } else if (state.moodColor == 8) {
+    // 새벽 수유: 수면을 방해하는 청색광을 최소화
+    setRgb(brightness, brightness / 4, brightness / 16);
+  } else if (state.moodColor == 9) {
+    // 로맨틱 모드: 부드러운 핑크빛
+    setRgb(brightness, brightness / 6, brightness * 2 / 5);
   } else {
     setRgb(brightness, brightness / 2, brightness / 4);
   }
@@ -251,14 +279,36 @@ void printPadded(const String &text) {
   for (int i = text.length(); i < 16; i++) lcd.print(" ");
 }
 
+String moodModeLabel() {
+  if (state.moodColor == 1) return "COOL WHITE";
+  if (state.moodColor == 2) return "NATURAL";
+  if (state.moodColor == 3) return "SLEEP";
+  if (state.moodColor == 4) return "READING";
+  if (state.moodColor == 5) return "RELAX";
+  if (state.moodColor == 6) return "FOCUS";
+  if (state.moodColor == 7) return "MEDITATION";
+  if (state.moodColor == 8) return "NIGHT FEED";
+  if (state.moodColor == 9) return "ROMANTIC";
+  if (state.moodColor == 10) return "CUSTOM RGB";
+  return "WARM WHITE";
+}
+
 void printDevice(int index) {
   int current = 0;
 
   if (state.moodPower) {
     if (current == index) {
-      printPadded("MOOD LIGHT ON");
+      printPadded(moodModeLabel());
       lcd.setCursor(0, 1);
-      printPadded("Bright " + String(state.moodBrightness) + "%");
+      if (state.moodColor == 10) {
+        printPadded(
+          "R" + String(state.moodRed) +
+          " G" + String(state.moodGreen) +
+          " B" + String(state.moodBlue)
+        );
+      } else {
+        printPadded("Bright " + String(state.moodBrightness) + "%");
+      }
       return;
     }
     current++;

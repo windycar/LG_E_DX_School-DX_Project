@@ -9,6 +9,19 @@ type ApplianceKey = "moodLight" | "aircon" | "humidifier" | "dehumidifier" | "ai
 type ApplianceState = Record<ApplianceKey, boolean>;
 type ApplianceSettingsState = Record<ApplianceKey, any>;
 
+const MOOD_LIGHT_PRESETS = [
+  { name: "따뜻한 화이트", rgb: { red: 255, green: 128, blue: 64 }, swatch: "#FFB06A" },
+  { name: "차가운 화이트", rgb: { red: 128, green: 128, blue: 255 }, swatch: "#B9C7FF" },
+  { name: "자연광", rgb: { red: 255, green: 255, blue: 128 }, swatch: "#FFF2A3" },
+  { name: "수면 모드", rgb: { red: 85, green: 0, blue: 128 }, swatch: "#76439A" },
+  { name: "독서 모드", rgb: { red: 255, green: 190, blue: 100 }, swatch: "#FFC678" },
+  { name: "휴식 모드", rgb: { red: 120, green: 180, blue: 255 }, swatch: "#78B4FF" },
+  { name: "집중 모드", rgb: { red: 180, green: 220, blue: 255 }, swatch: "#B4DCFF" },
+  { name: "명상 모드", rgb: { red: 150, green: 100, blue: 220 }, swatch: "#9664DC" },
+  { name: "새벽 수유", rgb: { red: 255, green: 70, blue: 15 }, swatch: "#FF561F" },
+  { name: "로맨틱 모드", rgb: { red: 255, green: 45, blue: 100 }, swatch: "#FF2D64" },
+];
+
 const DEFAULT_APPLIANCE_POWER: ApplianceState = {
   moodLight: false,
   aircon: true,
@@ -20,7 +33,7 @@ const DEFAULT_APPLIANCE_POWER: ApplianceState = {
 };
 
 const DEFAULT_APPLIANCE_SETTINGS: ApplianceSettingsState = {
-  moodLight: { brightness: 50, color: "따뜻한 화이트", power: false },
+  moodLight: { brightness: 50, color: "따뜻한 화이트", red: 255, green: 128, blue: 64, power: false },
   aircon: { temp: 24, mode: "냉방", fan: 2, power: true },
   humidifier: { humidity: 55, intensity: 2, power: false },
   dehumidifier: { humidity: 50, intensity: 2, power: false },
@@ -115,6 +128,20 @@ const connectArduino = async () => {
   const data = await res.json();
   if (!res.ok || data.status !== "Success") {
     throw new Error(data.detail || data.message || "Arduino 연결에 실패했습니다.");
+  }
+  return data.serial;
+};
+
+const getArduinoStatus = async () => {
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/api/appliances/arduino/status`,
+    {},
+    3000,
+    "Arduino 연결 상태 확인 시간이 초과되었습니다.",
+  );
+  const data = await res.json();
+  if (!res.ok || data.status !== "Success") {
+    throw new Error(data.detail || data.message || "Arduino 연결 상태를 확인하지 못했습니다.");
   }
   return data.serial;
 };
@@ -224,9 +251,23 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 호흡 개선" };
       map.humidifier = { key: "humidifier", name: "가습기", action: "55~60% 유지", icon: "💧", reason: "건조함 완화" };
     }
-    // 🚀 스트레스 지수(stress >= 7) 조건을 지우고 감정만 남겼습니다!
+    if (!selSymptoms.includes("수면장애")) {
+      if (selEmotions.includes("불안") || selEmotions.includes("우울")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "명상 모드", icon: "💡", reason: "차분한 보랏빛 조명으로 심리적 안정감 부여" };
+      } else if (selEmotions.includes("피로") || selEmotions.includes("화남") || selSymptoms.includes("두통") || selSymptoms.includes("피로감")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "휴식 모드", icon: "💡", reason: "부드러운 조명으로 긴장과 피로 완화" };
+      } else if (selEmotions.includes("설렘")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "로맨틱 모드", icon: "💡", reason: "따뜻한 분위기로 긍정적인 감정 강화" };
+      } else if (selEmotions.includes("행복")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "따뜻한 화이트", icon: "💡", reason: "편안하고 따뜻한 분위기 유지" };
+      } else if (selEmotions.includes("안정")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "자연광", icon: "💡", reason: "안정적인 상태에 맞는 자연스러운 조명 유지" };
+      } else if (selEmotions.includes("중립")) {
+        map.moodLight = { key: "moodLight", name: "무드등", action: "집중 모드", icon: "💡", reason: "선명한 조명으로 일상 활동 집중 지원" };
+      }
+    }
+
     if (selEmotions.includes("불안") || selEmotions.includes("피로") || selEmotions.includes("우울") || selEmotions.includes("화남")) {
-      map.moodLight = { key: "moodLight", name: "무드등", action: "이완 모드", icon: "💡", reason: "차분한 조명으로 심리적 안정감 부여" };
       map.airPurifier = { key: "airPurifier", name: "공기청정기", action: "쾌적 모드", icon: "💨", reason: "신선한 공기로 기분 전환" };
     }
     return Object.values(map);
@@ -266,10 +307,19 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
           speed: action.includes("강") ? 3 : 2,
         };
       case "moodLight":
+        const moodPresets: Record<string, { brightness: number; color: string; red: number; green: number; blue: number }> = {
+          "따뜻한 화이트": { brightness: 50, color: "따뜻한 화이트", red: 255, green: 128, blue: 64 },
+          "자연광": { brightness: 55, color: "자연광", red: 255, green: 255, blue: 128 },
+          "수면 모드": { brightness: 30, color: "수면 모드", red: 85, green: 0, blue: 128 },
+          "휴식 모드": { brightness: 45, color: "휴식 모드", red: 120, green: 180, blue: 255 },
+          "집중 모드": { brightness: 65, color: "집중 모드", red: 180, green: 220, blue: 255 },
+          "명상 모드": { brightness: 35, color: "명상 모드", red: 150, green: 100, blue: 220 },
+          "로맨틱 모드": { brightness: 45, color: "로맨틱 모드", red: 255, green: 45, blue: 100 },
+        };
+        const recommendedMood = moodPresets[action] || moodPresets["휴식 모드"];
         return {
           power: true,
-          brightness: action.includes("수면") ? 30 : 45,
-          color: action.includes("수면") ? "수면 모드" : "이완 모드",
+          ...recommendedMood,
         };
       default:
         return { power: true };
@@ -328,9 +378,12 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
       setAppliances(nextPower);
       setApplianceSettings(nextSettings);
       await saveApplianceSettings(userId, nextPower, nextSettings);
-      await connectArduino();
-      await syncArduinoSettings(userId, nextPower, nextSettings);
-      setRecommendApplyMessage("추천 가전모드를 Arduino 시연 장치에 전송했습니다.");
+      const currentStatus = await getArduinoStatus();
+      const connectedStatus = currentStatus.connected ? currentStatus : await connectArduino();
+      const syncedStatus = await syncArduinoSettings(userId, nextPower, nextSettings);
+      setRecommendApplyMessage(
+        `추천 가전모드를 Arduino에 적용했습니다. (${syncedStatus.port || connectedStatus.port || "USB"})`,
+      );
     } catch (error) {
       setRecommendApplyMessage(error instanceof Error ? error.message : "추천 가전모드 전송에 실패했습니다.");
     } finally {
@@ -383,7 +436,10 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     const settings = applianceSettings[key];
     if (!settings) return "설정 없음";
     switch (key) {
-      case "moodLight": return `${settings.color} • 밝기 ${settings.brightness}%`;
+      case "moodLight":
+        return settings.color === "사용자 RGB"
+          ? `수동 RGB · ${settings.red}, ${settings.green}, ${settings.blue} · 밝기 ${settings.brightness}%`
+          : `${settings.color} · 밝기 ${settings.brightness}%`;
       case "airPurifier": return `${settings.mode} • 풍량 ${settings.speed}`;
       case "aircon": return `목표 온도 ${settings.temp}℃ • 풍량 ${settings.fan}`;
       case "humidifier": return `목표 습도 ${settings.humidity}% • 세기 ${settings.intensity}`;
@@ -568,6 +624,98 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
               <h3 className="font-semibold text-foreground">{APPLIANCE_LIST.find((a) => a.key === selectedAppliance)?.name} 수동 설정</h3>
               <button onClick={() => setSelectedAppliance(null)}><X size={20} className="text-muted-foreground" /></button>
             </div>
+
+            {selectedAppliance === "moodLight" && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">밝기: {applianceSettings.moodLight.brightness}%</p>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={applianceSettings.moodLight.brightness}
+                    onChange={(e) => setApplianceSettings((prev) => ({
+                      ...prev,
+                      moodLight: { ...prev.moodLight, brightness: Number(e.target.value) },
+                    }))}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "#C94E70" }}
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-2">조명 모드</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MOOD_LIGHT_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => setApplianceSettings((prev) => ({
+                          ...prev,
+                          moodLight: { ...prev.moodLight, color: preset.name, ...preset.rgb },
+                        }))}
+                        className="py-2 px-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2"
+                        style={{
+                          background: applianceSettings.moodLight.color === preset.name ? "rgba(201,78,112,0.1)" : "var(--secondary)",
+                          border: `1.5px solid ${applianceSettings.moodLight.color === preset.name ? "#C94E70" : "transparent"}`,
+                          color: applianceSettings.moodLight.color === preset.name ? "#C94E70" : "var(--muted-foreground)",
+                        }}
+                      >
+                        <span className="w-3 h-3 rounded-full border border-black/10" style={{ background: preset.swatch }} />
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">RGB 직접 설정</p>
+                    <span
+                      className="w-8 h-8 rounded-full border border-border shadow-inner"
+                      style={{ background: `rgb(${applianceSettings.moodLight.red}, ${applianceSettings.moodLight.green}, ${applianceSettings.moodLight.blue})` }}
+                    />
+                  </div>
+                  {[
+                    { key: "red", label: "R", color: "#EF4444" },
+                    { key: "green", label: "G", color: "#22C55E" },
+                    { key: "blue", label: "B", color: "#3B82F6" },
+                  ].map((channel) => (
+                    <div key={channel.key} className="grid grid-cols-[20px_1fr_64px] items-center gap-2">
+                      <span className="text-sm font-bold" style={{ color: channel.color }}>{channel.label}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="255"
+                        value={applianceSettings.moodLight[channel.key]}
+                        onChange={(e) => setApplianceSettings((prev) => ({
+                          ...prev,
+                          moodLight: {
+                            ...prev.moodLight,
+                            color: "사용자 RGB",
+                            [channel.key]: Number(e.target.value),
+                          },
+                        }))}
+                        className="w-full"
+                        style={{ accentColor: channel.color }}
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="255"
+                        value={applianceSettings.moodLight[channel.key]}
+                        onChange={(e) => setApplianceSettings((prev) => ({
+                          ...prev,
+                          moodLight: {
+                            ...prev.moodLight,
+                            color: "사용자 RGB",
+                            [channel.key]: Math.max(0, Math.min(255, Number(e.target.value) || 0)),
+                          },
+                        }))}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border text-sm text-center bg-background"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {selectedAppliance === "aircon" && (
               <div className="space-y-4">
