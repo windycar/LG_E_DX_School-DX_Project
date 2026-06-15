@@ -29,6 +29,14 @@ const calculateWeek = (dateString: string | undefined | null) => {
   return Math.max(0, Math.floor(diffDays / 7));
 };
 
+const normalizePregnancyPeriod = (period: string | undefined | null) => {
+  const value = String(period || "").trim().replace(/^임신\s*/, "");
+  if (value === "초기" || value === "중기" || value === "후기") {
+    return `임신 ${value}`;
+  }
+  return "임신 시기 미지정";
+};
+
 export default function MyCommunityView({ userId, initialTab, onClose }: MyCommunityViewProps) {
   const [activeTab, setActiveTab] = useState<"posts" | "comments">(initialTab);
   const [data, setData] = useState<any[]>([]);
@@ -181,7 +189,9 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
                         <p className="text-sm font-bold text-foreground">{item.author || "익명"}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>임신 {item.pregnancy_period || "일반"}</span>
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
+                          {normalizePregnancyPeriod(item.pregnancy_period)}
+                        </span>
                         <span className="text-[11px] text-muted-foreground">{timeAgo(item.created_at)}</span>
                       </div>
                     </div>

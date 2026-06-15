@@ -66,6 +66,15 @@ class CommunityPostLike(Base):
     user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, index=True)
     created_at = Column(DateTime, default=func.now())
 
+
+class AdminStopwordSetting(Base):
+    __tablename__ = "ADMIN_STOPWORD_SETTINGS"
+
+    setting_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    admin_user_id = Column(BigInteger, ForeignKey("USERS.user_id"), nullable=False, unique=True, index=True)
+    stopwords_json = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
 # 6. 스몰토크 주제 테이블
 class SmallTalkTopic(Base):
     __tablename__ = "SMALL_TALK_TOPICS"

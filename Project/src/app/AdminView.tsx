@@ -192,6 +192,7 @@ export default function AdminView({
   const [error, setError] = useState("");
   const [stopwordInput, setStopwordInput] = useState("");
   const [stopwords, setStopwords] = useState<string[]>(["오늘", "진짜", "너무"]);
+  const [stopwordSaving, setStopwordSaving] = useState(false);
   const [textAnalysis, setTextAnalysis] = useState<TextAnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -214,8 +215,22 @@ export default function AdminView({
     }
   };
 
+  const loadStopwords = async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/admin/community/stopwords/${encodeURIComponent(String(adminIdentifier))}`));
+      const json = await res.json();
+      if (!res.ok || json.status !== "Success") {
+        throw new Error(json.detail || json.message || "불용어를 불러오지 못했습니다.");
+      }
+      setStopwords(json.stopwords);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "불용어를 불러오지 못했습니다.");
+    }
+  };
+
   useEffect(() => {
     loadOverview();
+    loadStopwords();
   }, [adminIdentifier]);
 
   const filteredUsers = useMemo(() => {
@@ -277,15 +292,38 @@ export default function AdminView({
     loadOverview();
   };
 
-  const addStopword = () => {
-    const word = stopwordInput.trim();
-    if (!word || stopwords.includes(word)) return;
-    setStopwords((prev) => [...prev, word]);
-    setStopwordInput("");
+  const saveStopwords = async (nextStopwords: string[]) => {
+    setStopwordSaving(true);
+    try {
+      const res = await fetch(apiUrl(`/api/admin/community/stopwords/${encodeURIComponent(String(adminIdentifier))}`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stopwords: nextStopwords }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.status !== "Success") {
+        throw new Error(json.detail || json.message || "불용어 저장에 실패했습니다.");
+      }
+      setStopwords(json.stopwords);
+      return true;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "불용어 저장에 실패했습니다.");
+      return false;
+    } finally {
+      setStopwordSaving(false);
+    }
   };
 
-  const removeStopword = (word: string) => {
-    setStopwords((prev) => prev.filter((item) => item !== word));
+  const addStopword = async () => {
+    const word = stopwordInput.trim();
+    if (!word || stopwords.includes(word)) return;
+    if (await saveStopwords([...stopwords, word])) {
+      setStopwordInput("");
+    }
+  };
+
+  const removeStopword = async (word: string) => {
+    await saveStopwords(stopwords.filter((item) => item !== word));
   };
 
   const runCommunityAnalysis = async () => {
@@ -544,13 +582,13 @@ export default function AdminView({
                   placeholder="불용어 입력"
                   className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:border-primary"
                 />
-                <button onClick={addStopword} className="px-3 py-2 rounded-xl text-xs font-bold text-white" style={{ background: "#7B68B5" }}>
-                  추가
+                <button onClick={addStopword} disabled={stopwordSaving} className="px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-60" style={{ background: "#7B68B5" }}>
+                  {stopwordSaving ? "저장 중" : "추가"}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {stopwords.map((word) => (
-                  <button key={word} onClick={() => removeStopword(word)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary text-xs text-muted-foreground">
+                  <button key={word} onClick={() => removeStopword(word)} disabled={stopwordSaving} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary text-xs text-muted-foreground disabled:opacity-60">
                     {word}
                     <X size={12} />
                   </button>

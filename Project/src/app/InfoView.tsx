@@ -473,7 +473,7 @@ export default function InfoView({ onBack, onNavigate }: { onBack: () => void; o
         </div>
 
         <button
-          onClick={() => setShowChatbot(true)}
+          onClick={() => onNavigate?.("medical-chat")}
           className="w-full py-4 rounded-2xl font-semibold text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
           style={{ background: "linear-gradient(135deg, #2D7A9A, #4A9AB8)" }}
         >

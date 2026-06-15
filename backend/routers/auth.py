@@ -2,14 +2,43 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from datetime import datetime, date, timedelta
+import os
 import random
 import string
+
+from dotenv import load_dotenv
 
 import models
 import schemas
 import database
 
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env.demo-login"), override=True)
+
 router = APIRouter(tags=["Auth & Profile"])
+
+
+def resolve_demo_login(login_id: str, password: str):
+    aliases = {
+        os.getenv("DEMO_MOM_LOGIN_ID", "").strip().lower(): (
+            os.getenv("DEMO_MOM_EMAIL", "").strip().lower(),
+            os.getenv("DEMO_MOM_PASSWORD", ""),
+        ),
+        os.getenv("DEMO_DAD_LOGIN_ID", "").strip().lower(): (
+            os.getenv("DEMO_DAD_EMAIL", "").strip().lower(),
+            os.getenv("DEMO_DAD_PASSWORD", ""),
+        ),
+    }
+    aliases.pop("", None)
+
+    target = aliases.get(login_id)
+    if not target:
+        return login_id, False
+
+    target_email, alias_password = target
+    if not target_email or not alias_password or password != alias_password:
+        raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
+    return target_email, True
+
 
 def ensure_user_schema():
     with database.engine.begin() as conn:
@@ -126,17 +155,22 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
 
 @router.post("/api/auth/login")
 def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db)):
-    normalized_email = request.email.strip().lower()
+    login_id = request.email.strip().lower()
+    normalized_email, authenticated_by_alias = resolve_demo_login(login_id, request.password)
     user = db.query(models.User).filter(func.lower(models.User.email) == normalized_email).first()
-    if not user or user.password != request.password:
+    if not user or (not authenticated_by_alias and user.password != request.password):
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 틀렸습니다.")
     
     pregnant_info = None
     guardian_info = None
+    effective_baby_nickname = user.baby_nickname
+    effective_pregnancy_start_date = user.pregnancy_start_date
     
     if user.role == "GUARDIAN" and user.parent_user_id:
         parent = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if parent:
+            effective_baby_nickname = parent.baby_nickname
+            effective_pregnancy_start_date = parent.pregnancy_start_date
             pregnant_info = {
                 "name": parent.name,
                 "baby_nickname": parent.baby_nickname,
@@ -159,8 +193,8 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             "name": user.name,
             "nickname": user.nickname or user.name,
             "role": user.role,
-            "baby_nickname": user.baby_nickname,
-            "pregnancy_start_date": str(user.pregnancy_start_date) if user.pregnancy_start_date else None,
+            "baby_nickname": effective_baby_nickname,
+            "pregnancy_start_date": str(effective_pregnancy_start_date) if effective_pregnancy_start_date else None,
             "connection_code": user.connection_code,
             "parent_user_id": user.parent_user_id,
             "connected_pregnant": pregnant_info,
@@ -180,6 +214,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
 
     partner_code = None
     pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
+    effective_baby_nickname = user.baby_nickname
     connected_name = None
     connected_email = None
 
@@ -188,6 +223,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         if parent:
             partner_code = parent.connection_code
             pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
+            effective_baby_nickname = parent.baby_nickname
             connected_name = parent.name
             connected_email = parent.email
     elif user.role == "PREGNANT" and user.parent_user_id:
@@ -201,7 +237,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         "user_id": user.id,
         "name": user.name,
         "nickname": user.nickname or user.name,
-        "baby_nickname": user.baby_nickname,
+        "baby_nickname": effective_baby_nickname,
         "connection_code": user.connection_code,
         "partner_code": partner_code,
         "pregnancy_start_date": pregnant_start_date,
@@ -219,7 +255,13 @@ def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = D
         raise HTTPException(status_code=400, detail="이름을 입력해 주세요.")
     user.name = normalized_name
     user.nickname = (profile.nickname or "").strip() or user.nickname
-    user.baby_nickname = profile.baby_nickname
+    baby_nickname = (profile.baby_nickname or "").strip() or None
+    if user.role == "GUARDIAN" and user.parent_user_id:
+        pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
+        if pregnant_user:
+            pregnant_user.baby_nickname = baby_nickname
+    else:
+        user.baby_nickname = baby_nickname
     db.commit()
     return {"status": "Success", "message": "프로필이 수정되었습니다."}
 

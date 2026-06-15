@@ -18,7 +18,7 @@ export default function LoginView({
   const handleLogin = async () => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
-      setError("이메일과 비밀번호를 입력해주세요.");
+      setError("이메일 또는 아이디와 비밀번호를 입력해주세요.");
       return;
     }
     setLoading(true);
@@ -58,7 +58,9 @@ export default function LoginView({
         onSuccess({
           name: userInfo.name,
           nickname: userInfo.nickname || userInfo.name,
-          babyNickname: userInfo.baby_nickname || "아기", 
+          babyNickname: userInfo.connected_pregnant?.baby_nickname || userInfo.baby_nickname || "아기",
+          baby_nickname: userInfo.connected_pregnant?.baby_nickname || userInfo.baby_nickname || "",
+          pregnancy_start_date: userInfo.connected_pregnant?.pregnancy_start_date || userInfo.pregnancy_start_date || "",
           email: userInfo.email || normalizedEmail,
           role: isAdmin ? "admin" : normalizedRole === "PREGNANT" ? "pregnant" : "guardian",
           pregnancyWeek: calcWeek, 
@@ -100,8 +102,8 @@ export default function LoginView({
 
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-border space-y-4">
           <div>
-            <label className="text-sm font-medium text-foreground block mb-2">이메일</label>
-            <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일을 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
+            <label className="text-sm font-medium text-foreground block mb-2">이메일 또는 아이디</label>
+            <input type="text" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="이메일 또는 아이디를 입력하세요" className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 focus:outline-none focus:border-primary text-sm transition-colors" />
           </div>
           <div>
             <label className="text-sm font-medium text-foreground block mb-2">비밀번호</label>

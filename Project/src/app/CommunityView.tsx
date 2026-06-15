@@ -26,6 +26,17 @@ const calculateWeek = (dateString: string | undefined | null) => {
   return Math.max(0, Math.floor(diffDays / 7));
 };
 
+const normalizePregnancyPeriod = (period: string | undefined | null) => {
+  const value = String(period || "").trim().replace(/^임신\s*/, "");
+  if (value === "초기" || value === "중기" || value === "후기") {
+    return `임신 ${value}`;
+  }
+  return "임신 시기 미지정";
+};
+
+const pregnancyPeriodKey = (period: string | undefined | null) =>
+  normalizePregnancyPeriod(period).replace(/^임신\s*/, "");
+
 export default function CommunityView({ user, onBack, onNavigate }: { user: AppUser; onBack: () => void; onNavigate?: (s: Screen) => void }) {
   const isPregnant = String(user.role).toUpperCase() === "PREGNANT";
   const userId = (user as any).id || user.user_id; 
@@ -261,7 +272,9 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
   ];
 
   const safePosts = Array.isArray(posts) ? posts : [];
-  const filtered = selPeriod === "전체" ? safePosts : safePosts.filter((p) => p && (p.period === selPeriod || p.pregnancy_period === selPeriod));
+  const filtered = selPeriod === "전체"
+    ? safePosts
+    : safePosts.filter((p) => p && pregnancyPeriodKey(p.period || p.pregnancy_period) === selPeriod);
 
   const addPost = async () => {
     if (!newTitle.trim() || !newPost.trim()) {
@@ -379,7 +392,9 @@ export default function CommunityView({ user, onBack, onNavigate }: { user: AppU
                           <p className="text-sm font-bold text-foreground">{post.author || "익명"}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>임신 {post.period || post.pregnancy_period}</span>
+                          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
+                            {normalizePregnancyPeriod(post.period || post.pregnancy_period)}
+                          </span>
                           <span className="text-[11px] text-muted-foreground">{post.created_at ? timeAgo(post.created_at) : (post.time || "방금 전")}</span>
                         </div>
                       </div>

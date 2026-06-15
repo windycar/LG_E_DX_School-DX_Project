@@ -1,11 +1,38 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
+from datetime import date, datetime
 import models
 import schemas
 import database
 
 router = APIRouter(tags=["Community & MyPage"])
+PREGNANCY_PERIODS = ("임신 초기", "임신 중기", "임신 후기")
+
+
+def calculate_pregnancy_period(user: models.User, db: Session, reference_date=None):
+    pregnant_user = user
+    if str(user.role or "").upper() != "PREGNANT" and user.parent_user_id:
+        pregnant_user = db.query(models.User).filter(
+            models.User.id == user.parent_user_id,
+            func.upper(models.User.role) == "PREGNANT",
+        ).first()
+
+    if not pregnant_user or not pregnant_user.pregnancy_start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="연결된 임산부의 임신 시작일을 확인할 수 없습니다.",
+        )
+
+    if isinstance(reference_date, datetime):
+        reference_date = reference_date.date()
+    reference_date = reference_date or date.today()
+    pregnancy_week = max(1, (reference_date - pregnant_user.pregnancy_start_date).days // 7 + 1)
+    if pregnancy_week <= 13:
+        return "임신 초기"
+    if pregnancy_week <= 27:
+        return "임신 중기"
+    return "임신 후기"
 
 
 def ensure_community_like_schema():
@@ -87,7 +114,8 @@ def get_community_posts(user_id: int | None = Query(None), db: Session = Depends
 
 @router.post("/api/community/posts")
 def create_community_post(post: schemas.PostCreate, db: Session = Depends(database.get_db)):
-    if not db.query(models.User).filter(models.User.id == post.user_id).first():
+    author = db.query(models.User).filter(models.User.id == post.user_id).first()
+    if not author:
         raise HTTPException(status_code=404, detail="작성자 계정을 찾을 수 없습니다.")
     title = post.title.strip()
     content = post.content.strip()
@@ -95,7 +123,7 @@ def create_community_post(post: schemas.PostCreate, db: Session = Depends(databa
         raise HTTPException(status_code=400, detail="제목과 내용을 모두 입력해 주세요.")
     db.add(models.CommunityPost(
         user_id=post.user_id,
-        pregnancy_period=post.pregnancy_period.strip(),
+        pregnancy_period=calculate_pregnancy_period(author, db),
         title=title,
         content=content,
     ))

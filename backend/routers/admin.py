@@ -2,7 +2,7 @@ import json
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,7 +14,14 @@ router = APIRouter(tags=["Admin"])
 
 
 class CommunityAnalyzeRequest(BaseModel):
-    stopwords: list[str] = []
+    stopwords: list[str] = Field(default_factory=list)
+
+
+class CommunityStopwordsUpdate(BaseModel):
+    stopwords: list[str] = Field(default_factory=list)
+
+
+DEFAULT_ADMIN_STOPWORDS = ["오늘", "진짜", "너무"]
 
 
 def calculate_pregnancy_week(start_date):
@@ -77,6 +84,18 @@ def community_texts(db: Session):
     texts = [text or "" for (text,) in db.query(models.CommunityPost.content).all()]
     texts.extend(text or "" for (text,) in db.query(models.CommunityComment.content).all())
     return texts
+
+
+def normalize_stopwords(stopwords: list[str]):
+    normalized = []
+    seen = set()
+    for value in stopwords:
+        word = str(value or "").strip()
+        if not word or len(word) > 100 or word in seen:
+            continue
+        normalized.append(word)
+        seen.add(word)
+    return normalized
 
 
 def appliance_average_settings(db: Session):
@@ -188,11 +207,19 @@ def get_admin_overview(admin_identifier: str, db: Session = Depends(database.get
             ],
         })
 
-    period_distribution = [
-        {"label": label or "미지정", "count": int(count)}
-        for label, count in db.query(models.CommunityPost.pregnancy_period, func.count(models.CommunityPost.post_id))
+    period_counts = {
+        label: int(count)
+        for label, count in db.query(
+            models.CommunityPost.pregnancy_period,
+            func.count(models.CommunityPost.post_id),
+        )
+        .filter(models.CommunityPost.pregnancy_period.in_(("임신 초기", "임신 중기", "임신 후기")))
         .group_by(models.CommunityPost.pregnancy_period)
         .all()
+    }
+    period_distribution = [
+        {"label": label, "count": period_counts.get(label, 0)}
+        for label in ("임신 초기", "임신 중기", "임신 후기")
     ]
     emotion_distribution = [
         {"label": label or "미지정", "count": int(count)}
@@ -246,6 +273,51 @@ def analyze_admin_community(
     return {"status": "Success", "analysis": analysis}
 
 
+@router.get("/api/admin/community/stopwords/{admin_identifier}")
+def get_admin_stopwords(admin_identifier: str, db: Session = Depends(database.get_db)):
+    admin = get_admin_user(admin_identifier, db)
+    setting = (
+        db.query(models.AdminStopwordSetting)
+        .filter(models.AdminStopwordSetting.admin_user_id == admin.id)
+        .first()
+    )
+    if not setting:
+        setting = models.AdminStopwordSetting(
+            admin_user_id=admin.id,
+            stopwords_json=json.dumps(DEFAULT_ADMIN_STOPWORDS, ensure_ascii=False),
+        )
+        db.add(setting)
+        db.commit()
+        db.refresh(setting)
+    try:
+        stopwords = normalize_stopwords(json.loads(setting.stopwords_json))
+    except (TypeError, ValueError):
+        stopwords = DEFAULT_ADMIN_STOPWORDS
+    return {"status": "Success", "stopwords": stopwords}
+
+
+@router.put("/api/admin/community/stopwords/{admin_identifier}")
+def update_admin_stopwords(
+    admin_identifier: str,
+    payload: CommunityStopwordsUpdate,
+    db: Session = Depends(database.get_db),
+):
+    admin = get_admin_user(admin_identifier, db)
+    stopwords = normalize_stopwords(payload.stopwords)
+    setting = (
+        db.query(models.AdminStopwordSetting)
+        .filter(models.AdminStopwordSetting.admin_user_id == admin.id)
+        .first()
+    )
+    encoded = json.dumps(stopwords, ensure_ascii=False)
+    if setting:
+        setting.stopwords_json = encoded
+    else:
+        db.add(models.AdminStopwordSetting(admin_user_id=admin.id, stopwords_json=encoded))
+    db.commit()
+    return {"status": "Success", "stopwords": stopwords}
+
+
 @router.delete("/api/admin/users/{user_id}")
 def admin_delete_user(user_id: int, admin_identifier: str = Query(...), db: Session = Depends(database.get_db)):
     admin = get_admin_user(admin_identifier, db)
@@ -259,6 +331,7 @@ def admin_delete_user(user_id: int, admin_identifier: str = Query(...), db: Sess
     diary_ids = [row.diary_id for row in db.query(models.DiaryLog.diary_id).filter(models.DiaryLog.user_id == user_id).all()]
     if diary_ids:
         db.query(models.AiAnalysisResult).filter(models.AiAnalysisResult.diary_id.in_(diary_ids)).delete(synchronize_session=False)
+    db.query(models.AdminStopwordSetting).filter(models.AdminStopwordSetting.admin_user_id == user_id).delete()
     db.query(models.CommunityPostLike).filter(models.CommunityPostLike.user_id == user_id).delete()
     db.query(models.CommunityComment).filter(models.CommunityComment.user_id == user_id).delete()
     post_ids = [row.post_id for row in db.query(models.CommunityPost.post_id).filter(models.CommunityPost.user_id == user_id).all()]
