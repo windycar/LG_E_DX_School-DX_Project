@@ -12,6 +12,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
   // 기본 정보 상태
   const [connectionCode, setConnectionCode] = useState<string>("");
   const [pregnancyStartDate, setPregnancyStartDate] = useState<string | null>(null);
+  const [babyGender, setBabyGender] = useState<string>("");
   
   // 통계 상태
   const [stats, setStats] = useState({ diary: 0, posts: 0, comments: 0 });
@@ -37,6 +38,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
           const code = isPregnant ? data.connection_code : data.partner_code;
           setConnectionCode(code);
           setPregnancyStartDate(data.pregnancy_start_date); // 남편 접속 시에도 아내의 임신 시작일이 들어옵니다!
+          setBabyGender(data.baby_gender || "");
 
           // 2. 코드를 가져왔다면, 즉시 캘린더 검진일 API 호출!
           if (code) {
@@ -116,6 +118,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
             <p className="font-bold text-xl text-foreground">{user.name}</p>
             <p className="text-sm text-muted-foreground">{user.email}</p>
             {user.babyNickname && <p className="text-xs text-muted-foreground mt-0.5">아기 태명: {user.babyNickname}</p>}
+            {babyGender && <p className="text-xs text-muted-foreground mt-0.5">태아 성별: {babyGender}</p>}
             <span className="inline-block mt-1 text-xs px-3 py-1 rounded-full font-bold shadow-sm" style={{ background: "rgba(201,78,112,0.1)", color: "#C94E70" }}>
               {isPregnant ? "임산부" : "보호자"}
             </span>
@@ -196,6 +199,7 @@ export default function ProfileView({ user, onNavigate }: { user: AppUser; onNav
             <div className="bg-white rounded-2xl p-4 border border-border space-y-3 shadow-sm">
               {[
                 { label: "출산 예정일", value: pregInfo.dueDateText }, 
+                { label: "태아 성별", value: babyGender || "미등록" },
                 { label: "최근 검진일", value: checkupInfo.recent },
                 { label: "다음 검진일", value: checkupInfo.next },
               ].map((info) => (

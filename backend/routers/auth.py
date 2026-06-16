@@ -47,6 +47,11 @@ def ensure_user_schema():
         ).first()
         if not nickname_column:
             conn.execute(text("ALTER TABLE USERS ADD COLUMN nickname VARCHAR(50) NULL AFTER name"))
+        baby_gender_column = conn.execute(
+            text("SHOW COLUMNS FROM USERS LIKE 'baby_gender'")
+        ).first()
+        if not baby_gender_column:
+            conn.execute(text("ALTER TABLE USERS ADD COLUMN baby_gender VARCHAR(10) NULL AFTER baby_nickname"))
 
 def ensure_admin_user():
     with database.SessionLocal() as db:
@@ -174,6 +179,7 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             pregnant_info = {
                 "name": parent.name,
                 "baby_nickname": parent.baby_nickname,
+                "baby_gender": parent.baby_gender,
                 "pregnancy_start_date": str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None,
                 "connection_code": parent.connection_code
             }
@@ -194,6 +200,7 @@ def login(request: schemas.LoginRequest, db: Session = Depends(database.get_db))
             "nickname": user.nickname or user.name,
             "role": user.role,
             "baby_nickname": effective_baby_nickname,
+            "baby_gender": pregnant_info["baby_gender"] if pregnant_info else user.baby_gender,
             "pregnancy_start_date": str(effective_pregnancy_start_date) if effective_pregnancy_start_date else None,
             "connection_code": user.connection_code,
             "parent_user_id": user.parent_user_id,
@@ -215,6 +222,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
     partner_code = None
     pregnant_start_date = str(user.pregnancy_start_date) if user.pregnancy_start_date else None
     effective_baby_nickname = user.baby_nickname
+    effective_baby_gender = user.baby_gender
     connected_name = None
     connected_email = None
 
@@ -224,6 +232,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
             partner_code = parent.connection_code
             pregnant_start_date = str(parent.pregnancy_start_date) if parent.pregnancy_start_date else None
             effective_baby_nickname = parent.baby_nickname
+            effective_baby_gender = parent.baby_gender
             connected_name = parent.name
             connected_email = parent.email
     elif user.role == "PREGNANT" and user.parent_user_id:
@@ -238,6 +247,7 @@ def get_user_info(identifier: str, db: Session = Depends(database.get_db)):
         "name": user.name,
         "nickname": user.nickname or user.name,
         "baby_nickname": effective_baby_nickname,
+        "baby_gender": effective_baby_gender,
         "connection_code": user.connection_code,
         "partner_code": partner_code,
         "pregnancy_start_date": pregnant_start_date,
@@ -256,12 +266,21 @@ def update_profile(user_id: int, profile: schemas.ProfileUpdate, db: Session = D
     user.name = normalized_name
     user.nickname = (profile.nickname or "").strip() or user.nickname
     baby_nickname = (profile.baby_nickname or "").strip() or None
+    sent_fields = getattr(profile, "model_fields_set", getattr(profile, "__fields_set__", set()))
+    baby_gender = (profile.baby_gender or "").strip() or None
+    if "baby_gender" in sent_fields:
+        if baby_gender and baby_gender not in {"남아", "여아"}:
+            raise HTTPException(status_code=400, detail="태아 성별은 남아 또는 여아만 선택할 수 있습니다.")
+        if str(user.role).upper() != "PREGNANT":
+            raise HTTPException(status_code=403, detail="태아 성별은 임산부 계정만 수정할 수 있습니다.")
     if user.role == "GUARDIAN" and user.parent_user_id:
         pregnant_user = db.query(models.User).filter(models.User.id == user.parent_user_id).first()
         if pregnant_user:
             pregnant_user.baby_nickname = baby_nickname
     else:
         user.baby_nickname = baby_nickname
+        if "baby_gender" in sent_fields:
+            user.baby_gender = baby_gender
     db.commit()
     return {"status": "Success", "message": "프로필이 수정되었습니다."}
 

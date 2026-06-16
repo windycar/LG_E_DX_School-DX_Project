@@ -17,10 +17,19 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   const userId = (user as any).id || user.user_id;
 
   // 백엔드에서 직접 가져온 데이터를 담을 그릇
-  const [dbInfo, setDbInfo] = useState({ baby_nickname: "", connection_code: "", partner_code: "", connected_name: "", connected_email: "" });
+  const [dbInfo, setDbInfo] = useState({
+    baby_nickname: "",
+    baby_gender: "",
+    pregnancy_start_date: "",
+    connection_code: "",
+    partner_code: "",
+    connected_name: "",
+    connected_email: "",
+  });
 
   const [editName, setEditName] = useState(user.name || "");
   const [editBabyNickname, setEditBabyNickname] = useState("");
+  const [editBabyGender, setEditBabyGender] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -34,6 +43,7 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
         if (data.status === "Success") {
           setDbInfo(data);
           setEditBabyNickname(data.baby_nickname || "");
+          setEditBabyGender(data.baby_gender || "");
         }
       })
       .catch(e => console.error("데이터 불러오기 실패:", e));
@@ -44,6 +54,15 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
   }, [userId]);
 
   const connectionCode = isPregnant ? (dbInfo.connection_code || "연결 코드 없음") : (dbInfo.partner_code || "연결 코드 없음");
+  const calculatePregnancyWeek = (startDateStr?: string | null) => {
+    if (!startDateStr) return user.pregnancyWeek || 0;
+    const start = new Date(startDateStr);
+    const today = new Date();
+    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.floor(diffDays / 7));
+  };
+  const pregnancyWeek = calculatePregnancyWeek(dbInfo.pregnancy_start_date || user.pregnancy_start_date);
+  const canEditBabyGender = isPregnant && pregnancyWeek >= 16;
 
   // 🚀 즉시 반영되는 프로필 업데이트 함수
   // 🚀 로그아웃을 막고 메인 화면까지 즉시 동기화하는 프로필 업데이트 함수
@@ -56,7 +75,12 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
       const res = await fetch(apiUrl(`/api/user/profile/${userId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editName.trim(), nickname: user.nickname, baby_nickname: editBabyNickname.trim() }),
+        body: JSON.stringify({
+          name: editName.trim(),
+          nickname: user.nickname,
+          baby_nickname: editBabyNickname.trim(),
+          ...(canEditBabyGender ? { baby_gender: editBabyGender } : {}),
+        }),
       });
       if (res.ok) {
         alert("프로필이 성공적으로 수정되었습니다!");
@@ -68,10 +92,16 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
         user.name = editName;
         (user as any).baby_nickname = editBabyNickname;
         (user as any).babyNickname = editBabyNickname; // 혹시 모를 camelCase 대비
+        if (canEditBabyGender) {
+          (user as any).baby_gender = editBabyGender;
+        }
         
         // 만약 보호자 계정이라서 연결된 임산부의 태명을 바꾼 경우도 함께 동기화합니다.
         if ((user as any).connected_pregnant) {
           (user as any).connected_pregnant.baby_nickname = editBabyNickname;
+          if (canEditBabyGender) {
+            (user as any).connected_pregnant.baby_gender = editBabyGender;
+          }
         }
         
         // 현재 설정창의 로컬 상태도 함께 최신화합니다.
@@ -250,6 +280,40 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
                   placeholder="아기를 부를 애칭" 
                   className="w-full px-4 py-3 rounded-xl border border-border bg-card focus:outline-none focus:border-primary text-sm" 
                 />
+              </div>
+            )}
+
+            {canEditBabyGender && (
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">태아 성별</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["남아", "여아"].map((gender) => (
+                    <button
+                      key={gender}
+                      type="button"
+                      onClick={() => setEditBabyGender(gender)}
+                      className="py-3 rounded-xl border text-sm font-bold transition-all"
+                      style={{
+                        borderColor: editBabyGender === gender ? "#C94E70" : "var(--border)",
+                        background: editBabyGender === gender ? "rgba(201,78,112,0.1)" : "var(--card)",
+                        color: editBabyGender === gender ? "#C94E70" : "var(--foreground)",
+                      }}
+                    >
+                      {gender}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">16주 이상 임산부 계정에서만 수정할 수 있고, 보호자에게도 공유됩니다.</p>
+              </div>
+            )}
+
+            {!isPregnant && dbInfo.baby_gender && (
+              <div>
+                <label className="text-sm font-medium text-foreground block mb-2">태아 성별</label>
+                <div className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm text-muted-foreground">
+                  {dbInfo.baby_gender}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">태아 성별은 임산부 계정에서만 수정할 수 있습니다.</p>
               </div>
             )}
 

@@ -12,6 +12,7 @@ class User(Base):
     nickname = Column(String(50), nullable=True)
     role = Column(String(20))
     baby_nickname = Column(String(50), nullable=True)
+    baby_gender = Column(String(10), nullable=True)
     pregnancy_start_date = Column(Date, nullable=True)
     connection_code = Column(String(20), nullable=True)
     parent_user_id = Column(Integer, nullable=True)

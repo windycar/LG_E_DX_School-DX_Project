@@ -60,6 +60,7 @@ export default function LoginView({
           nickname: userInfo.nickname || userInfo.name,
           babyNickname: userInfo.connected_pregnant?.baby_nickname || userInfo.baby_nickname || "아기",
           baby_nickname: userInfo.connected_pregnant?.baby_nickname || userInfo.baby_nickname || "",
+          baby_gender: userInfo.connected_pregnant?.baby_gender || userInfo.baby_gender || "",
           pregnancy_start_date: userInfo.connected_pregnant?.pregnancy_start_date || userInfo.pregnancy_start_date || "",
           email: userInfo.email || normalizedEmail,
           role: isAdmin ? "admin" : normalizedRole === "PREGNANT" ? "pregnant" : "guardian",

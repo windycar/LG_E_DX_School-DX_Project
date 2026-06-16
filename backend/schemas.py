@@ -23,6 +23,7 @@ class ProfileUpdate(BaseModel):
     name: str
     nickname: Optional[str] = None
     baby_nickname: Optional[str] = None
+    baby_gender: Optional[str] = None
 
 class PasswordUpdate(BaseModel):
     current_password: str

@@ -13,12 +13,14 @@ export interface AppUser {
   nickname?: string;
   babyNickname?: string;
   baby_nickname?: string;
+  baby_gender?: string | null;
   pregnancy_start_date?: string;
   user_id?: number;
   parent_user_id?: number | null;
   connected_pregnant?: {
     name: string;
     baby_nickname: string | null;
+    baby_gender?: string | null;
     pregnancy_start_date: string;
   } | null;
 }
