@@ -233,8 +233,6 @@ def get_admin_overview(admin_identifier: str, db: Session = Depends(database.get
         .group_by(models.ApplianceSetting.appliance_name)
         .all()
     ]
-    text_analysis = analyze_community_text(community_texts(db), [], limit=10)
-
     return {
         "status": "Success",
         "stats": {
@@ -255,7 +253,7 @@ def get_admin_overview(admin_identifier: str, db: Session = Depends(database.get
             "period_distribution": period_distribution,
             "emotion_distribution": emotion_distribution,
             "appliance_distribution": appliance_distribution,
-            "keyword_distribution": [{"label": row["word"], "count": row["count"]} for row in text_analysis["top_words"]],
+            "keyword_distribution": [],
             "environment_average": diary_environment_average(db),
             "appliance_average": appliance_average_settings(db),
         },

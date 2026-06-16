@@ -6,10 +6,10 @@ set "ROOT=%~dp0"
 set "PYTHON_EXE=%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"
 set "FRONTEND_URL=http://127.0.0.1:5173"
 
-if not exist "%PYTHON_EXE%" (
-  if exist "%ROOT%backend\venv\Scripts\python.exe" (
-    set "PYTHON_EXE=%ROOT%backend\venv\Scripts\python.exe"
-  ) else (
+if exist "%ROOT%backend\venv\Scripts\python.exe" (
+  set "PYTHON_EXE=%ROOT%backend\venv\Scripts\python.exe"
+) else (
+  if not exist "%PYTHON_EXE%" (
     set "PYTHON_EXE=python"
   )
 )

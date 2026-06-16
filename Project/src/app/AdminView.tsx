@@ -597,7 +597,7 @@ export default function AdminView({
               <button onClick={runCommunityAnalysis} disabled={analyzing} className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60" style={{ background: "#C94E70" }}>
                 {analyzing ? "분석 중..." : "커뮤니티 전체 Kiwi 분석 실행"}
               </button>
-              <WordCloud words={textAnalysis?.top_words || data.analytics.keyword_distribution.map((row) => ({ word: row.label, count: row.count }))} />
+              <WordCloud words={textAnalysis?.top_words || []} />
               {textAnalysis && (
                 <div className="grid grid-cols-3 gap-2">
                   <StatCard label="분석 문서" value={textAnalysis.total_documents} color="#7B68B5" />
