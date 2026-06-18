@@ -154,7 +154,8 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-[150] flex flex-col animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-0 bg-black/40 z-[150] flex justify-center">
+      <div className="bg-background w-full max-w-[430px] min-h-screen flex flex-col shadow-2xl">
       <div className="flex items-center justify-between px-5 py-4 bg-card/90 backdrop-blur-sm sticky top-0 z-10 border-b border-border">
         <h1 className="font-semibold text-foreground">나의 활동 내역</h1>
         <button onClick={onClose} className="p-2 rounded-xl hover:bg-secondary transition-colors"><X size={20} className="text-foreground" /></button>
@@ -178,17 +179,17 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
             // 🚀 이제 "내가 쓴 글"이든 "내가 쓴 댓글"이든 똑같은 메인 커뮤니티 카드가 나옵니다!
             return (
               <div key={postId} className="bg-white rounded-2xl p-5 border border-border shadow-sm transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 mb-3 min-[380px]:flex-row min-[380px]:items-start min-[380px]:justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-[#FCF0F4]">👤</div>
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         <span className="text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: item.role === "pregnant" || item.role === "PREGNANT" ? "rgba(201,78,112,0.1)" : "rgba(123,104,181,0.1)", color: item.role === "pregnant" || item.role === "PREGNANT" ? "#C94E70" : "#7B68B5" }}>
                           {item.role === "pregnant" || item.role === "PREGNANT" ? "임산부" : "보호자"}
                         </span>
-                        <p className="text-sm font-bold text-foreground">{item.author || "익명"}</p>
+                        <p className="text-sm font-bold text-foreground truncate">{item.author || "익명"}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(120,201,160,0.1)", color: "#78C9A0" }}>
                           {normalizePregnancyPeriod(item.pregnancy_period)}
                         </span>
@@ -198,9 +199,9 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
                   </div>
                   {/* 🚀 게시글 삭제 버튼 (게시글의 작성자 == 로그인한 유저일 때만 뜸) */}
                   {userId === item.user_id && (
-                    <div className="flex gap-1">
-                      <button onClick={() => { setEditingPostId(postId); setEditPostTitle(item.title || ""); setEditPostContent(item.content || ""); }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-[#69B98D] hover:bg-green-50"><Pencil size={14} /> 수정</button>
-                      <button onClick={() => deletePost(postId)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 size={14} /> 삭제</button>
+                    <div className="flex gap-1 self-end min-[380px]:self-start shrink-0">
+                      <button onClick={() => { setEditingPostId(postId); setEditPostTitle(item.title || ""); setEditPostContent(item.content || ""); }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-[#69B98D] hover:bg-green-50 whitespace-nowrap"><Pencil size={14} /> 수정</button>
+                      <button onClick={() => deletePost(postId)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors whitespace-nowrap"><Trash2 size={14} /> 삭제</button>
                     </div>
                   )}
                 </div>
@@ -286,6 +287,7 @@ export default function MyCommunityView({ userId, initialTab, onClose }: MyCommu
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

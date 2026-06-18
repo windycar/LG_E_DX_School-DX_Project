@@ -445,8 +445,8 @@ export default function ApplianceControlView({
       </div>
 
       {selectedAppliance && (
-        <div className="fixed inset-0 bg-black/50 flex items-end z-50" onClick={() => setSelectedAppliance(null)}>
-          <div className="bg-background rounded-t-3xl p-5 w-full max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={() => setSelectedAppliance(null)}>
+          <div className="bg-background rounded-t-3xl p-5 w-full max-w-[430px] max-h-[78vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-foreground">
                 {APPLIANCE_LIST.find((a) => a.key === selectedAppliance)?.name} 설정
@@ -472,7 +472,7 @@ export default function ApplianceControlView({
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground mb-2">색상</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
                     {MOOD_LIGHT_PRESETS.map((preset) => (
                       <button
                         key={preset.name}
