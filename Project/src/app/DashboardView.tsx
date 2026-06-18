@@ -316,6 +316,7 @@ export default function DashboardView({
   const weeklyTip = getWeeklyTip(currentWeek);
   const dailyBenefit = getDailyBenefit(currentWeek);
   const [tipSlide, setTipSlide] = useState(0);
+  const [backendGuardianMission, setBackendGuardianMission] = useState<any>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -324,42 +325,164 @@ export default function DashboardView({
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (isPregnant || !userId) return;
+    fetch(apiUrl(`/api/guardian/missions/today/${userId}`))
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.status === "Success" && data.mission) {
+          setBackendGuardianMission(data.mission);
+        } else {
+          setBackendGuardianMission(null);
+        }
+      })
+      .catch((error) => console.error("보호자 대시보드 미션 조회 실패:", error));
+  }, [isPregnant, userId, partnerStatus?.timestamp]);
+
   const getMissionFromStatus = (status: PartnerStatus | null) => {
     if (!status) return null;
-    const { symptoms, emotions, stress } = status;
+    const { emotions, stress = 0 } = status;
+    const symptoms = (status.symptoms || []).filter((symptom) => symptom !== "없음");
+    const hasSymptom = (targets: string[]) => targets.some((target) => symptoms.includes(target));
 
     if (symptoms.length === 0 && emotions.length === 0 && stress <= 3) {
-      return { type: "good" as const, icon: "😊", message: "아내가 오늘 기분이 좋아요!", subtitle: "함께 행복한 시간을 보내세요 💕", color: "#69C99A" };
+      return { type: "good" as const, icon: "😊", message: "오늘 컨디션 최고!", subtitle: "함께 동네 산책하기", color: "#69C99A" };
     }
 
-    const missionMap: Record<string, { icon: string; message: string; subtitle: string }> = {
-      "두통": { icon: "💊", message: "아내가 두통이 있어요", subtitle: "조용한 환경을 만들어주고 빨래를 대신 해주세요" },
-      "입덧": { icon: "🍵", message: "아내가 입덧으로 힘들어해요", subtitle: "생강차를 준비해주고 환기를 시켜주세요" },
-      "붓기": { icon: "🦶", message: "아내가 붓기로 불편해해요", subtitle: "발 마사지를 해주고 다리를 높이 올려 쉬도록 해주세요" },
-      "피로감": { icon: "😴", message: "아내가 피곤해하고 있어요", subtitle: "집안일을 대신하고 충분히 쉴 수 있게 해주세요" },
-      "허리통증": { icon: "💆", message: "아내가 허리 통증이 있어요", subtitle: "부드럽게 마사지해주고 무거운 물건을 들지 않게 도와주세요" },
-      "수면장애": { icon: "🌙", message: "아내가 잠을 잘 못 자고 있어요", subtitle: "조명을 어둡게 하고 편안한 환경을 만들어주세요" },
-      "소화불량": { icon: "🍽️", message: "아내가 소화불량이에요", subtitle: "가벼운 식사를 준비하고 식후 산책을 함께 해주세요" },
-    };
-
-    for (const symptom of symptoms) {
-      if (missionMap[symptom]) {
-        return { type: "mission" as const, icon: missionMap[symptom].icon, message: missionMap[symptom].message, subtitle: missionMap[symptom].subtitle, color: "#FFAB76" };
-      }
+    if (hasSymptom(["가슴통증", "배뇨통", "질분비물"])) {
+      return { type: "mission" as const, icon: "🚨", message: "주의 신호를 함께 확인해주세요", subtitle: "증상 시간 기록하고 병원 문의 준비하기", color: "#E53935" };
     }
 
-    if (emotions.includes("스트레스") || emotions.includes("불안") || emotions.includes("우울감")) {
-      return { type: "mission" as const, icon: "💙", message: "아내가 감정적으로 힘든 시간이에요", subtitle: "대화를 나누고 따뜻하게 안아주세요", color: "#9B8EC4" };
+    if (hasSymptom(["입덧", "소화불량", "역류 증상", "변비"])) {
+      return { type: "mission" as const, icon: "🍵", message: "속이 불편한 아내를 위해", subtitle: "따뜻한 물과 부담 없는 간식 준비하기", color: "#FFAB76" };
+    }
+
+    if (hasSymptom(["두통", "허리통증", "골반통", "좌골신경통", "다리경련", "손발저림"])) {
+      return { type: "mission" as const, icon: "💆", message: "통증 부담을 줄여주세요", subtitle: "무거운 일 대신하고 편한 자세 도와주기", color: "#4D8AF0" };
+    }
+
+    if (hasSymptom(["피로감", "어지러움", "빈혈", "붓기", "정맥류", "치질"])) {
+      return { type: "mission" as const, icon: "😴", message: "몸이 무거운 아내를 위해", subtitle: "집안일 대신하고 다리 올려 쉬게 돕기", color: "#4D8AF0" };
+    }
+
+    if (hasSymptom(["수면장애", "코막힘", "코피", "잇몸출혈"])) {
+      return { type: "mission" as const, icon: "🌙", message: "편안한 휴식 환경을 만들어주세요", subtitle: "침실 조명 낮추고 실내 습도 확인하기", color: "#7E57C2" };
+    }
+
+    if (hasSymptom(["요실금"])) {
+      return { type: "mission" as const, icon: "🚻", message: "생활 동선을 편하게 챙겨주세요", subtitle: "외출 전 화장실 위치와 휴식 동선 챙기기", color: "#26A69A" };
+    }
+
+    if (emotions.includes("스트레스") || emotions.includes("불안") || emotions.includes("우울") || emotions.includes("우울감")) {
+      return { type: "mission" as const, icon: "💙", message: "지친 마음을 안아주세요", subtitle: "아내의 이야기 공감하며 듣기", color: "#9B8EC4" };
     }
 
     if (stress >= 7) {
-      return { type: "mission" as const, icon: "🧘", message: "아내의 스트레스 지수가 높아요", subtitle: "함께 산책하거나 좋아하는 음악을 들어주세요", color: "#FFAB76" };
+      return { type: "mission" as const, icon: "🧘", message: "지친 마음을 안아주세요", subtitle: "아내의 이야기 공감하며 듣기", color: "#FFAB76" };
     }
 
-    return { type: "info" as const, icon: "💕", message: "아내의 컨디션을 확인해보세요", subtitle: "작은 관심이 큰 힘이 됩니다", color: "#FFB3C6" };
+    return { type: "info" as const, icon: "💕", message: "오늘 컨디션 최고!", subtitle: "함께 동네 산책하기", color: "#69C99A" };
   };
 
-  const mission = !isPregnant ? getMissionFromStatus(partnerStatus || null) : null;
+  const getMissionStyle = (missionType?: string) => {
+    switch (missionType) {
+      case "warning_care":
+        return { icon: "🚨", color: "#E53935" };
+      case "digestive_care":
+        return { icon: "🍵", color: "#FFAB76" };
+      case "pain_care":
+        return { icon: "💆", color: "#4D8AF0" };
+      case "fatigue_care":
+        return { icon: "😴", color: "#4D8AF0" };
+      case "rest_care":
+        return { icon: "🌙", color: "#7E57C2" };
+      case "urinary_care":
+        return { icon: "🚻", color: "#26A69A" };
+      case "emotional_support":
+        return { icon: "💙", color: "#9B8EC4" };
+      case "positive":
+        return { icon: "😊", color: "#69C99A" };
+      case "physical_care":
+        return { icon: "🍵", color: "#FFAB76" };
+      case "housework":
+        return { icon: "😴", color: "#4D8AF0" };
+      default:
+        return { icon: "🎁", color: "#FFB3C6" };
+    }
+  };
+
+  const getStatusSummary = (status: PartnerStatus | null | undefined) => {
+    if (!status) return null;
+    const symptoms = (status.symptoms || []).filter((symptom) => symptom !== "없음");
+    if (symptoms.length > 0) return symptoms.slice(0, 2).join(", ");
+    if ((status.emotions || []).length > 0) return status.emotions.slice(0, 2).join(", ");
+    return "특이 증상 없음";
+  };
+
+  const getMissionTypeSummary = (missionType?: string) => {
+    switch (missionType) {
+      case "warning_care":
+        return "확인이 필요한 증상";
+      case "digestive_care":
+        return "속 불편감";
+      case "pain_care":
+        return "통증이나 저림";
+      case "fatigue_care":
+        return "피로감";
+      case "rest_care":
+        return "휴식이 필요한 증상";
+      case "urinary_care":
+        return "생활 동선 배려가 필요한 증상";
+      case "emotional_support":
+        return "마음 케어가 필요한 상태";
+      case "positive":
+        return "좋은 컨디션";
+      case "physical_care":
+        return "몸 불편감";
+      case "housework":
+        return "피로감";
+      default:
+        return null;
+    }
+  };
+
+  const localMission = !isPregnant && partnerStatus ? getMissionFromStatus(partnerStatus) : null;
+  const backendStatus = backendGuardianMission?.status_check
+    ? {
+        symptoms: backendGuardianMission.status_check.symptoms || [],
+        emotions: backendGuardianMission.status_check.emotions || [],
+        stress: 0,
+        timestamp: backendGuardianMission.status_check.created_at || "",
+      }
+    : null;
+  const statusSummary = getStatusSummary(partnerStatus) || getStatusSummary(backendStatus) || getMissionTypeSummary(backendGuardianMission?.mission_type);
+  const backendMission = !partnerStatus && backendGuardianMission
+    ? {
+        type: "mission" as const,
+        ...getMissionStyle(backendGuardianMission.mission_type),
+        message: statusSummary ? `오늘은 ${statusSummary}이 있어요` : backendGuardianMission.mission_title || "오늘의 아내 케어 미션",
+        subtitle: backendGuardianMission.mission_content || backendGuardianMission.mission_reason || "",
+      }
+    : null;
+  const mission = localMission || backendMission;
+  const guardianNotice = !isPregnant
+    ? mission
+      ? {
+          ...mission,
+          message: statusSummary
+            ? statusSummary === "특이 증상 없음"
+              ? "오늘은 특이 증상이 없어요"
+              : `오늘은 ${statusSummary}이 있어요`
+            : mission.message,
+        }
+      : {
+        type: "info" as const,
+        icon: "🎁",
+        message: "오늘의 아내 케어 미션",
+        subtitle: "아직 등록된 상태체크 미션이 없습니다",
+        color: "#FFB3C6",
+      }
+    : null;
 
  // 🚀 마이 로드의 기획: 정신 케어 삭제, 상태 체크를 2칸(colSpan: 2)으로 확장
   // 🚀 동적 렌더링: 접속 권한에 따른 메뉴 스와이핑
@@ -420,22 +543,17 @@ export default function DashboardView({
               <p className="text-white/80 text-xs mt-0.5">오늘 컨디션: 보통 💙</p>
             </div>
 
-            {mission && (
-              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3 }} className="rounded-2xl px-5 py-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${mission.color}15, ${mission.color}08)`, border: `2px solid ${mission.color}40` }}>
+            {guardianNotice && (
+              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.3 }} className="rounded-2xl px-5 py-4 shadow-lg" style={{ background: `linear-gradient(135deg, ${guardianNotice.color}15, ${guardianNotice.color}08)`, border: `2px solid ${guardianNotice.color}40` }}>
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0" style={{ background: `${mission.color}20` }}>
-                    {mission.icon}
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0" style={{ background: `${guardianNotice.color}20` }}>
+                    {guardianNotice.icon}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-bold text-foreground">{mission.message}</p>
-                      {mission.type === "mission" && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${mission.color}`, color: "white" }}>
-                          오늘의 미션
-                        </span>
-                      )}
+                      <p className="font-bold text-foreground">{guardianNotice.message}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{mission.subtitle}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{guardianNotice.subtitle}</p>
                   </div>
                 </div>
               </motion.div>

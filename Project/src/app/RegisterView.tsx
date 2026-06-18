@@ -16,7 +16,6 @@ const pregnancyDateMax = toDateInputValue(todayDate);
 const pregnancyMinDate = new Date(todayDate);
 pregnancyMinDate.setDate(pregnancyMinDate.getDate() - 280);
 const pregnancyDateMin = toDateInputValue(pregnancyMinDate);
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterView({ onBack, onSuccess }: { onBack: () => void; onSuccess: (u: AppUser) => void }) {
   const [name, setName] = useState("");
@@ -42,14 +41,6 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
         (role === "pregnant" && !normalizedBabyNickname) ||
         (role === "guardian" && !normalizedInviteCode)) {
       setError("모든 필수 항목을 입력해주세요.");
-      return;
-    }
-    if (!EMAIL_PATTERN.test(normalizedEmail)) {
-      setError("올바른 이메일 형식을 입력해주세요.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("비밀번호는 6자 이상 입력해주세요.");
       return;
     }
     if (password !== passwordConfirm) {
@@ -158,8 +149,8 @@ export default function RegisterView({ onBack, onSuccess }: { onBack: () => void
             <input placeholder="우리아기 태명" maxLength={50} value={babyNickname} onChange={e => setBabyNickname(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
           )}
 
-          <input type="email" placeholder="이메일" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
-          <input type="password" placeholder="비밀번호 (6자 이상)" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input type="text" placeholder="이메일 또는 아이디" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
+          <input type="password" placeholder="비밀번호" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
           <input type="password" placeholder="비밀번호 확인" autoComplete="new-password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-border bg-secondary/40 text-sm focus:border-pink-300 outline-none" />
 
           {/* 🚀 마이 로드의 기획 반영: 친절한 임신 날짜 입력 안내 박스 */}

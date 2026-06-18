@@ -119,10 +119,6 @@ export default function SettingsView({ user, onNavigate, onLogout }: { user: App
       alert("현재 비밀번호와 새 비밀번호를 모두 입력해주세요.");
       return;
     }
-    if (newPassword.length < 6) {
-      alert("새 비밀번호는 6자 이상 입력해주세요.");
-      return;
-    }
     if (newPassword !== newPasswordConfirm) {
       alert("새 비밀번호가 일치하지 않습니다.");
       return;

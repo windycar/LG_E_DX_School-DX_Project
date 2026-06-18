@@ -417,8 +417,7 @@ export default function DiscomfortView({ user, onBack, onNavigate, onStatusUpdat
     setSubmitted(true);
 
     if (onStatusUpdate) {
-      // 🚀 stress 파라미터를 제외하고 넘기도록 수정!
-      onStatusUpdate({ symptoms: selSymptoms, emotions: selEmotions, timestamp: new Date().toISOString() } as any);
+      onStatusUpdate({ symptoms: selSymptoms, emotions: selEmotions, stress: 0, timestamp: new Date().toISOString() });
     }
   };
 

@@ -78,29 +78,109 @@ export default function MissionView({
       };
     }
 
-    const { symptoms, emotions, stress } = partnerStatus;
+    const { symptoms, emotions, stress = 0 } = partnerStatus;
+    const hasSymptom = (targets: string[]) => targets.some((target) => symptoms.includes(target));
+    const pickSymptom = (targets: string[]) => targets.find((target) => symptoms.includes(target));
 
-    if (symptoms.includes("입덧") || symptoms.includes("소화불량")) {
+    const warningSymptom = pickSymptom(["가슴통증", "배뇨통", "질분비물"]);
+    if (warningSymptom) {
+      const actions: Record<string, string> = {
+        가슴통증: "통증 시작 시간 기록하고 병원 연락 기준 확인하기",
+        배뇨통: "수분 섭취 챙기고 배뇨통 지속 여부 기록하기",
+        질분비물: "분비물 색과 냄새 변화 기록하고 진료 문의 준비하기",
+      };
+      return {
+        title: "주의 신호를 함께 확인해주세요",
+        desc: `아내가 ${warningSymptom} 증상을 기록했어요. 증상이 계속되거나 통증, 출혈, 열감이 동반되면 병원 문의를 우선하도록 도와주세요.`,
+        action: actions[warningSymptom],
+        icon: <Heart size={32} className="text-white" />,
+        color: ["#FF8A80", "#E53935"],
+      };
+    }
+
+    const digestiveSymptom = pickSymptom(["입덧", "소화불량", "역류 증상", "변비"]);
+    if (digestiveSymptom) {
+      const actions: Record<string, string> = {
+        입덧: "냄새 강한 음식 치우고 크래커와 따뜻한 물 챙기기",
+        소화불량: "가벼운 식사 준비하고 식후 10분 산책 제안하기",
+        "역류 증상": "식후 바로 눕지 않게 쿠션과 앉을 자리 준비하기",
+        변비: "물과 과일 간식 챙기고 가벼운 움직임 제안하기",
+      };
       return {
         title: "속이 불편한 아내를 위해",
-        desc: "아내가 입덧이나 소화불량으로 힘들어하고 있어요. 실내 공기를 환기하고 따뜻한 차를 준비해주세요.",
-        action: "생강차 타주고 환기하기",
+        desc: `아내가 ${digestiveSymptom} 증상을 기록했어요. 냄새 강한 음식은 피하고, 부담 없는 간식과 따뜻한 물을 챙겨주세요.`,
+        action: actions[digestiveSymptom],
         icon: <Coffee size={32} className="text-white" />,
         color: ["#FFDAA5", "#FFB74D"],
       };
     }
 
-    if (symptoms.includes("허리통증") || symptoms.includes("붓기") || symptoms.includes("피로감")) {
+    const painSymptom = pickSymptom(["두통", "허리통증", "골반통", "좌골신경통", "다리경련", "손발저림"]);
+    if (painSymptom) {
+      const actions: Record<string, string> = {
+        두통: "조명 낮추고 조용히 쉴 수 있는 자리 만들어주기",
+        허리통증: "무거운 일 대신하고 허리 받칠 쿠션 챙기기",
+        골반통: "걷는 거리 줄이고 편히 앉을 자리 먼저 준비하기",
+        좌골신경통: "오래 서 있지 않게 하고 다리 받침 준비하기",
+        다리경련: "종아리 스트레칭 도와주고 따뜻한 물 챙기기",
+        손발저림: "손발을 따뜻하게 하고 편한 자세로 쉬게 돕기",
+      };
       return {
-        title: "몸이 무거운 아내를 위해",
-        desc: "아내가 신체적 피로와 통증을 느끼고 있어요. 오늘은 집안일을 전담하고 다리를 주물러주세요.",
-        action: "15분 다리 마사지 해주기",
+        title: "통증 부담을 줄여주세요",
+        desc: `아내가 ${painSymptom} 증상을 기록했어요. 무리한 움직임을 줄이고 편하게 쉴 수 있는 자세를 도와주세요.`,
+        action: actions[painSymptom],
         icon: <Heart size={32} className="text-white" />,
         color: ["#82B1FF", "#4D8AF0"],
       };
     }
 
-    if (emotions.includes("우울감") || emotions.includes("불안") || stress >= 7) {
+    const fatigueSymptom = pickSymptom(["피로감", "어지러움", "빈혈", "붓기", "정맥류", "치질"]);
+    if (fatigueSymptom) {
+      const actions: Record<string, string> = {
+        피로감: "오늘 집안일 하나 먼저 끝내고 낮잠 시간 확보하기",
+        어지러움: "갑자기 일어나지 않게 돕고 물과 간식 챙기기",
+        빈혈: "철분 챙길 식사 준비하고 무리한 활동 막기",
+        붓기: "다리 올릴 쿠션 준비하고 짠 음식 줄이기",
+        정맥류: "오래 서 있지 않게 하고 다리 휴식 시간 만들기",
+        치질: "화장실 시간을 편하게 쓰도록 배려하고 물 챙기기",
+      };
+      return {
+        title: "몸이 무거운 아내를 위해",
+        desc: `아내가 ${fatigueSymptom} 증상을 기록했어요. 오래 서 있지 않게 돕고 충분히 쉬게 해주세요.`,
+        action: actions[fatigueSymptom],
+        icon: <Heart size={32} className="text-white" />,
+        color: ["#82B1FF", "#4D8AF0"],
+      };
+    }
+
+    const restSymptom = pickSymptom(["수면장애", "코막힘", "코피", "잇몸출혈"]);
+    if (restSymptom) {
+      const actions: Record<string, string> = {
+        수면장애: "침실 조명 낮추고 잠들기 전 소음 줄이기",
+        코막힘: "실내 습도 확인하고 따뜻한 물 준비하기",
+        코피: "휴지와 물 준비하고 반복 여부 기록 돕기",
+        잇몸출혈: "부드러운 음식 준비하고 출혈 반복 여부 확인하기",
+      };
+      return {
+        title: "편안한 휴식 환경을 만들어주세요",
+        desc: `아내가 ${restSymptom} 증상을 기록했어요. 침실을 조용히 정리하고 습도와 조명을 편안하게 맞춰주세요.`,
+        action: actions[restSymptom],
+        icon: <Wind size={32} className="text-white" />,
+        color: ["#B39DDB", "#7E57C2"],
+      };
+    }
+
+    if (hasSymptom(["요실금"])) {
+      return {
+        title: "생활 동선을 편하게 챙겨주세요",
+        desc: "아내가 비뇨 관련 불편을 기록했어요. 외출이나 휴식 중 화장실을 편하게 이용할 수 있도록 배려해주세요.",
+        action: "외출 전 화장실 위치와 휴식 동선 챙기기",
+        icon: <Heart size={32} className="text-white" />,
+        color: ["#80CBC4", "#26A69A"],
+      };
+    }
+
+    if (emotions.includes("우울") || emotions.includes("우울감") || emotions.includes("불안") || stress >= 7) {
       return {
         title: "지친 마음을 안아주세요",
         desc: "아내의 스트레스 지수가 높거나 불안감을 느끼고 있어요. 가만히 이야기를 들어주고 안아주세요.",
@@ -122,19 +202,25 @@ export default function MissionView({
 
   useEffect(() => {
     if (!userId) return;
+    if (partnerStatus?.timestamp) setIsCompleted(false);
     fetch(apiUrl(`/api/guardian/missions/today/${userId}`))
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "Success" && data.mission) {
           setBackendMission(data.mission);
-          setIsCompleted(data.mission.execution_status === "COMPLETED");
+          setIsCompleted(partnerStatus?.timestamp ? false : data.mission.execution_status === "COMPLETED");
+        } else {
+          setBackendMission(null);
+          setIsCompleted(false);
         }
       })
       .catch((error) => console.error("오늘의 보호자 미션 조회 실패:", error));
-  }, [userId]);
+  }, [userId, partnerStatus?.timestamp]);
 
   const localMission = getTodayMission();
-  const mission = backendMission
+  const mission = partnerStatus
+    ? localMission
+    : backendMission
     ? {
         title: backendMission.mission_title,
         desc: backendMission.mission_reason || localMission.desc,
